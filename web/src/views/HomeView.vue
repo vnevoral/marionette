@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref } from "vue";
+import { onMounted, ref } from "vue";
 import Button from "primevue/button";
 import Card from "primevue/card";
 import Message from "primevue/message";
@@ -20,16 +20,31 @@ const pending = ref<Record<string, "primary" | "status"> | undefined>({});
 const loading = ref(true);
 const error = ref("");
 
+const defaultFastPollingIntervalSeconds = 10;
+const defaultFastPollingWindowSeconds = 120;
+
+function wait(milliseconds: number) {
+	return new Promise((resolve) => window.setTimeout(resolve, milliseconds));
+}
+
 async function loadDashboard() {
 	loading.value = true;
 	error.value = "";
 	try {
 		const loadedCards = await listCards();
-		const loadedStatuses = await Promise.all(
-			loadedCards.map(async (card) => [card.id, await getStatus(card.id)] as const),
-		);
 		cards.value = loadedCards;
-		statuses.value = Object.fromEntries(loadedStatuses);
+		const loadedStatuses = await Promise.all(
+			loadedCards.map(async (card) => {
+				try {
+					return [card.id, await getStatus(card.id)] as const;
+				} catch {
+					return [card.id, undefined] as const;
+				}
+			}),
+		);
+		statuses.value = Object.fromEntries(
+			loadedStatuses.filter((entry): entry is [string, StatusSnapshot] => entry[1] !== undefined),
+		);
 	} catch (loadError) {
 		error.value = loadError instanceof Error ? loadError.message : "Unable to load dashboard";
 	} finally {
@@ -37,14 +52,35 @@ async function loadDashboard() {
 	}
 }
 
+async function waitForStatusUpdate(card: ActionCard, previousCheckedAt?: string) {
+	if (!card.status) return;
+
+	const intervalMilliseconds =
+		(card.fastPollingIntervalSeconds || defaultFastPollingIntervalSeconds) * 1000;
+	const deadline =
+		Date.now() + (card.fastPollingWindowSeconds || defaultFastPollingWindowSeconds) * 1000;
+
+	while (Date.now() < deadline) {
+		await wait(intervalMilliseconds);
+		try {
+			const snapshot = await getStatus(card.id);
+			statuses.value[card.id] = snapshot;
+			if (snapshot.checkedAt !== previousCheckedAt) return;
+		} catch {
+			return;
+		}
+	}
+}
+
 async function runAction(card: ActionCard, action: "primary" | "status") {
 	if (pending.value?.[card.id]) return;
+	const previousCheckedAt = statuses.value[card.id]?.checkedAt;
 	pending.value = { ...pending.value, [card.id]: action };
 	error.value = "";
 	try {
 		if (action === "primary") await enqueuePrimary(card.id);
 		else await enqueueStatus(card.id);
-		statuses.value[card.id] = await getStatus(card.id);
+		if (card.status) await waitForStatusUpdate(card, previousCheckedAt);
 	} catch (actionError) {
 		error.value = actionError instanceof Error ? actionError.message : "Unable to queue action";
 	} finally {
@@ -53,6 +89,8 @@ async function runAction(card: ActionCard, action: "primary" | "status") {
 		pending.value = nextPending;
 	}
 }
+
+onMounted(loadDashboard);
 
 function stateLabel(card: ActionCard) {
 	return pending.value?.[card.id] ? "Running" : (statuses.value[card.id]?.state ?? "unknown");
