@@ -18,7 +18,7 @@ uloží do `docs/plans/blocks/NNNN-nazev.md`. Blok se implementuje promptem
 | 2    | Doménový model + config store (in-memory + JSON perzistence)                                 | **Hotovo**                                       | FR-10..14, FR-30..33, ADR-0004 |
 | 3    | Execution engine (bezpečné spouštění akcí na hostu)                                          | **Hotovo**                                       | FR-11, FR-13, NFR-01, NFR-04   |
 | 4    | Status/health-check engine (vč. volitelného pollingu)                                        | **Hotovo**                                       | FR-12, FR-15, FR-16, FR-17     |
-| 5    | REST API (CRUD karet/akcí, spuštění, čtení stavu)                                            | Plánováno                                        | FR-40, FR-41                   |
+| 5    | REST API (CRUD karet/akcí, spuštění, čtení stavu)                                            | **Probíhá** (0010–0012 návrh)                    | FR-40, FR-41                   |
 | 6    | Dashboard UI (karty, stavové indikátory, formuláře správy)                                   | Plánováno                                        | FR-20..23                      |
 | 7    | Balíčkování a nasazení (systemd unit, install skript, arm64 release)                         | Plánováno                                        | FR-02..04, NFR-02              |
 | 8    | Zpevnění (auth/access control, logování, chybové stavy, testy, dokumentace)                  | Plánováno                                        | NFR-01, NFR-04..06             |
@@ -53,6 +53,14 @@ uloží do `docs/plans/blocks/NNNN-nazev.md`. Blok se implementuje promptem
   - [0007 — Status projekce a transition historie](blocks/0007-status-projection.md)
   - [0008 — Status check service](blocks/0008-status-check-service.md)
   - [0009 — Standardní a zrychlený polling scheduler](blocks/0009-polling-scheduler.md)
+
+- Fáze 5 je rozpracována do návrhů bloků 0010–0012 v pořadí:
+  - [0010 — REST API kontrakt a HTTP transport](blocks/0010-rest-api-transport.md)
+  - [0011 — Orchestrace primární a status akce](blocks/0011-action-orchestration.md)
+  - [0012 — Kompozice aplikace, reconcile a lifecycle](blocks/0012-application-composition-lifecycle.md)
+
+  Všechny bloky jsou zatím ve stavu **Návrh** a čekají na schválení před
+  implementací.
 
 - Bloky uvnitř fáze by měly být dost malé na jednu implementační relaci s AI
   agentem (řádově hodiny práce, ne dny) a musí mít jasné kritérium hotovosti

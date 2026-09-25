@@ -2,7 +2,8 @@
 
 > Stav: **zpřesněno** (fáze 1, 2026-09-25; doplněno o dva polling intervaly a
 > vynucenou terminaci akcí, 2026-09-25; doplněno o perzistenci historie běhů
-> při řízeném ukončení, 2026-09-25). Otevřené otázky z v0.1 byly rozhodnuty
+> při řízeném ukončení, 2026-09-25; řízení status akcí interním schedulerem,
+> 2026-09-25). Otevřené otázky z v0.1 byly rozhodnuty
 > s vlastníkem projektu, viz [Rozhodnutí fáze 1](#7-rozhodnutí-fáze-1),
 > [Rozhodnutí — polling a terminace](#9-rozhodnutí-polling-a-terminace-2026-09-25)
 > a [Rozhodnutí — perzistence historie při vypnutí](#11-rozhodnutí-perzistence-historie-při-vypnutí-2026-09-25).
@@ -62,10 +63,14 @@ spustitelný soubor.
   neúspěch) a volitelně dalším pravidlem porovnávajícím zachycený výstup proti
   regulárnímu výrazu (např. „musí obsahovat“ / „nesmí obsahovat“). Pravidlo na
   výstup je nepovinné rozšíření nad rámec exit kódu.
-- **FR-15**: Status akce se dá spustit ručně (tlačítko „ověřit stav“) a
-  volitelně automaticky v nastaveném **standardním polling intervalu**, per
-  karta. Výchozí standardní interval je **60 s**; polling lze pro danou
-  kartu i zcela vypnout (jen ruční ověření). Standardní polling je
+- **FR-15** _(aktualizováno 2026-09-25)_: Status akce se může vyvolat ručně
+  přes API, ale stejně jako primární akce pouze asynchronně: API potvrdí její
+  zařazení ke spuštění a nečeká na její dokončení. Status akci také volitelně
+  automaticky spouštějí interní background procesy, především scheduler, v
+  nastaveném **standardním polling intervalu**, per karta. API čtení statusu je
+  oddělená synchronní read-only operace, která vždy vrací poslední známou
+  status projekci a status akci nespouští. Výchozí standardní interval je
+  **60 s**; polling lze pro danou kartu zcela vypnout. Standardní polling je
   předpoklad pro FR-15a (zrychlený polling) — bez zapnutého standardního
   pollingu se zrychlený polling neaktivuje.
 - **FR-15a**: Bezprostředně po vyvolání **primární akce** karty (ruční nebo
