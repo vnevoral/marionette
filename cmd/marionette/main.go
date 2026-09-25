@@ -32,6 +32,8 @@ func main() {
 	store.OnChange = func(changedStore *config.Store) error {
 		return changedStore.SaveFile(configPath)
 	}
+	statusEvents := server.NewStatusEventBroker()
+	store.OnStatusChange = statusEvents.Publish
 
 	executor := execengine.NewExecutor()
 	runner, err := execengine.NewRunner(store.GetSettings(), executor)
@@ -62,10 +64,11 @@ func main() {
 	}
 
 	handler := server.NewRequestTracker(server.NewRouterWithDependencies(server.RouterDependencies{
-		Store:      store,
-		Actions:    backgroundActions,
-		Notifier:   scheduler,
-		Reconciler: scheduler,
+		Store:        store,
+		Actions:      backgroundActions,
+		Notifier:     scheduler,
+		Reconciler:   scheduler,
+		StatusEvents: statusEvents,
 	}))
 	srv := &http.Server{
 		Addr:              addr,

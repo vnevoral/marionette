@@ -41,6 +41,10 @@ type Store struct {
 	// OnChange is called after a successful configuration mutation. It is not
 	// called for AppendRun because run history is saved only at shutdown.
 	OnChange func(*Store) error
+
+	// OnStatusChange is called after a status transition is stored. It runs
+	// outside the store lock and is intended for transient runtime consumers.
+	OnStatusChange func(string, StatusSnapshot)
 }
 
 // NewStore creates an empty store. Invalid settings are replaced with the
@@ -261,14 +265,15 @@ func (store *Store) UpdateStatus(cardID string, snapshot StatusSnapshot) error {
 	}
 
 	store.mu.Lock()
-	defer store.mu.Unlock()
 	if _, exists := store.cards[cardID]; !exists {
+		store.mu.Unlock()
 		return ErrNotFound
 	}
 
 	previous, exists := store.statuses[cardID]
 	if exists && previous.State == snapshot.State {
 		store.statuses[cardID] = cloneStatusSnapshot(snapshot)
+		store.mu.Unlock()
 		return nil
 	}
 
@@ -276,6 +281,7 @@ func (store *Store) UpdateStatus(cardID string, snapshot StatusSnapshot) error {
 	if len(changes) > 0 {
 		last := &changes[0]
 		if snapshot.CheckedAt.Before(last.StartedAt) {
+			store.mu.Unlock()
 			return fmt.Errorf("status check time precedes current status change")
 		}
 		endedAt := snapshot.CheckedAt
@@ -285,6 +291,11 @@ func (store *Store) UpdateStatus(cardID string, snapshot StatusSnapshot) error {
 	change := StatusChange{State: snapshot.State, StartedAt: snapshot.CheckedAt}
 	store.statusHistory[cardID] = trimStatusChanges(append([]StatusChange{change}, changes...), store.settings.HistorySize)
 	store.statuses[cardID] = cloneStatusSnapshot(snapshot)
+	onStatusChange := store.OnStatusChange
+	store.mu.Unlock()
+	if onStatusChange != nil {
+		onStatusChange(cardID, cloneStatusSnapshot(snapshot))
+	}
 	return nil
 }
 

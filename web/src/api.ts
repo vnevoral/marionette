@@ -51,6 +51,11 @@ export interface StatusSnapshot {
 	lastCheck: Run;
 }
 
+export interface StatusEvent {
+	cardId: string;
+	snapshot: StatusSnapshot;
+}
+
 async function request<T>(path: string, options?: RequestInit): Promise<T> {
 	const response = await fetch(path, {
 		headers: { Accept: "application/json", ...options?.headers },
@@ -123,6 +128,22 @@ export interface StatusChange {
 
 export function getStatusHistory(cardID: string): Promise<StatusChange[]> {
 	return request<StatusChange[]>(`/api/cards/${encodeURIComponent(cardID)}/status/history`);
+}
+
+export function connectStatusEvents(
+	onStatusChange: (event: StatusEvent) => void,
+): EventSource | undefined {
+	if (typeof EventSource === "undefined") return undefined;
+	const source = new EventSource("/api/events");
+	source.addEventListener("status.changed", (event) => {
+		if (!(event instanceof MessageEvent)) return;
+		try {
+			onStatusChange(JSON.parse(event.data) as StatusEvent);
+		} catch {
+			// Ignore malformed transient events; REST polling remains available.
+		}
+	});
+	return source;
 }
 
 export function enqueuePrimary(cardID: string): Promise<void> {

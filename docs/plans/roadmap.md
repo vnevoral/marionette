@@ -23,7 +23,7 @@ uloží do `docs/plans/blocks/NNNN-nazev.md`. Blok se implementuje promptem
 | 7    | Balíčkování a nasazení (systemd unit, install skript, arm64 release)                         | Plánováno                                        | FR-02..04, NFR-02              |
 | 8    | Zpevnění (auth/access control, logování, chybové stavy, testy, dokumentace)                  | Plánováno                                        | NFR-01, NFR-04..06             |
 | 9    | UX redesign a sdílený design systém                                                          | **Probíhá** (UX-05)                              | FR-24..29, NFR-08..10          |
-| 10   | Realtime doručování statusů přes SSE                                                         | Plánováno                                        | FR-42, NFR-11                  |
+| 10   | Realtime doručování statusů přes SSE                                                         | **Probíhá** (0022)                               | FR-42, NFR-11                  |
 
 ## Poznámky k plánování
 

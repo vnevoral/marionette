@@ -397,3 +397,34 @@ func TestStoreStatusHistoryTrimsWithSettings(t *testing.T) {
 		t.Fatalf("trimmed status changes = %#v, error = %v", changes, err)
 	}
 }
+
+func TestStoreStatusChangeCallbackOnlyRunsForTransitions(t *testing.T) {
+	store := NewStore(validSettings())
+	card, err := store.CreateCard(validCard())
+	if err != nil {
+		t.Fatalf("CreateCard() error = %v", err)
+	}
+	callbacks := make(chan StatusState, 2)
+	store.OnStatusChange = func(_ string, snapshot StatusSnapshot) {
+		callbacks <- snapshot.State
+	}
+	checkedAt := time.Date(2026, time.September, 25, 12, 0, 0, 0, time.UTC)
+	for _, state := range []StatusState{StatusStateOK, StatusStateOK, StatusStateFail} {
+		if err := store.UpdateStatus(card.ID, StatusSnapshot{State: state, CheckedAt: checkedAt}); err != nil {
+			t.Fatalf("UpdateStatus(%q) error = %v", state, err)
+		}
+		checkedAt = checkedAt.Add(time.Second)
+	}
+
+	if first := <-callbacks; first != StatusStateOK {
+		t.Fatalf("first callback state = %q", first)
+	}
+	if second := <-callbacks; second != StatusStateFail {
+		t.Fatalf("second callback state = %q", second)
+	}
+	select {
+	case extra := <-callbacks:
+		t.Fatalf("unexpected extra callback state = %q", extra)
+	default:
+	}
+}

@@ -11,7 +11,9 @@ import {
 	getStatus,
 	listCards,
 	type ActionCard,
+	connectStatusEvents,
 	type StatusSnapshot,
+	type StatusEvent,
 } from "@/api";
 import StatusBadge from "@/components/StatusBadge.vue";
 
@@ -32,6 +34,7 @@ const defaultFastPollingIntervalSeconds = 10;
 const defaultFastPollingWindowSeconds = 120;
 let statusRefreshGeneration = 0;
 let statusPollTimer: number | undefined;
+let statusEventSource: EventSource | undefined;
 
 const healthyCount = computed(
 	() => cards.value.filter((card) => statuses.value[card.id]?.state === "ok").length,
@@ -39,6 +42,19 @@ const healthyCount = computed(
 
 function wait(milliseconds: number) {
 	return new Promise((resolve) => window.setTimeout(resolve, milliseconds));
+}
+
+function startStatusPolling() {
+	if (statusPollTimer !== undefined) return;
+	statusPollTimer = window.setInterval(() => {
+		if (cards.value.length) void refreshStatuses(cards.value);
+	}, 5000);
+}
+
+function stopStatusPolling() {
+	if (statusPollTimer === undefined) return;
+	window.clearInterval(statusPollTimer);
+	statusPollTimer = undefined;
 }
 
 async function loadDashboard() {
@@ -81,6 +97,24 @@ async function refreshStatuses(cardsToRefresh: ActionCard[]) {
 		if (snapshot) statuses.value[cardID] = snapshot;
 		statusErrors.value[cardID] = failed;
 	}
+}
+
+function applyStatusEvent(event: StatusEvent) {
+	if (!cards.value.some((card) => card.id === event.cardId)) return;
+	statusRefreshGeneration++;
+	statuses.value[event.cardId] = event.snapshot;
+	statusErrors.value[event.cardId] = false;
+}
+
+function connectLiveStatusEvents() {
+	const source = connectStatusEvents(applyStatusEvent);
+	if (!source) {
+		startStatusPolling();
+		return;
+	}
+	statusEventSource = source;
+	source.addEventListener("open", stopStatusPolling);
+	source.addEventListener("error", startStatusPolling);
 }
 
 async function waitForStatusUpdate(card: ActionCard, previousCheckedAt?: string) {
@@ -180,13 +214,14 @@ function requestLabel(cardID: string) {
 
 onMounted(() => {
 	void loadDashboard();
-	statusPollTimer = window.setInterval(() => {
-		if (cards.value.length) void refreshStatuses(cards.value);
-	}, 5000);
+	startStatusPolling();
+	connectLiveStatusEvents();
 });
 
 onUnmounted(() => {
-	if (statusPollTimer !== undefined) window.clearInterval(statusPollTimer);
+	stopStatusPolling();
+	statusEventSource?.close();
+	statusEventSource = undefined;
 });
 </script>
 

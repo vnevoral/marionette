@@ -3,7 +3,7 @@
 - **Fáze**: 10 — Realtime status delivery
 - **Vazba na požadavky**: FR-20, FR-27, FR-40, FR-42, NFR-03, NFR-06, NFR-11
 - **Vazba na ADR**: ADR-0008 (SSE status event stream)
-- **Stav**: Schváleno
+- **Stav**: Probíhá
 - **Závislosti**: FR-42/NFR-11, existující status projection a scheduler (bloky 0007–0009), REST API (bloky 0010–0012), Dashboard (blok 0013)
 
 ## Cíl bloku

@@ -19,10 +19,11 @@ const maxJSONBodyBytes = 1 << 20
 
 // RouterDependencies contains application services used by API routes.
 type RouterDependencies struct {
-	Store      *config.Store
-	Actions    ActionQueue
-	Notifier   PrimaryActionNotifier
-	Reconciler CardReconciler
+	Store        *config.Store
+	Actions      ActionQueue
+	Notifier     PrimaryActionNotifier
+	Reconciler   CardReconciler
+	StatusEvents *StatusEventBroker
 }
 
 // NewRouter builds the top-level HTTP handler for the application. A store
@@ -41,11 +42,16 @@ func NewRouterWithDependencies(dependencies RouterDependencies) http.Handler {
 
 	mux.HandleFunc("GET /api/health", handleHealth)
 	if dependencies.Store != nil {
+		statusEvents := dependencies.StatusEvents
+		if statusEvents == nil {
+			statusEvents = NewStatusEventBroker()
+		}
 		handler := cardAPI{
-			store:      dependencies.Store,
-			actions:    dependencies.Actions,
-			notifier:   dependencies.Notifier,
-			reconciler: dependencies.Reconciler,
+			store:        dependencies.Store,
+			actions:      dependencies.Actions,
+			notifier:     dependencies.Notifier,
+			reconciler:   dependencies.Reconciler,
+			statusEvents: statusEvents,
 		}
 		mux.HandleFunc("GET /api/cards", handler.listCards)
 		mux.HandleFunc("POST /api/cards", handler.createCard)
@@ -55,6 +61,7 @@ func NewRouterWithDependencies(dependencies RouterDependencies) http.Handler {
 		mux.HandleFunc("GET /api/cards/{id}/runs", handler.getRuns)
 		mux.HandleFunc("GET /api/cards/{id}/status", handler.getStatus)
 		mux.HandleFunc("GET /api/cards/{id}/status/history", handler.getStatusHistory)
+		mux.HandleFunc("GET /api/events", handler.events)
 		if dependencies.Actions != nil {
 			mux.HandleFunc("POST /api/cards/{id}/actions/primary", handler.enqueuePrimary)
 			mux.HandleFunc("POST /api/cards/{id}/actions/status/check", handler.enqueueStatus)
@@ -67,10 +74,11 @@ func NewRouterWithDependencies(dependencies RouterDependencies) http.Handler {
 }
 
 type cardAPI struct {
-	store      *config.Store
-	actions    ActionQueue
-	notifier   PrimaryActionNotifier
-	reconciler CardReconciler
+	store        *config.Store
+	actions      ActionQueue
+	notifier     PrimaryActionNotifier
+	reconciler   CardReconciler
+	statusEvents *StatusEventBroker
 }
 
 type cardView struct {
