@@ -137,12 +137,25 @@ func waitForTimer(t *testing.T, clock *fakeClock) {
 	}
 }
 
+func waitForInitialCheck(t *testing.T, checker *fakeChecker, cardID string) {
+	t.Helper()
+	select {
+	case checkedID := <-checker.calls:
+		if checkedID != cardID {
+			t.Fatalf("initially checked card = %q, want %q", checkedID, cardID)
+		}
+	case <-time.After(time.Second):
+		t.Fatal("initial status check did not run")
+	}
+}
+
 func TestSchedulerRunsStandardPolling(t *testing.T) {
 	scheduler, clock, checker, cancel := newTestScheduler(t, "standard", 10, 2, 5)
 	defer cancel()
 	defer scheduler.Stop()
 	waitForTimer(t, clock)
 	<-clock.durations
+	waitForInitialCheck(t, checker, "standard")
 	clock.Advance(9 * time.Second)
 	select {
 	case <-checker.calls:
@@ -166,6 +179,7 @@ func TestSchedulerUsesFastPollingAndReturnsToStandard(t *testing.T) {
 	defer scheduler.Stop()
 	waitForTimer(t, clock)
 	<-clock.durations
+	waitForInitialCheck(t, checker, "fast")
 	if err := scheduler.NotifyPrimaryAction("fast"); err != nil {
 		t.Fatalf("NotifyPrimaryAction() error = %v", err)
 	}
@@ -215,6 +229,7 @@ func TestSchedulerStopCancelsPolling(t *testing.T) {
 	defer cancel()
 	waitForTimer(t, clock)
 	<-clock.durations
+	waitForInitialCheck(t, checker, "stoppable")
 	if err := scheduler.Stop(); err != nil {
 		t.Fatalf("Stop() error = %v", err)
 	}
@@ -249,6 +264,7 @@ func TestSchedulerReconcileAddsRestartsAndRemovesWorkers(t *testing.T) {
 	if duration := <-clock.durations; duration != 10*time.Second {
 		t.Fatalf("initial timer duration = %v", duration)
 	}
+	waitForInitialCheck(t, checker, "reconcile")
 
 	card, ok := store.GetCard("reconcile")
 	if !ok {
@@ -264,6 +280,7 @@ func TestSchedulerReconcileAddsRestartsAndRemovesWorkers(t *testing.T) {
 	if duration := <-clock.durations; duration != 4*time.Second {
 		t.Fatalf("restarted timer duration = %v", duration)
 	}
+	waitForInitialCheck(t, checker, "reconcile")
 
 	if err := store.DeleteCard(card.ID); err != nil {
 		t.Fatalf("DeleteCard() error = %v", err)
@@ -283,10 +300,11 @@ func TestSchedulerReconcileAddsRestartsAndRemovesWorkers(t *testing.T) {
 }
 
 func TestSchedulerRestartClearsFastPollingWindow(t *testing.T) {
-	scheduler, clock, _, cancel := newTestScheduler(t, "restart", 10, 2, 30)
+	scheduler, clock, checker, cancel := newTestScheduler(t, "restart", 10, 2, 30)
 	defer cancel()
 	waitForTimer(t, clock)
 	<-clock.durations
+	waitForInitialCheck(t, checker, "restart")
 	if err := scheduler.NotifyPrimaryAction("restart"); err != nil {
 		t.Fatalf("NotifyPrimaryAction() error = %v", err)
 	}
@@ -303,6 +321,7 @@ func TestSchedulerRestartClearsFastPollingWindow(t *testing.T) {
 	if duration := <-clock.durations; duration != 10*time.Second {
 		t.Fatalf("restart timer duration = %v, want standard interval", duration)
 	}
+	waitForInitialCheck(t, checker, "restart")
 	if err := scheduler.Stop(); err != nil {
 		t.Fatalf("final Stop() error = %v", err)
 	}

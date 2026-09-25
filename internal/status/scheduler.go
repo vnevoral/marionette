@@ -220,6 +220,7 @@ func (scheduler *Scheduler) runWorker(ctx context.Context, cardID string, worker
 	if !exists || card.PollingIntervalSeconds <= 0 || card.Status == nil {
 		return
 	}
+	_, _ = scheduler.checker.CheckNow(cardID)
 	timer := scheduler.clock.NewTimer(scheduler.nextInterval(card))
 	defer timer.Stop()
 

@@ -132,6 +132,14 @@ async function runAction(card: ActionCard, action: ActionKind) {
 }
 
 function statusView(card: ActionCard) {
+	if (!card.status) {
+		return {
+			label: "No status check",
+			icon: "pi pi-minus-circle",
+			severity: "secondary",
+			tone: "unknown",
+		};
+	}
 	const request = requests.value[card.id];
 	if (request?.state === "queued" || request?.state === "running") {
 		return {
