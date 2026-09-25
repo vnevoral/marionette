@@ -1,0 +1,22 @@
+{
+	"version": "0.2.0",
+	"configurations": [
+		{
+			"name": "Marionette: backend",
+			"type": "go",
+			"request": "launch",
+			"mode": "auto",
+			"program": "${workspaceFolder}/cmd/marionette",
+			"preLaunchTask": "Marionette: build UI",
+			"env": {
+				"MARIONETTE_ADDR": ":8080",
+				"MARIONETTE_CONFIG": "${workspaceFolder}/.vscode/marionette.dev.json"
+			},
+			"serverReadyAction": {
+				"action": "openExternally",
+				"pattern": "marionette listening on :([0-9]+)",
+				"uriFormat": "http://localhost:%s"
+			}
+		}
+	]
+}
