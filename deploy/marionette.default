@@ -1,0 +1,3 @@
+# Marionette service configuration.
+MARIONETTE_CONFIG=/var/lib/marionette/marionette.json
+MARIONETTE_ADDR=:8080

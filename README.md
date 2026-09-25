@@ -31,6 +31,30 @@ make build-arm64   # cross-compiles for Raspberry Pi (Ubuntu, linux/arm64)
 The resulting binary in `bin/` serves the UI and API from a single process —
 no separate web server or Node runtime is needed on the Raspberry Pi.
 
+## Installation on Linux with systemd
+
+Create the ARM64 release archive on a build host:
+
+```bash
+make release-arm64
+```
+
+Copy `bin/marionette-linux-arm64.tar.gz` to the target Linux host, extract it,
+and run the installer as root:
+
+```bash
+tar -xzf marionette-linux-arm64.tar.gz
+sudo ./install.sh ./marionette-linux-arm64
+```
+
+The installer creates the `marionette` service account, preserves an existing
+`/var/lib/marionette/marionette.json`, installs the unit, and starts the
+service. Runtime settings are read from `/etc/default/marionette`.
+
+For an update, run the installer again with the new binary. It keeps the
+existing configuration and restarts the service. To roll back, run the
+installer with the previous binary; configuration data is not removed.
+
 ## Project process & documentation
 
 Development is spec-driven: requirements, architecture decisions (ADRs) and

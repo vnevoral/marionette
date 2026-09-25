@@ -20,7 +20,7 @@ uloží do `docs/plans/blocks/NNNN-nazev.md`. Blok se implementuje promptem
 | 4    | Status/health-check engine (vč. volitelného pollingu)                                        | **Hotovo**                                       | FR-12, FR-15, FR-16, FR-17     |
 | 5    | REST API (CRUD karet/akcí, spuštění, čtení stavu)                                            | **Hotovo**                                       | FR-40, FR-41                   |
 | 6    | Dashboard UI (karty, stavové indikátory, formuláře správy)                                   | **Hotovo**                                       | FR-20..23                      |
-| 7    | Balíčkování a nasazení (systemd unit, install skript, arm64 release)                         | **Připraven návrh bloku 0023**                   | FR-01..04, NFR-02              |
+| 7    | Balíčkování a nasazení (systemd unit, install skript, arm64 release)                         | **Probíhá** (0023)                               | FR-01..04, NFR-02              |
 | 8    | Zpevnění (auth/access control, logování, chybové stavy, testy, dokumentace)                  | Plánováno                                        | NFR-01, NFR-04..06             |
 | 9    | UX redesign a sdílený design systém                                                          | **Hotovo**                                       | FR-24..29, NFR-08..10          |
 | 10   | Realtime doručování statusů přes SSE                                                         | **Hotovo**                                       | FR-42, NFR-11                  |
@@ -84,11 +84,10 @@ uloží do `docs/plans/blocks/NNNN-nazev.md`. Blok se implementuje promptem
   je přijato a schválený implementační blok je [0022 — SSE: živé změny
   statusů](blocks/0022-sse-status-events.md).
 
-- Fáze 7 je připravena návrhem bloku [0023 — systemd nasazení a release
+- Fáze 7 je rozpracována v bloku [0023 — systemd nasazení a release
   artefakt](blocks/0023-deployment-systemd-release.md) pro obecný Linux se
   systemd; Ubuntu 24.x na Raspberry Pi ARM64 slouží jako referenční validační
-  prostředí. Blok čeká na schválení; do té doby se deployment kód
-  neimplementuje.
+  prostředí.
 
 - Bloky uvnitř fáze by měly být dost malé na jednu implementační relaci s AI
   agentem (řádově hodiny práce, ne dny) a musí mít jasné kritérium hotovosti

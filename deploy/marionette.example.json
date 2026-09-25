@@ -1,0 +1,7 @@
+{
+  "settings": {
+    "historySize": 20,
+    "maxConcurrentActions": 4
+  },
+  "cards": []
+}

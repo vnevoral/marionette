@@ -1,0 +1,23 @@
+[Unit]
+Description=Marionette action card service
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=simple
+User=marionette
+Group=marionette
+WorkingDirectory=/var/lib/marionette
+EnvironmentFile=-/etc/default/marionette
+ExecStart=/usr/local/bin/marionette
+Restart=on-failure
+RestartSec=5s
+UMask=0077
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=read-only
+ReadWritePaths=/var/lib/marionette
+
+[Install]
+WantedBy=multi-user.target

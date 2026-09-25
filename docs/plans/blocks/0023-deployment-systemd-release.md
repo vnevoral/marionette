@@ -3,7 +3,7 @@
 - **Fáze**: 7 — Balíčkování a nasazení
 - **Vazba na požadavky**: FR-01..FR-04, NFR-02
 - **Vazba na ADR**: ADR-0002
-- **Stav**: Návrh
+- **Stav**: Probíhá
 - **Závislosti**: Bloky 0001–0022, existující `make build-arm64`
 
 ## Cílové prostředí
@@ -42,10 +42,10 @@ Mimo rozsah:
 
 ## Schválení
 
-- **Schválil**: čeká
-- **Datum schválení**: čeká
-- **Poznámky k rozhodnutí**: Návrh navazuje na FR-01..04 a existující release
-  proces; implementace smí začít až po schválení tohoto bloku.
+- **Schválil**: projektový vlastník
+- **Datum schválení**: 2026-09-25
+- **Poznámky k rozhodnutí**: Deployment má podporovat obecný Linux se systemd;
+  Ubuntu 24.x na Raspberry Pi ARM64 slouží jako referenční validační prostředí.
 
 ## Návrh řešení
 
@@ -91,6 +91,14 @@ Viz [Definition of Done](../devops/definition-of-done.md) +:
 
 ## Uzavření
 
-- **Stav po implementaci**: čeká
-- **Ověření**: čeká na schválení a implementaci
-- **Dokumentace aktualizována**: návrh bloku a roadmapa
+- **Stav po implementaci**: Probíhá
+- **Ověření**: `make release-arm64`, `go build ./...`, `go vet ./...`,
+  `go test ./... -count=1`, `bash -n deploy/install.sh` a `git diff --check`
+  prošly. Archiv obsahuje binárku, unit, default konfiguraci, JSON šablonu a
+  instalační skript; binárka je ELF64 AArch64 a statická. Staged instalace
+  ověřila idempotenci a zachování existující konfigurace.
+- **Zbývá ověřit**: `systemd-analyze verify`, start/stop/restart, health endpoint
+  a rollback na referenčním Ubuntu 24.x hostu. Devcontainer nástroj
+  `systemd-analyze` neposkytuje.
+- **Dokumentace aktualizována**: README, `docs/devops/ci-cd.md`, requirements,
+  testing strategy a roadmapa.

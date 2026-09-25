@@ -15,13 +15,16 @@ před mergem do hlavní větve.
 
 ## Release proces (cílový stav, viz roadmapa fáze 7)
 
-1. `make build-arm64` vyprodukuje `bin/marionette-linux-arm64`.
-2. Artefakt + `systemd` unit soubor (`deploy/marionette.service`, vznikne ve
-   fázi 7) se nahrají na cílový Linux host; referenční ověření probíhá na
+1. `make release-arm64` vyprodukuje archiv
+   `bin/marionette-linux-arm64.tar.gz` s binárkou a instalačními soubory.
+2. Archiv se nahraje na cílový Linux host; referenční ověření probíhá na
    Raspberry Pi ARM64 s Ubuntu 24.x.
-3. Instalace = zkopírovat binárku (např. do `/opt/marionette/`), nainstalovat
-   systemd unit, `systemctl enable --now marionette`.
-4. Žádný krok nevyžaduje instalaci Go, Node.js ani jiného runtime na cíli.
+3. Po rozbalení se spustí `sudo ./install.sh ./marionette-linux-arm64`.
+   Skript nainstaluje unit, zachová existující konfiguraci a provede
+   `systemctl enable` + start/restart služby.
+4. Aktualizace používá stejný skript s novou binárkou. Rollback používá
+   předchozí binárku a nemaže `/var/lib/marionette/marionette.json`.
+5. Žádný krok nevyžaduje instalaci Go, Node.js ani jiného runtime na cíli.
 
 ## Verzování závislostí
 
