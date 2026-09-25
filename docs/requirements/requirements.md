@@ -1,7 +1,9 @@
-# Požadavky na Marionette (SRS) — v0.2
+# Požadavky na Marionette (SRS) — v0.3
 
-> Stav: **zpřesněno** (fáze 1, 2026-09-25). Otevřené otázky z v0.1 byly
-> rozhodnuty s vlastníkem projektu, viz [Rozhodnutí fáze 1](#7-rozhodnutí-fáze-1).
+> Stav: **zpřesněno** (fáze 1, 2026-09-25; doplněno o dva polling intervaly a
+> vynucenou terminaci akcí, 2026-09-25). Otevřené otázky z v0.1 byly
+> rozhodnuty s vlastníkem projektu, viz [Rozhodnutí fáze 1](#7-rozhodnutí-fáze-1)
+> a [Rozhodnutí — polling a terminace](#9-rozhodnutí-polling-a-terminace-2026-09-25).
 > Každá položka má ID pro zpětné odkazování z ADR a implementačních bloků.
 
 ## 1. Účel a rozsah
@@ -44,7 +46,10 @@ spustitelný soubor.
   název, popis, ikonu a je viditelná na dashboardu.
 - **FR-11**: Každá karta má právě jednu **primární akci** — definici příkazu
   spouštěného na hostu (příkaz, argumenty, pracovní adresář, proměnné
-  prostředí, timeout).
+  prostředí, timeout). Timeout je závazná **maximální doba čekání na
+  dokončení akce** — po jejím uplynutí execution engine proces vynuceně
+  ukončí (terminate/kill), běh se zaznamená jako neúspěšný/timeout a nesmí
+  zůstat viset (viz FR-19, NFR-04).
 - **FR-12**: Každá karta může mít volitelně **status akci** (health check) —
   akci stejného typu jako primární, jejíž výsledek určuje aktuální stav karty.
 - **FR-13**: Spuštění akce zachytí exit kód, stdout/stderr a čas běhu.
@@ -56,11 +61,24 @@ spustitelný soubor.
   regulárnímu výrazu (např. „musí obsahovat“ / „nesmí obsahovat“). Pravidlo na
   výstup je nepovinné rozšíření nad rámec exit kódu.
 - **FR-15**: Status akce se dá spustit ručně (tlačítko „ověřit stav“) a
-  volitelně automaticky v nastaveném intervalu (polling), nastaveném per
-  karta. Výchozí interval je **30 s**; polling lze pro danou kartu i zcela
-  vypnout (jen ruční ověření).
+  volitelně automaticky v nastaveném **standardním polling intervalu**, per
+  karta. Výchozí standardní interval je **60 s**; polling lze pro danou
+  kartu i zcela vypnout (jen ruční ověření). Standardní polling je
+  předpoklad pro FR-15a (zrychlený polling) — bez zapnutého standardního
+  pollingu se zrychlený polling neaktivuje.
+- **FR-15a**: Bezprostředně po vyvolání **primární akce** karty (ruční nebo
+  budoucí naplánované spuštění) se status akce dočasně přepne na
+  **zrychlený polling interval**, výchozí **10 s**, po dobu výchozích
+  **120 s** (obě hodnoty konfigurovatelné globálně/per karta). Po uplynutí
+  této doby se karta vrátí na standardní polling interval (FR-15). Pokud
+  karta nemá standardní polling zapnutý, zrychlený polling se neaktivuje
+  (viz FR-15).
 - **FR-16**: Příklad referenčního use-case: primární akce = Wake-on-LAN paket
   na MAC adresu; status akce = `ping` na IP/hostname cílového PC.
+- **FR-19**: Vypršení timeoutu akce (FR-11) vede k vynucené terminaci
+  spuštěného procesu ze strany execution enginu (nikdy k jeho ponechání běžet
+  na pozadí) — ochrana proti nekontrolovanému hromadění nedokončených
+  procesů na slabém hardwaru (NFR-04, NFR-07).
 - **FR-17**: Pro každou akci (primární i status) se uchovává historie
   posledních **N běhů** (výchozí N = 20, konfigurovatelné globálně). UI karty
   zobrazuje aktuální/poslední stav, historie je dostupná jako detail/log.
@@ -140,9 +158,10 @@ args...)` se strukturovanými argumenty, nikdy skládáním shell příkazu ze
 
 ## 6. Otevřené otázky
 
-Žádné blokující otevřené otázky pro fáze 2–5 (viz níže rozhodnutí fáze 1).
-Budoucí otázky (auth pro víceuživatelský provoz, škálování historie běhů nad
-rámec N záznamů) se řeší až s konkrétní potřebou, samostatným requirementem.
+Žádné blokující otevřené otázky pro fáze 2–5 (viz níže rozhodnutí fáze 1 a
+rozhodnutí o pollingu/terminaci). Budoucí otázky (auth pro víceuživatelský
+provoz, škálování historie běhů nad rámec N záznamů) se řeší až s konkrétní
+potřebou, samostatným requirementem.
 
 ## 7. Rozhodnutí fáze 1 (2026-09-25)
 
@@ -161,7 +180,16 @@ promítnuty do FR/NFR výše:
 | Počet akcí na kartu            | 1 primární + 1 nepovinná status akce, víc akcí na kartu není v MVP (viz FR-11, FR-12).           |
 | Souběžnost spouštění akcí      | Konfigurovatelný limit, výchozí 4 (FR-18, NFR-07).                                               |
 
-## 8. Sledovatelnost
+## 9. Rozhodnutí — polling a terminace (2026-09-25)
+
+| Otázka                             | Rozhodnutí                                                                                                                                       |
+| ---------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Standardní polling interval        | Výchozí **60 s** (dříve 30 s), per karta (FR-15).                                                                                                |
+| Zrychlený polling po primární akci | Výchozí interval **10 s** po dobu **120 s** od vyvolání primární akce, pak návrat na standardní (FR-15a).                                        |
+| Zrychlený polling bez standardního | Neaktivuje se — zrychlený polling je jen dočasné zesílení standardního, vyžaduje ho mít zapnutý (FR-15a).                                        |
+| Vynucená terminace po timeoutu     | Existující `TimeoutSec` (FR-11) je závazná maximální doba čekání; po vypršení execution engine proces zabije (FR-19), žádný nový parametr navíc. |
+
+## 10. Sledovatelnost
 
 Každý implementační blok v [roadmapě](../plans/roadmap.md) musí odkazovat na
 alespoň jedno FR/NFR z tohoto dokumentu. Nové požadavky se přidávají promptem

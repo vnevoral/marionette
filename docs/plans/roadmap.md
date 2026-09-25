@@ -12,7 +12,7 @@ uloží do `docs/plans/blocks/NNNN-nazev.md`. Blok se implementuje promptem
 | ---- | -------------------------------------------------------------------------------------------- | ------------------------------------------------ | ------------------------------ |
 | 0    | Bootstrap projektu (repo, Go+Vue+PrimeVue skelet, Makefile, embed, devops/agent scaffolding) | **Hotovo**                                       | FR-01..04 (základ)             |
 | 1    | Zpřesnění požadavků a architektury                                                           | **Hotovo** (requirements v0.2, ADR-0004 přijato) | vše (SRS review)               |
-| 2    | Doménový model + config store (in-memory + JSON perzistence)                                 | Plánováno                                        | FR-10..14, FR-30..33, ADR-0004 |
+| 2    | Doménový model + config store (in-memory + JSON perzistence)                                 | **Naplánováno** (bloky 0001–0003, stav Návrh)    | FR-10..14, FR-30..33, ADR-0004 |
 | 3    | Execution engine (bezpečné spouštění akcí na hostu)                                          | Plánováno                                        | FR-11, FR-13, NFR-01, NFR-04   |
 | 4    | Status/health-check engine (vč. volitelného pollingu)                                        | Plánováno                                        | FR-12, FR-15, FR-16            |
 | 5    | REST API (CRUD karet/akcí, spuštění, čtení stavu)                                            | Plánováno                                        | FR-40, FR-41                   |
@@ -26,8 +26,16 @@ uloží do `docs/plans/blocks/NNNN-nazev.md`. Blok se implementuje promptem
   otázky vyřešeny, viz sekce 7 dokumentu) a
   [ADR-0004](../architecture/decisions/0004-action-card-domain-model.md) je
   přijato vč. historie běhů, pravidla na výstup, pollingu a limitu
-  souběžnosti. Další krok je `/plan-block` pro fázi 2 (doménový model + config
-  store).
+  souběžnosti.
+- Fáze 2 je rozpracována do implementačních bloků (stav: Návrh, čekají na
+  schválení před implementací promptem `/implement-block`):
+  - [0001 — Doménové typy a validace konfigurace](blocks/0001-config-domain-types.md)
+  - [0002 — In-memory config store (CRUD karet + historie běhů)](blocks/0002-config-inmemory-store.md)
+  - [0003 — JSON perzistence konfigurace a načtení při startu](blocks/0003-config-json-persistence.md)
+
+  Bloky se implementují v tomto pořadí (0002 staví na typech z 0001, 0003 na
+  store z 0002).
+
 - Bloky uvnitř fáze by měly být dost malé na jednu implementační relaci s AI
   agentem (řádově hodiny práce, ne dny) a musí mít jasné kritérium hotovosti
   (viz [Definition of Done](../devops/definition-of-done.md)).

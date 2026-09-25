@@ -1,32 +1,49 @@
 # ADR-0004: Doménový model akčních karet a JSON konfigurace
 
 - **Stav**: Přijato
-- **Datum**: 2026-09-25 (aktualizováno po zpřesnění požadavků na v0.2)
+- **Datum**: 2026-09-25 (aktualizováno po zpřesnění požadavků na v0.2 a v0.3)
 
 ## Kontext
 
-Potřebujeme doménový model pro akční karty (FR-10 až FR-18) a způsob jejich
+Potřebujeme doménový model pro akční karty (FR-10 až FR-19) a způsob jejich
 perzistence (FR-30 až FR-34), který je dost jednoduchý na jednotky až nízké
 desítky karet a nevyžaduje provoz databázového serveru na Raspberry Pi. Po
-zpřesnění požadavků (viz [requirements.md §7](../../requirements/requirements.md#7-rozhodnutí-fáze-1))
+zpřesnění požadavků (viz [requirements.md §7](../../requirements/requirements.md#7-rozhodnutí-fáze-1)
+a [§9](../../requirements/requirements.md#9-rozhodnutí-polling-a-terminace-2026-09-25))
 je potřeba doménový model doplnit o: pravidlo vyhodnocení na výstup (FR-14),
-historii běhů (FR-17), per-kartu polling (FR-15) a globální limit souběžnosti
-(FR-18/NFR-07).
+historii běhů (FR-17), globální limit souběžnosti (FR-18/NFR-07), dva polling
+intervaly per karta — standardní a dočasně zrychlený po primární akci
+(FR-15, FR-15a) — a explicitní vynucenou terminaci akce po timeoutu (FR-19).
 
 ## Rozhodnutí
 
 - Doménové entity:
   - `Action` — příkaz, argumenty (`[]string`, nikdy shell string), pracovní
-    adresář, env, timeout, a `OutputRule` pro vyhodnocení výsledku.
+    adresář, env, `TimeoutSec` a `OutputRule` pro vyhodnocení výsledku.
+    `TimeoutSec` je závazná maximální doba běhu — execution engine (fáze 3)
+    po jejím uplynutí proces vynuceně ukončí (`SIGKILL`/`cmd.Process.Kill()`
+    přes `context.WithTimeout`), nikdy ho neponechá běžet na pozadí (FR-19).
   - `OutputRule` — `Type: "exit_code" | "match" | "not_match"` (výchozí jen
     `exit_code`), u `match`/`not_match` navíc `Pattern` (regulární výraz
     aplikovaný na zachycený, případně ořízlý výstup).
   - `ActionCard` — id, název, popis, ikona, `PrimaryAction`, volitelná
-    `StatusAction`, volitelný `PollingIntervalSeconds` (0/nil = polling
-    vypnutý; relevantní jen má-li karta `StatusAction`).
+    `StatusAction`, a tři volitelné parametry pollingu (relevantní jen má-li
+    karta `StatusAction`):
+    - `PollingIntervalSeconds` (0/nil = standardní polling vypnutý; výchozí
+      doporučená hodnota `60`) — pravidelný interval, dokud není aktivní
+      zrychlené okno.
+    - `FastPollingIntervalSeconds` (výchozí `10`) — interval použitý po
+      dobu zrychleného okna.
+    - `FastPollingWindowSeconds` (výchozí `120`) — jak dlouho po vyvolání
+      **primární akce** karty platí `FastPollingIntervalSeconds`, než se
+      polling vrátí na `PollingIntervalSeconds`.
+      Zrychlené okno se aktivuje **pouze** pokud má karta `PollingIntervalSeconds
+      > 0`(standardní polling zapnutý) — bez něj`FastPollingIntervalSeconds`/
+`FastPollingWindowSeconds` nemají efekt (FR-15a).
   - `Run` — jedno spuštění akce: exit kód, zachycený výstup (max 4 KB, s
     příznakem `Truncated`), čas startu/konce, odvozený výsledek
-    (`ok`/`fail`) dle `OutputRule`.
+    (`ok`/`fail`/`timeout`) dle `OutputRule` (`timeout`, pokud engine akci
+    vynuceně ukončil dle `TimeoutSec`).
 - Config store (`internal/config`, přesný název upřesní implementační blok) je
   in-memory struktura držící **dvě oddělené věci**:
   1. **Konfigurace** (persistovaná do JSON): seznam `ActionCard` a globální
@@ -51,7 +68,12 @@ historii běhů (FR-17), per-kartu polling (FR-15) a globální limit souběžno
   frontě (FR-18), nezahazují se.
 - Polling: samostatný scheduler (fáze 4) udržuje pro každou kartu s aktivním
   `PollingIntervalSeconds` časovač, který přes execution engine (a jeho
-  semafor) spouští `StatusAction` a zapisuje `Run` do historie.
+  semafor) spouští `StatusAction` a zapisuje `Run` do historie. Po každém
+  spuštění **primární** akce scheduler přepne časovač dané karty na
+  `FastPollingIntervalSeconds` a naplánuje návrat na `PollingIntervalSeconds`
+  po `FastPollingWindowSeconds` (implementační detail — jednoduchý časový
+  příznak „do kdy platí zrychlené okno“ u karty ve scheduleru, ne v
+  persistované konfiguraci).
 
 ## Zvažované alternativy
 
