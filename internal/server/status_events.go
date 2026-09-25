@@ -39,6 +39,16 @@ func (broker *StatusEventBroker) Publish(cardID string, snapshot config.StatusSn
 		select {
 		case subscriber <- event:
 		default:
+			// Keep the stream non-blocking while ensuring the newest snapshot
+			// replaces stale buffered data for a slow client.
+			select {
+			case <-subscriber:
+			default:
+			}
+			select {
+			case subscriber <- event:
+			default:
+			}
 		}
 	}
 	broker.mu.Unlock()

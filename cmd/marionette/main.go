@@ -33,7 +33,6 @@ func main() {
 		return changedStore.SaveFile(configPath)
 	}
 	statusEvents := server.NewStatusEventBroker()
-	store.OnStatusChange = statusEvents.Publish
 
 	executor := execengine.NewExecutor()
 	runner, err := execengine.NewRunner(store.GetSettings(), executor)

@@ -113,7 +113,10 @@ function connectLiveStatusEvents() {
 		return;
 	}
 	statusEventSource = source;
-	source.addEventListener("open", stopStatusPolling);
+	source.addEventListener("open", () => {
+		void refreshStatuses(cards.value);
+		stopStatusPolling();
+	});
 	source.addEventListener("error", startStatusPolling);
 }
 

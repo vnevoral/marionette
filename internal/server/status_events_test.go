@@ -29,6 +29,57 @@ func TestStatusEventBrokerPublishesToSubscribers(t *testing.T) {
 	}
 }
 
+func TestStatusEventBrokerKeepsNewestEventForSlowSubscriber(t *testing.T) {
+	broker := NewStatusEventBroker()
+	subscriber, unsubscribe := broker.subscribe()
+	defer unsubscribe()
+
+	for index := 1; index <= 9; index++ {
+		broker.Publish("card-a", config.StatusSnapshot{State: config.StatusStateOK})
+	}
+
+	var last StatusEvent
+	for {
+		select {
+		case last = <-subscriber:
+		default:
+			if last.ID != 9 {
+				t.Fatalf("last event ID = %d, want 9", last.ID)
+			}
+			return
+		}
+	}
+}
+
+func TestRouterWiresStoreStatusChangesToBroker(t *testing.T) {
+	store := config.NewStore(config.Settings{HistorySize: 5, MaxConcurrentActions: 1})
+	card := config.ActionCard{
+		ID:      "card-status",
+		Name:    "Status card",
+		Primary: config.Action{Command: "primary", TimeoutSec: 1},
+		Status:  &config.Action{Command: "status", TimeoutSec: 1},
+	}
+	if _, err := store.CreateCard(card); err != nil {
+		t.Fatalf("CreateCard() error = %v", err)
+	}
+	broker := NewStatusEventBroker()
+	subscriber, unsubscribe := broker.subscribe()
+	defer unsubscribe()
+	_ = NewRouterWithDependencies(RouterDependencies{Store: store, StatusEvents: broker})
+
+	if err := store.UpdateStatus(card.ID, config.StatusSnapshot{State: config.StatusStateOK}); err != nil {
+		t.Fatalf("UpdateStatus() error = %v", err)
+	}
+	select {
+	case event := <-subscriber:
+		if event.CardID != card.ID || event.Snapshot.State != config.StatusStateOK {
+			t.Fatalf("event = %#v", event)
+		}
+	case <-time.After(time.Second):
+		t.Fatal("timed out waiting for router-wired status event")
+	}
+}
+
 func TestStatusEventsEndpointSetsSSEHeadersAndStopsWithRequest(t *testing.T) {
 	store := config.NewStore(config.Settings{HistorySize: 5, MaxConcurrentActions: 1})
 	broker := NewStatusEventBroker()

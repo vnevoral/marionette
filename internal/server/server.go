@@ -46,6 +46,13 @@ func NewRouterWithDependencies(dependencies RouterDependencies) http.Handler {
 		if statusEvents == nil {
 			statusEvents = NewStatusEventBroker()
 		}
+		existingStatusChange := dependencies.Store.OnStatusChange
+		dependencies.Store.OnStatusChange = func(cardID string, snapshot config.StatusSnapshot) {
+			if existingStatusChange != nil {
+				existingStatusChange(cardID, snapshot)
+			}
+			statusEvents.Publish(cardID, snapshot)
+		}
 		handler := cardAPI{
 			store:        dependencies.Store,
 			actions:      dependencies.Actions,
