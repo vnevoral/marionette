@@ -159,58 +159,62 @@ onMounted(loadDetail);
 			</p>
 
 			<section class="detail-grid grid" aria-label="Card summary">
-				<div class="detail-panel summary-panel col-12 md:col-6 p-6">
-					<div class="panel-heading">
-						<h2>Current status</h2>
-						<i class="pi pi-heart" aria-hidden="true"></i>
+				<div class="col-12 md:col-6 p-2">
+					<div class="detail-panel summary-panel p-6 h-full">
+						<div class="panel-heading">
+							<h2>Current status</h2>
+							<i class="pi pi-heart" aria-hidden="true"></i>
+						</div>
+						<p class="summary-state">{{ stateView(status?.state).label }}</p>
+						<dl class="summary-list">
+							<div>
+								<dt>Last checked</dt>
+								<dd>{{ formatDate(status?.checkedAt) }}</dd>
+							</div>
+							<div>
+								<dt>Last outcome</dt>
+								<dd>
+									{{
+										status?.lastCheck?.outcome
+											? outcomeLabel(status.lastCheck.outcome)
+											: "Not checked"
+									}}
+								</dd>
+							</div>
+						</dl>
+						<p v-if="sectionErrors.status" class="section-error">{{ sectionErrors.status }}</p>
 					</div>
-					<p class="summary-state">{{ stateView(status?.state).label }}</p>
-					<dl class="summary-list">
-						<div>
-							<dt>Last checked</dt>
-							<dd>{{ formatDate(status?.checkedAt) }}</dd>
-						</div>
-						<div>
-							<dt>Last outcome</dt>
-							<dd>
-								{{
-									status?.lastCheck?.outcome
-										? outcomeLabel(status.lastCheck.outcome)
-										: "Not checked"
-								}}
-							</dd>
-						</div>
-					</dl>
-					<p v-if="sectionErrors.status" class="section-error">{{ sectionErrors.status }}</p>
 				</div>
 
-				<div class="detail-panel action-panel col-12 md:col-6 p-6">
-					<div class="panel-heading">
-						<h2>Actions</h2>
-						<i class="pi pi-bolt" aria-hidden="true"></i>
+				<div class="col-12 md:col-6 p-2">
+					<div class="detail-panel action-panel p-6 h-full">
+						<div class="panel-heading">
+							<h2>Actions</h2>
+							<i class="pi pi-bolt" aria-hidden="true"></i>
+						</div>
+						<div class="detail-action-buttons flex flex-wrap gap-3">
+							<Button
+								label="Run action"
+								icon="pi pi-play"
+								:loading="actionLoading === 'primary'"
+								:disabled="Boolean(actionLoading)"
+								@click="runAction('primary')"
+							/>
+							<Button
+								v-if="card.status"
+								label="Check status"
+								icon="pi pi-heart"
+								severity="secondary"
+								outlined
+								:loading="actionLoading === 'status'"
+								:disabled="Boolean(actionLoading)"
+								@click="runAction('status')"
+							/>
+						</div>
+						<p class="action-hint">
+							Actions are queued asynchronously and may take a moment to report a new status.
+						</p>
 					</div>
-					<div class="detail-action-buttons flex flex-wrap gap-3">
-						<Button
-							label="Run action"
-							icon="pi pi-play"
-							:loading="actionLoading === 'primary'"
-							:disabled="Boolean(actionLoading)"
-							@click="runAction('primary')"
-						/>
-						<Button
-							v-if="card.status"
-							label="Check status"
-							icon="pi pi-heart"
-							severity="secondary"
-							outlined
-							:loading="actionLoading === 'status'"
-							:disabled="Boolean(actionLoading)"
-							@click="runAction('status')"
-						/>
-					</div>
-					<p class="action-hint">
-						Actions are queued asynchronously and may take a moment to report a new status.
-					</p>
 				</div>
 			</section>
 

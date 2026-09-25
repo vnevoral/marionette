@@ -17,6 +17,18 @@
 				"pattern": "marionette listening on :([0-9]+)",
 				"uriFormat": "http://localhost:%s"
 			}
+		},
+		{
+			"name": "Marionette: frontend (Vite)",
+			"type": "node-terminal",
+			"request": "launch",
+			"command": "npm run dev -- --host 0.0.0.0",
+			"cwd": "${workspaceFolder}/web",
+			"serverReadyAction": {
+				"action": "openExternally",
+				"pattern": "Local:\\s+(http://localhost:5173/)",
+				"uriFormat": "%s"
+			}
 		}
 	]
 }
