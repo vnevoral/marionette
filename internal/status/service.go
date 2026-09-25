@@ -21,7 +21,7 @@ type StatusCheckService struct {
 	runner runner
 }
 
-// NewCheckService creates a status check service for the supplied store and runner.
+// NewStatusCheckService creates a status check service for the supplied store and runner.
 func NewStatusCheckService(store *config.Store, actionRunner runner) (*StatusCheckService, error) {
 	if store == nil {
 		return nil, errors.New("config store is required")
