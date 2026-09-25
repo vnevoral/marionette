@@ -23,6 +23,7 @@ uloží do `docs/plans/blocks/NNNN-nazev.md`. Blok se implementuje promptem
 | 7    | Balíčkování a nasazení (systemd unit, install skript, arm64 release)                         | Plánováno                                        | FR-02..04, NFR-02              |
 | 8    | Zpevnění (auth/access control, logování, chybové stavy, testy, dokumentace)                  | Plánováno                                        | NFR-01, NFR-04..06             |
 | 9    | UX redesign a sdílený design systém                                                          | **Probíhá** (UX-05)                              | FR-24..29, NFR-08..10          |
+| 10   | Realtime doručování statusů přes SSE                                                         | Plánováno                                        | FR-42, NFR-11                  |
 
 ## Poznámky k plánování
 
@@ -78,6 +79,10 @@ uloží do `docs/plans/blocks/NNNN-nazev.md`. Blok se implementuje promptem
   Následuje [0020 — PrimeFlex view migration](blocks/0020-primeflex-view-migration.md).
   Aktuální pokračování fáze je [0021 — UX-05: Vizuální konzistence,
   accessibility a responsive audit](blocks/0021-ux-consistency-accessibility.md).
+
+- Fáze 10 je připravena požadavkem FR-42/NFR-11. [ADR-0008](../architecture/decisions/0008-sse-status-event-stream.md)
+  je přijato a schválený implementační blok je [0022 — SSE: živé změny
+  statusů](blocks/0022-sse-status-events.md).
 
 - Bloky uvnitř fáze by měly být dost malé na jednu implementační relaci s AI
   agentem (řádově hodiny práce, ne dny) a musí mít jasné kritérium hotovosti
