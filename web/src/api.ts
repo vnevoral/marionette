@@ -62,6 +62,26 @@ export function listCards(): Promise<ActionCard[]> {
 	return request<ActionCard[]>("/api/cards");
 }
 
+export function createCard(card: ActionCard): Promise<ActionCard> {
+	return request<ActionCard>("/api/cards", {
+		method: "POST",
+		headers: { "Content-Type": "application/json" },
+		body: JSON.stringify(card),
+	});
+}
+
+export function updateCard(card: ActionCard): Promise<ActionCard> {
+	return request<ActionCard>(`/api/cards/${encodeURIComponent(card.id)}`, {
+		method: "PUT",
+		headers: { "Content-Type": "application/json" },
+		body: JSON.stringify(card),
+	});
+}
+
+export function deleteCard(cardID: string): Promise<void> {
+	return request(`/api/cards/${encodeURIComponent(cardID)}`, { method: "DELETE" });
+}
+
 export function getStatus(cardID: string): Promise<StatusSnapshot> {
 	return request<StatusSnapshot>(`/api/cards/${encodeURIComponent(cardID)}/status`);
 }

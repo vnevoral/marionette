@@ -5,6 +5,7 @@ import Card from "primevue/card";
 import Message from "primevue/message";
 import ProgressSpinner from "primevue/progressspinner";
 import Tag from "primevue/tag";
+import { RouterLink } from "vue-router";
 import {
 	getStatus,
 	listCards,
@@ -124,6 +125,7 @@ function checkedLabel(cardID: string) {
 				:loading="loading"
 				@click="loadDashboard"
 			/>
+			<RouterLink class="manage-link" to="/manage">Manage cards</RouterLink>
 		</header>
 
 		<Message v-if="error" severity="error" :closable="false">{{ error }}</Message>
