@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { onMounted, reactive, ref } from "vue";
-import { RouterLink, useRoute, useRouter } from "vue-router";
+import { computed, onBeforeUnmount, onMounted, reactive, ref } from "vue";
+import { onBeforeRouteLeave, RouterLink, useRoute, useRouter } from "vue-router";
 import Button from "primevue/button";
 import Card from "primevue/card";
 import InputNumber from "primevue/inputnumber";
@@ -31,6 +31,8 @@ const saving = ref(false);
 const error = ref("");
 const notice = ref("");
 const statusEnabled = ref(false);
+const initialFingerprint = ref("");
+const fieldErrors = reactive<Record<string, string>>({});
 
 function emptyAction(): Action {
 	return { command: "", args: [], dir: "", env: {}, timeoutSec: 30, rule: { type: "exit_code" } };
@@ -52,6 +54,30 @@ const statusArgs = ref<string[]>([]);
 const primaryEnv = ref<EnvironmentRow[]>([]);
 const statusEnv = ref<EnvironmentRow[]>([]);
 
+function formFingerprint() {
+	return JSON.stringify({
+		name: form.name,
+		description: form.description,
+		icon: form.icon,
+		primary: actionFrom(form.primary, primaryArgs.value, primaryEnv.value),
+		status:
+			statusEnabled.value && form.status
+				? actionFrom(form.status, statusArgs.value, statusEnv.value)
+				: undefined,
+		pollingIntervalSeconds: form.pollingIntervalSeconds,
+		fastPollingIntervalSeconds: form.fastPollingIntervalSeconds,
+		fastPollingWindowSeconds: form.fastPollingWindowSeconds,
+	});
+}
+
+const isDirty = computed(
+	() => initialFingerprint.value !== "" && initialFingerprint.value !== formFingerprint(),
+);
+
+function markClean() {
+	initialFingerprint.value = formFingerprint();
+}
+
 function copyAction(action: Action): Action {
 	return {
 		...action,
@@ -72,6 +98,7 @@ function applyCard(card: ActionCard) {
 	statusArgs.value = [...(card.status?.args ?? [])];
 	primaryEnv.value = Object.entries(card.primary.env ?? {}).map(([key, value]) => ({ key, value }));
 	statusEnv.value = Object.entries(card.status?.env ?? {}).map(([key, value]) => ({ key, value }));
+	markClean();
 }
 
 function actionFrom(action: Action, args: string[], environment: EnvironmentRow[]): Action {
@@ -91,14 +118,21 @@ function actionFrom(action: Action, args: string[], environment: EnvironmentRow[
 }
 
 function validate() {
-	if (!form.name.trim()) return "Card name is required";
-	if (!form.primary.command.trim()) return "Primary command is required";
-	if (form.primary.timeoutSec <= 0) return "Primary timeout must be positive";
+	for (const key of Object.keys(fieldErrors)) delete fieldErrors[key];
+	let firstError = "";
+	const addError = (key: string, message: string) => {
+		fieldErrors[key] = message;
+		if (!firstError) firstError = message;
+	};
+	if (!form.name.trim()) addError("name", "Card name is required");
+	if (!form.primary.command.trim()) addError("primaryCommand", "Primary command is required");
+	if (form.primary.timeoutSec <= 0) addError("primaryTimeout", "Primary timeout must be positive");
 	if (statusEnabled.value) {
-		if (!form.status?.command.trim()) return "Status command is required";
-		if (!form.status || form.status.timeoutSec <= 0) return "Status timeout must be positive";
+		if (!form.status?.command.trim()) addError("statusCommand", "Status command is required");
+		if (!form.status || form.status.timeoutSec <= 0)
+			addError("statusTimeout", "Status timeout must be positive");
 	}
-	return "";
+	return firstError;
 }
 
 async function save() {
@@ -118,6 +152,7 @@ async function save() {
 	};
 	try {
 		const saved = isNew() ? await createCard(payload) : await updateCard(payload);
+		markClean();
 		notice.value = "Card saved";
 		await router.push(`/cards/${encodeURIComponent(saved.id)}`);
 	} catch (saveError) {
@@ -138,6 +173,8 @@ function addEnvironment(target: "primary" | "status") {
 onMounted(async () => {
 	if (isNew()) {
 		loading.value = false;
+		markClean();
+		window.addEventListener("beforeunload", handleBeforeUnload);
 		return;
 	}
 	try {
@@ -146,7 +183,23 @@ onMounted(async () => {
 		error.value = loadError instanceof Error ? loadError.message : "Unable to load card";
 	} finally {
 		loading.value = false;
+		window.addEventListener("beforeunload", handleBeforeUnload);
 	}
+});
+
+function handleBeforeUnload(event: BeforeUnloadEvent) {
+	if (!isDirty.value) return;
+	event.preventDefault();
+	event.returnValue = "";
+}
+
+onBeforeRouteLeave(() => {
+	if (!isDirty.value || saving.value) return true;
+	return window.confirm("You have unsaved changes. Leave without saving?");
+});
+
+onBeforeUnmount(() => {
+	window.removeEventListener("beforeunload", handleBeforeUnload);
 });
 </script>
 
@@ -181,7 +234,11 @@ onMounted(async () => {
 						<p>Name the service and choose how it appears on the dashboard.</p>
 					</div>
 					<div class="form-grid grid">
-						<label class="col-12 md:col-6">Name <InputText v-model="form.name" /></label>
+						<label class="col-12 md:col-6"
+							>Name
+							<InputText v-model="form.name" :invalid="Boolean(fieldErrors.name)" />
+							<small v-if="fieldErrors.name" class="field-error">{{ fieldErrors.name }}</small>
+						</label>
 						<label class="col-12"
 							>Description <Textarea v-model="form.description" rows="2"
 						/></label>
@@ -217,6 +274,7 @@ onMounted(async () => {
 					:args="primaryArgs"
 					:environment="primaryEnv"
 					title="Primary action"
+					:errors="{ command: fieldErrors.primaryCommand, timeoutSec: fieldErrors.primaryTimeout }"
 					@update:args="primaryArgs = $event"
 					@update:environment="primaryEnv = $event"
 					@add-argument="addArgument('primary')"
@@ -234,6 +292,7 @@ onMounted(async () => {
 					:args="statusArgs"
 					:environment="statusEnv"
 					title="Status action"
+					:errors="{ command: fieldErrors.statusCommand, timeoutSec: fieldErrors.statusTimeout }"
 					@update:model-value="form.status = $event"
 					@update:args="statusArgs = $event"
 					@update:environment="statusEnv = $event"

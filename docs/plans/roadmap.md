@@ -22,7 +22,7 @@ uloží do `docs/plans/blocks/NNNN-nazev.md`. Blok se implementuje promptem
 | 6    | Dashboard UI (karty, stavové indikátory, formuláře správy)                                   | **Hotovo**                                       | FR-20..23                      |
 | 7    | Balíčkování a nasazení (systemd unit, install skript, arm64 release)                         | Plánováno                                        | FR-02..04, NFR-02              |
 | 8    | Zpevnění (auth/access control, logování, chybové stavy, testy, dokumentace)                  | Plánováno                                        | NFR-01, NFR-04..06             |
-| 9    | UX redesign a sdílený design systém                                                          | **Probíhá** (UX-05)                              | FR-24..29, NFR-08..10          |
+| 9    | UX redesign a sdílený design systém                                                          | **Hotovo**                                       | FR-24..29, NFR-08..10          |
 | 10   | Realtime doručování statusů přes SSE                                                         | **Hotovo**                                       | FR-42, NFR-11                  |
 
 ## Poznámky k plánování
@@ -77,7 +77,7 @@ uloží do `docs/plans/blocks/NNNN-nazev.md`. Blok se implementuje promptem
   Následuje [0018 — UX-04: Detail karty, běhy a status timeline](blocks/0018-ux-card-detail.md).
   PrimeFlex layout foundation je zachycen v [0019](blocks/0019-primeflex-layout-foundation.md).
   Následuje [0020 — PrimeFlex view migration](blocks/0020-primeflex-view-migration.md).
-  Aktuální pokračování fáze je [0021 — UX-05: Vizuální konzistence,
+  Posledním dokončeným blokem fáze je [0021 — UX-05: Vizuální konzistence,
   accessibility a responsive audit](blocks/0021-ux-consistency-accessibility.md).
 
 - Fáze 10 je připravena požadavkem FR-42/NFR-11. [ADR-0008](../architecture/decisions/0008-sse-status-event-stream.md)

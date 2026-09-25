@@ -12,6 +12,10 @@ const props = defineProps<{
 	args: string[];
 	environment: EnvironmentRow[];
 	title: string;
+	errors?: {
+		command?: string;
+		timeoutSec?: string;
+	};
 }>();
 
 const emit = defineEmits<{
@@ -64,8 +68,15 @@ function updateEnvironment(index: number, key: "key" | "value", value: unknown) 
 		<h2>{{ title }}</h2>
 		<div class="form-grid grid">
 			<label class="col-12 md:col-6"
-				>Command <InputText :model-value="modelValue.command" @update:model-value="updateCommand"
-			/></label>
+				>Command
+				<InputText
+					:model-value="modelValue.command"
+					:invalid="Boolean(props.errors?.command)"
+					:aria-invalid="Boolean(props.errors?.command)"
+					@update:model-value="updateCommand"
+				/>
+				<small v-if="props.errors?.command" class="field-error">{{ props.errors.command }}</small>
+			</label>
 			<label class="col-12 md:col-6"
 				>Working directory
 				<InputText :model-value="modelValue.dir" @update:model-value="updateDirectory"
@@ -75,8 +86,14 @@ function updateEnvironment(index: number, key: "key" | "value", value: unknown) 
 				<InputNumber
 					:model-value="modelValue.timeoutSec"
 					:min="1"
+					:invalid="Boolean(props.errors?.timeoutSec)"
+					:aria-invalid="Boolean(props.errors?.timeoutSec)"
 					@update:model-value="updateTimeout"
-			/></label>
+				/>
+				<small v-if="props.errors?.timeoutSec" class="field-error">{{
+					props.errors.timeoutSec
+				}}</small>
+			</label>
 			<label class="col-12 md:col-6 lg:col-4"
 				>Output rule
 				<Select
@@ -139,6 +156,10 @@ label {
 	font-family: var(--font-ui);
 	font-size: 0.85rem;
 	font-weight: var(--font-weight-medium);
+}
+.field-error {
+	color: var(--color-danger);
+	font-size: 0.78rem;
 }
 .dynamic-block button {
 	width: fit-content;

@@ -3,7 +3,7 @@
 - **Fáze**: 9 — UX redesign a sdílený design systém
 - **Vazba na požadavky**: FR-24..FR-29, NFR-08..NFR-10
 - **Vazba na ADR**: ADR-0007
-- **Stav**: Probíhá
+- **Stav**: Hotovo
 - **Závislosti**: Bloky 0015–0020
 
 ## Cíl bloku
@@ -51,3 +51,14 @@ povrchy, spacing, stavové barvy a responsivní chování.
 Všechny tři hlavní obrazovky používají stejnou page/header/panel/form language,
 Manage cards vizuálně patří do stejné aplikace jako Overview, žádný běžný stav
 není komunikován pouze barvou a responsive/accessibility smoke testy procházejí.
+
+## Evidence dokončení
+
+- `npm run format`, `npm run lint -- --quiet` a `npm run build` ve `web/`
+  prošly.
+- Browser smoke test formuláře ověřil field-level validation, `aria-invalid`,
+  unsaved-changes confirmation při navigaci a funkční tab order.
+- Responsive kontrola na šířkách 320, 390, 768 a 1440 px neodhalila
+  horizontální overflow ani kolizi obsahu.
+- Ověřeny byly také loading, error, save feedback a běžné empty-state workflow
+  hlavních obrazovek.
