@@ -69,6 +69,7 @@ async function loadDetail() {
 	sectionErrors.value = {};
 	try {
 		card.value = await getCard(cardID.value);
+		status.value = card.value.currentStatus;
 	} catch (loadError) {
 		notFound.value = true;
 		error.value = loadError instanceof Error ? loadError.message : "Unable to load card";
@@ -76,14 +77,8 @@ async function loadDetail() {
 		return;
 	}
 
-	const results = await Promise.allSettled([
-		getStatus(cardID.value),
-		getRuns(cardID.value),
-		getStatusHistory(cardID.value),
-	]);
-	const [statusResult, runsResult, historyResult] = results;
-	if (statusResult.status === "fulfilled") status.value = statusResult.value;
-	else sectionErrors.value.status = "Status data is unavailable";
+	const results = await Promise.allSettled([getRuns(cardID.value), getStatusHistory(cardID.value)]);
+	const [runsResult, historyResult] = results;
 	if (runsResult.status === "fulfilled") runs.value = runsResult.value ?? [];
 	else sectionErrors.value.runs = "Run history is unavailable";
 	if (historyResult.status === "fulfilled") history.value = historyResult.value ?? [];
@@ -138,7 +133,9 @@ onMounted(loadDetail);
 				class="detail-header flex flex-column md:flex-row align-items-start md:align-items-end justify-content-between gap-6 mb-8"
 			>
 				<div class="detail-identity flex align-items-center gap-4">
-					<div class="detail-icon" aria-hidden="true">{{ card.icon || "◈" }}</div>
+					<div class="detail-icon" aria-hidden="true">
+						<i :class="card.icon || 'pi pi-desktop'" />
+					</div>
 					<div>
 						<p class="eyebrow">CARD DETAIL</p>
 						<h1>{{ card.name }}</h1>
@@ -275,7 +272,6 @@ onMounted(loadDetail);
 <style scoped>
 .detail-page {
 	max-width: 1200px;
-	min-height: calc(100vh - 72px);
 	margin: 0 auto;
 	padding: clamp(var(--space-6), 5vw, 64px) clamp(var(--space-4), 5vw, 64px);
 	color: var(--color-ink);

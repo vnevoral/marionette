@@ -73,8 +73,28 @@ type cardAPI struct {
 	reconciler CardReconciler
 }
 
+type cardView struct {
+	config.ActionCard
+	CurrentStatus *config.StatusSnapshot `json:"currentStatus,omitempty"`
+}
+
 func (api cardAPI) listCards(w http.ResponseWriter, _ *http.Request) {
-	writeJSON(w, http.StatusOK, api.store.ListCards())
+	cards := api.store.ListCards()
+	views := make([]cardView, 0, len(cards))
+	for _, card := range cards {
+		views = append(views, api.viewCard(card))
+	}
+	writeJSON(w, http.StatusOK, views)
+}
+
+func (api cardAPI) viewCard(card config.ActionCard) cardView {
+	view := cardView{ActionCard: card}
+	if snapshot, exists := api.store.GetStatus(card.ID); exists {
+		view.CurrentStatus = &snapshot
+	} else if card.Status != nil {
+		view.CurrentStatus = &config.StatusSnapshot{State: config.StatusStateUnknown}
+	}
+	return view
 }
 
 func (api cardAPI) createCard(w http.ResponseWriter, request *http.Request) {
@@ -111,7 +131,7 @@ func (api cardAPI) getCard(w http.ResponseWriter, request *http.Request) {
 		writeError(w, http.StatusNotFound, config.ErrNotFound)
 		return
 	}
-	writeJSON(w, http.StatusOK, card)
+	writeJSON(w, http.StatusOK, api.viewCard(card))
 }
 
 func (api cardAPI) updateCard(w http.ResponseWriter, request *http.Request) {

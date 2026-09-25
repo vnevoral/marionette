@@ -44,25 +44,16 @@ async function loadDashboard() {
 	try {
 		const loadedCards = await listCards();
 		cards.value = loadedCards;
-		const loadedStatuses = await Promise.all(
-			loadedCards.map(async (card) => {
-				try {
-					return [card.id, await getStatus(card.id), false] as const;
-				} catch {
-					return [card.id, undefined, true] as const;
-				}
-			}),
-		);
 		const nextStatuses: Record<string, StatusSnapshot> = {};
-		const nextStatusErrors: Record<string, boolean> = {};
-		for (const [cardID, snapshot, failed] of loadedStatuses) {
-			if (snapshot) nextStatuses[cardID] = snapshot;
-			if (failed) nextStatusErrors[cardID] = true;
+		for (const card of loadedCards) {
+			if (card.currentStatus) nextStatuses[card.id] = card.currentStatus;
 		}
 		statuses.value = nextStatuses;
-		statusErrors.value = nextStatusErrors;
+		statusErrors.value = {};
+		loading.value = false;
 	} catch (loadError) {
 		error.value = loadError instanceof Error ? loadError.message : "Unable to load cards";
+		loading.value = false;
 	} finally {
 		loading.value = false;
 	}
@@ -184,20 +175,27 @@ onMounted(loadDashboard);
 			<span>Loading cards...</span>
 		</div>
 
-		<section v-else-if="cards.length" class="grid" aria-labelledby="cards-heading">
+		<section v-else-if="cards.length" class="dashboard-grid grid" aria-labelledby="cards-heading">
 			<h2 id="cards-heading" class="sr-only">Action cards</h2>
-			<div v-for="card in cards" :key="card.id" class="col-12 md:col-6 lg:col-4">
+			<div v-for="card in cards" :key="card.id" class="col-12 md:col-6 lg:col-4 p-2">
 				<Card class="action-card h-full">
 					<template #header>
 						<div class="card-banner">
-							<span class="card-icon" aria-hidden="true">{{ card.icon || "◈" }}</span>
+							<div class="card-icon" aria-hidden="true">
+								<i :class="card.icon || 'pi pi-desktop'" />
+							</div>
 							<Tag :severity="statusView(card).severity">
 								<i :class="statusView(card).icon" aria-hidden="true"></i>
 								<span>{{ statusView(card).label }}</span>
 							</Tag>
 						</div>
 					</template>
-					<template #title>{{ card.name }}</template>
+					<template #title>
+						<div class="card-title-row">
+							<span class="card-title">{{ card.name }}</span>
+							<span class="card-id">{{ card.id }}</span>
+						</div>
+					</template>
 					<template #subtitle>{{ checkedLabel(card.id) }}</template>
 					<template #content>
 						<p class="card-description">{{ card.description || "No description provided." }}</p>
@@ -262,7 +260,6 @@ onMounted(loadDashboard);
 <style scoped>
 .overview-page {
 	max-width: 1200px;
-	min-height: calc(100vh - 72px);
 	margin: 0 auto;
 	padding: clamp(var(--space-6), 5vw, 64px) clamp(var(--space-4), 5vw, 64px);
 }
@@ -325,9 +322,14 @@ h1 {
 
 .action-card {
 	min-width: 0;
+	height: 100%;
 	border: 1px solid var(--color-border);
 	background: var(--color-surface);
 	box-shadow: var(--shadow-subtle);
+}
+
+.dashboard-grid {
+	margin: -var(--space-2);
 }
 
 .action-card :deep(.p-card-body) {
@@ -365,9 +367,35 @@ h1 {
 	font-size: 1.35rem;
 }
 
+.card-title-row {
+	display: flex;
+	min-width: 0;
+	flex-direction: column;
+	gap: var(--space-1);
+}
+
+.card-title {
+	overflow: hidden;
+	color: var(--color-ink);
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.card-id {
+	overflow: hidden;
+	color: var(--color-muted);
+	font-family: var(--font-ui);
+	font-size: 0.75rem;
+	font-weight: 500;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
 .action-card :deep(.p-card-title) {
+	margin: 0;
 	font-family: var(--font-display);
-	font-size: 1.4rem;
+	font-size: 1.45rem;
+	font-weight: 500;
 }
 
 .action-card :deep(.p-card-subtitle) {

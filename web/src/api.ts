@@ -1,5 +1,18 @@
 export type StatusState = "unknown" | "ok" | "fail";
 
+export const CARD_ICON_OPTIONS = [
+	{ label: "Desktop", value: "pi pi-desktop" },
+	{ label: "Home", value: "pi pi-home" },
+	{ label: "Server", value: "pi pi-server" },
+	{ label: "Cloud", value: "pi pi-cloud" },
+	{ label: "Database", value: "pi pi-database" },
+	{ label: "Globe", value: "pi pi-globe" },
+	{ label: "Bolt", value: "pi pi-bolt" },
+	{ label: "Cog", value: "pi pi-cog" },
+	{ label: "Shield", value: "pi pi-shield" },
+	{ label: "Heart", value: "pi pi-heart" },
+] as const;
+
 export interface Action {
 	command: string;
 	args?: string[];
@@ -19,6 +32,7 @@ export interface ActionCard {
 	pollingIntervalSeconds?: number;
 	fastPollingIntervalSeconds?: number;
 	fastPollingWindowSeconds?: number;
+	currentStatus?: StatusSnapshot;
 }
 
 export interface Run {
@@ -58,6 +72,12 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
 	return (await response.json()) as T;
 }
 
+function withoutRuntimeStatus(card: ActionCard): Omit<ActionCard, "currentStatus"> {
+	const configuration = { ...card };
+	delete configuration.currentStatus;
+	return configuration;
+}
+
 export function listCards(): Promise<ActionCard[]> {
 	return request<ActionCard[]>("/api/cards");
 }
@@ -70,7 +90,7 @@ export function createCard(card: ActionCard): Promise<ActionCard> {
 	return request<ActionCard>("/api/cards", {
 		method: "POST",
 		headers: { "Content-Type": "application/json" },
-		body: JSON.stringify(card),
+		body: JSON.stringify(withoutRuntimeStatus(card)),
 	});
 }
 
@@ -78,7 +98,7 @@ export function updateCard(card: ActionCard): Promise<ActionCard> {
 	return request<ActionCard>(`/api/cards/${encodeURIComponent(card.id)}`, {
 		method: "PUT",
 		headers: { "Content-Type": "application/json" },
-		body: JSON.stringify(card),
+		body: JSON.stringify(withoutRuntimeStatus(card)),
 	});
 }
 

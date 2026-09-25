@@ -142,6 +142,19 @@ func TestRouterReadsRunsAndStatusProjectionWithoutExecutingStatus(t *testing.T) 
 	}
 	handler := NewRouter(store)
 
+	listResponse := httptest.NewRecorder()
+	handler.ServeHTTP(listResponse, httptest.NewRequest(http.MethodGet, "/api/cards", nil))
+	if listResponse.Code != http.StatusOK {
+		t.Fatalf("list response = %d", listResponse.Code)
+	}
+	var views []cardView
+	if err := json.NewDecoder(listResponse.Body).Decode(&views); err != nil {
+		t.Fatalf("decode card views: %v", err)
+	}
+	if len(views) != 1 || views[0].CurrentStatus == nil || views[0].CurrentStatus.State != config.StatusStateOK {
+		t.Fatalf("card views = %#v", views)
+	}
+
 	statusResponse := httptest.NewRecorder()
 	handler.ServeHTTP(statusResponse, httptest.NewRequest(http.MethodGet, "/api/cards/card-status/status", nil))
 	if statusResponse.Code != http.StatusOK {

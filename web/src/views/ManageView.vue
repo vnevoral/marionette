@@ -6,9 +6,18 @@ import Card from "primevue/card";
 import InputNumber from "primevue/inputnumber";
 import InputText from "primevue/inputtext";
 import Message from "primevue/message";
+import Select from "primevue/select";
 import Textarea from "primevue/textarea";
 import ToggleSwitch from "primevue/toggleswitch";
-import { createCard, deleteCard, listCards, updateCard, type Action, type ActionCard } from "@/api";
+import {
+	CARD_ICON_OPTIONS,
+	createCard,
+	deleteCard,
+	listCards,
+	updateCard,
+	type Action,
+	type ActionCard,
+} from "@/api";
 import ActionEditor from "@/components/ActionEditor.vue";
 
 type EnvironmentRow = { key: string; value: string };
@@ -27,7 +36,13 @@ function emptyAction(): Action {
 }
 
 function emptyCard(): ActionCard {
-	return { id: "", name: "", description: "", icon: "", primary: emptyAction() };
+	return {
+		id: "",
+		name: "",
+		description: "",
+		icon: CARD_ICON_OPTIONS[0].value,
+		primary: emptyAction(),
+	};
 }
 
 const form = reactive<ActionCard>(emptyCard());
@@ -247,8 +262,30 @@ onMounted(async () => {
 							>Description <Textarea v-model="form.description" rows="2"
 						/></label>
 						<label class="col-12 md:col-6"
-							>Icon <InputText v-model="form.icon" placeholder="pi pi-desktop"
-						/></label>
+							>Icon
+							<Select
+								v-model="form.icon"
+								:options="[...CARD_ICON_OPTIONS]"
+								option-label="label"
+								option-value="value"
+								class="icon-select"
+							>
+								<template #value="slotProps">
+									<div v-if="slotProps.value" class="icon-option">
+										<i :class="slotProps.value" aria-hidden="true" />
+										<span>{{
+											CARD_ICON_OPTIONS.find((icon) => icon.value === slotProps.value)?.label
+										}}</span>
+									</div>
+								</template>
+								<template #option="slotProps">
+									<div class="icon-option">
+										<i :class="slotProps.option.value" aria-hidden="true" />
+										<span>{{ slotProps.option.label }}</span>
+									</div>
+								</template>
+							</Select>
+						</label>
 					</div>
 					<ActionEditor
 						v-model="form.primary"
@@ -310,7 +347,6 @@ onMounted(async () => {
 	font-family: var(--font-ui);
 }
 .manage-shell {
-	min-height: 100vh;
 	padding: clamp(2rem, 6vw, 5rem) clamp(1rem, 5vw, 5rem);
 	background: var(--color-canvas);
 }
