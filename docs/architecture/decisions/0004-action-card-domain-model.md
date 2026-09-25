@@ -1,19 +1,21 @@
 # ADR-0004: Doménový model akčních karet a JSON konfigurace
 
 - **Stav**: Přijato
-- **Datum**: 2026-09-25 (aktualizováno po zpřesnění požadavků na v0.2 a v0.3)
+- **Datum**: 2026-09-25 (aktualizováno po zpřesnění požadavků na v0.2, v0.3 a v0.4)
 
 ## Kontext
 
 Potřebujeme doménový model pro akční karty (FR-10 až FR-19) a způsob jejich
-perzistence (FR-30 až FR-34), který je dost jednoduchý na jednotky až nízké
+perzistence (FR-30 až FR-35), který je dost jednoduchý na jednotky až nízké
 desítky karet a nevyžaduje provoz databázového serveru na Raspberry Pi. Po
-zpřesnění požadavků (viz [requirements.md §7](../../requirements/requirements.md#7-rozhodnutí-fáze-1)
-a [§9](../../requirements/requirements.md#9-rozhodnutí-polling-a-terminace-2026-09-25))
+zpřesnění požadavků (viz [requirements.md §7](../../requirements/requirements.md#7-rozhodnutí-fáze-1),
+[§9](../../requirements/requirements.md#9-rozhodnutí-polling-a-terminace-2026-09-25)
+a [§11](../../requirements/requirements.md#11-rozhodnutí-perzistence-historie-při-vypnutí-2026-09-25))
 je potřeba doménový model doplnit o: pravidlo vyhodnocení na výstup (FR-14),
-historii běhů (FR-17), globální limit souběžnosti (FR-18/NFR-07), dva polling
-intervaly per karta — standardní a dočasně zrychlený po primární akci
-(FR-15, FR-15a) — a explicitní vynucenou terminaci akce po timeoutu (FR-19).
+historii běhů (FR-17) vč. její perzistence při řízeném ukončení (FR-35),
+globální limit souběžnosti (FR-18/NFR-07), dva polling intervaly per karta —
+standardní a dočasně zrychlený po primární akci (FR-15, FR-15a) — a
+explicitní vynucenou terminaci akce po timeoutu (FR-19).
 
 ## Rozhodnutí
 
@@ -28,18 +30,15 @@ intervaly per karta — standardní a dočasně zrychlený po primární akci
     aplikovaný na zachycený, případně ořízlý výstup).
   - `ActionCard` — id, název, popis, ikona, `PrimaryAction`, volitelná
     `StatusAction`, a tři volitelné parametry pollingu (relevantní jen má-li
-    karta `StatusAction`):
-    - `PollingIntervalSeconds` (0/nil = standardní polling vypnutý; výchozí
-      doporučená hodnota `60`) — pravidelný interval, dokud není aktivní
-      zrychlené okno.
-    - `FastPollingIntervalSeconds` (výchozí `10`) — interval použitý po
-      dobu zrychleného okna.
-    - `FastPollingWindowSeconds` (výchozí `120`) — jak dlouho po vyvolání
-      **primární akce** karty platí `FastPollingIntervalSeconds`, než se
-      polling vrátí na `PollingIntervalSeconds`.
-      Zrychlené okno se aktivuje **pouze** pokud má karta `PollingIntervalSeconds
+    karta `StatusAction`): - `PollingIntervalSeconds` (0/nil = standardní polling vypnutý; výchozí
+    doporučená hodnota `60`) — pravidelný interval, dokud není aktivní
+    zrychlené okno. - `FastPollingIntervalSeconds` (výchozí `10`) — interval použitý po
+    dobu zrychleného okna. - `FastPollingWindowSeconds` (výchozí `120`) — jak dlouho po vyvolání
+    **primární akce** karty platí `FastPollingIntervalSeconds`, než se
+    polling vrátí na `PollingIntervalSeconds`.
+    Zrychlené okno se aktivuje **pouze** pokud má karta `PollingIntervalSeconds
       > 0`(standardní polling zapnutý) — bez něj`FastPollingIntervalSeconds`/
-`FastPollingWindowSeconds` nemají efekt (FR-15a).
+    `FastPollingWindowSeconds` nemají efekt (FR-15a).
   - `Run` — jedno spuštění akce: exit kód, zachycený výstup (max 4 KB, s
     příznakem `Truncated`), čas startu/konce, odvozený výsledek
     (`ok`/`fail`/`timeout`) dle `OutputRule` (`timeout`, pokud engine akci
@@ -53,12 +52,22 @@ intervaly per karta — standardní a dočasně zrychlený po primární akci
      dočasného souboru a atomické přejmenování (`rename`), cesta dle
      `MARIONETTE_CONFIG` (default `./marionette.json`, viz FR-34).
   2. **Historie běhů** (`Run`, per akce, ring buffer velikosti
-     `Settings.HistorySize`): drží se **jen v paměti**, nepersistuje se do
-     JSON souboru. Důvod: jde o provozní/log data měnící se při každém běhu
-     (i při automatickém pollingu po 30 s) — persistovat by znamenalo časté
-     zápisy na SD kartu Raspberry Pi (opotřebení, NFR-03) bez odpovídající
-     hodnoty (historie běhů není potřeba přežít restart). Po restartu se
-     historie vynuluje, poslední konfigurace karet zůstává.
+     `Settings.HistorySize`): během běhu aplikace se drží **jen v paměti** a
+     `AppendRun` sama o sobě na disk nezapisuje. Důvod: jde o provozní/log
+     data měnící se při každém běhu (i při automatickém pollingu po
+     10–60 s) — persistovat při každém zápisu by znamenalo časté zápisy na
+     SD kartu Raspberry Pi (opotřebení, NFR-03).
+     **Výjimka (FR-35)**: při **řízeném ukončení** aplikace (graceful
+     shutdown po SIGINT/SIGTERM) se aktuální obsah historie jednorázově
+     uloží do stejného konfiguračního souboru (nový top-level klíč
+     `history`, viz níže) a při příštím startu se načte spolu s
+     konfigurací. Když aplikace skončí neřízeně (pád, `SIGKILL`, výpadek
+     napájení), poslední uložená historie zůstane stará/chybějící —
+     akceptované riziko, není cuklá pojistka pro každý jednotlivý běh.
+     JSON struktura souboru: `{"settings": Settings, "cards": []ActionCard,
+"history": {cardID: {"primary": []Run, "status": []Run}}}` — klíč
+     `history` je volitelný (starší/ručně vytvořené soubory bez něj se
+     načítají s prázdnou historií).
 - Spouštění akcí je oddělené od config store (samostatný „execution engine“
   balíček, fáze 3) — config store nezná detaily `os/exec`, jen drží definice
   a přijímá zápis výsledků (`Run`) do historie dané akce.
@@ -82,18 +91,29 @@ intervaly per karta — standardní a dočasně zrychlený po primární akci
   potřeba perzistentního úložiště pro časové řady odpadá.
 - Ukládání každé karty do vlastního souboru — zamítnuto, ztěžuje atomicitu a
   přehlednost (FR-30 vyžaduje jeden soubor).
-- Persistovat i historii běhů do JSON — zamítnuto (viz výše, opotřebení
-  SD karty); pokud se v budoucnu ukáže potřeba historii přežívající restart,
-  řešit samostatným ADR (např. append-only log soubor place mimo hlavní
-  config JSON).
+- Persistovat historii běhů při **každém** `AppendRun` — zamítnuto (viz
+  výše, opotřebení SD karty při pollingu každých 10–60 s). Místo toho se
+  historie ukládá jen jednorázově při řízeném vypnutí (FR-35) — kompromis
+  mezi trvanlivostí přes běžný restart/update a počtem zápisů na disk.
+- Periodické průběžné zapisování historie (např. jednou za minutu) —
+  zamítnuto pro MVP jako zbytečná komplexita; lze zvážit později samostatným
+  ADR, pokud se ukáže, že řízené vypnutí není dostatečné (např. časté
+  neřízené pády v provozu).
 
 ## Důsledky
 
 - Žádné externí závislosti na databázi ani ORM.
-- Po restartu aplikace je historie běhů (a tedy i poslední zobrazený stav
-  karty, dokud neproběhne nový health-check) prázdná — UI musí umět zobrazit
-  stav „neznámý“ a v ideálním případě po startu rovnou vyvolat jeden
-  status-check pro karty s pollingem (upřesní implementační blok fáze 4).
+- Po **řízeném** restartu/vypnutí (systemd `stop`/`restart`, update binárky)
+  je historie běhů zachována — načte se z `history` klíče konfiguračního
+  souboru. Po **neřízeném** ukončení (pád, výpadek napájení, `SIGKILL`) je
+  historie jen tak stará, jak poslední úspěšné řízené vypnutí — mezitím
+  proběhlé běhy (vč. posledního zobrazeného stavu karty) se ztratí a UI musí
+  umět zobrazit stav „neznámý“, dokud neproběhne nový health-check
+  (v ideálním případě po startu rovnou vyvolat jeden status-check pro karty
+  s pollingem — upřesní implementační blok fáze 4).
+- `cmd/marionette` musí zachytávat `SIGINT`/`SIGTERM`, provést graceful
+  shutdown HTTP serveru a až poté uložit store (config + history) — v tomto
+  pořadí, aby neprobíhal zápis souběžně s ještě běžícími handlery.
 - `Settings` (velikost historie, limit souběžnosti) jsou součástí
   persistované konfigurace a měnitelné přes stejné API/UI jako karty.
 - Toto ADR je vstupem pro implementační blok(y) fáze 2 v roadmapě.

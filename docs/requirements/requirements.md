@@ -1,9 +1,11 @@
-# Požadavky na Marionette (SRS) — v0.3
+# Požadavky na Marionette (SRS) — v0.4
 
 > Stav: **zpřesněno** (fáze 1, 2026-09-25; doplněno o dva polling intervaly a
-> vynucenou terminaci akcí, 2026-09-25). Otevřené otázky z v0.1 byly
-> rozhodnuty s vlastníkem projektu, viz [Rozhodnutí fáze 1](#7-rozhodnutí-fáze-1)
-> a [Rozhodnutí — polling a terminace](#9-rozhodnutí-polling-a-terminace-2026-09-25).
+> vynucenou terminaci akcí, 2026-09-25; doplněno o perzistenci historie běhů
+> při řízeném ukončení, 2026-09-25). Otevřené otázky z v0.1 byly rozhodnuty
+> s vlastníkem projektu, viz [Rozhodnutí fáze 1](#7-rozhodnutí-fáze-1),
+> [Rozhodnutí — polling a terminace](#9-rozhodnutí-polling-a-terminace-2026-09-25)
+> a [Rozhodnutí — perzistence historie při vypnutí](#11-rozhodnutí-perzistence-historie-při-vypnutí-2026-09-25).
 > Každá položka má ID pro zpětné odkazování z ADR a implementačních bloků.
 
 ## 1. Účel a rozsah
@@ -111,6 +113,17 @@ spustitelný soubor.
 - **FR-34**: Cesta ke konfiguračnímu souboru je nastavitelná proměnnou
   prostředí `MARIONETTE_CONFIG` (výchozí `./marionette.json`), analogicky k
   již existující `MARIONETTE_ADDR` (výchozí `:8080`) pro HTTP adresu/port.
+- **FR-35**: Při **řízeném ukončení aplikace** (přijetí SIGINT/SIGTERM a
+  doběhnutí graceful shutdown) se aktuální historie běhů (FR-17) uloží na
+  disk společně s konfigurací. Při startu aplikace se historie načte
+  společně s konfigurací, pokud je k dispozici a platná — díky tomu se při
+  řízeném vypnutí/restartu (např. update binárky, restart systemd služby)
+  historie běhů neztrácí. Při neřízeném ukončení (pád procesu, výpadek
+  napájení, `SIGKILL`) se historie od posledního uložení ztratí — to je
+  akceptované riziko (viz [ADR-0004](../architecture/decisions/0004-action-card-domain-model.md)
+  a NFR-03, důvod proč se historie nepersistuje při každém běhu).
+  Poškozená/chybějící uložená historie při startu se chová jako FR-33 —
+  nesmí shodit aplikaci, jen se historie nenačte (začne prázdná).
 
 ### 3.5 API
 
@@ -189,7 +202,13 @@ promítnuty do FR/NFR výše:
 | Zrychlený polling bez standardního | Neaktivuje se — zrychlený polling je jen dočasné zesílení standardního, vyžaduje ho mít zapnutý (FR-15a).                                        |
 | Vynucená terminace po timeoutu     | Existující `TimeoutSec` (FR-11) je závazná maximální doba čekání; po vypršení execution engine proces zabije (FR-19), žádný nový parametr navíc. |
 
-## 10. Sledovatelnost
+## 11. Rozhodnutí — perzistence historie při vypnutí (2026-09-25)
+
+| Otázka                            | Rozhodnutí                                                                                                                                                                                                                                                                                                                              |
+| --------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Ztráta historie běhů při restartu | Historie se navíc uloží na disk při **řízeném** ukončení aplikace (graceful shutdown) a načte zpět při startu spolu s konfigurací (FR-35). Za běhu (mezi jednotlivými běhy akcí) se nadále nepersistuje kvůli opotřebení SD karty (ADR-0004). Při neřízeném pádu/výpadku se historie od posledního uložení ztrácí — akceptované riziko. |
+
+## 12. Sledovatelnost
 
 Každý implementační blok v [roadmapě](../plans/roadmap.md) musí odkazovat na
 alespoň jedno FR/NFR z tohoto dokumentu. Nové požadavky se přidávají promptem
