@@ -73,6 +73,7 @@ func (api cardAPI) events(w http.ResponseWriter, request *http.Request) {
 	w.Header().Set("Content-Type", "text/event-stream")
 	w.Header().Set("X-Accel-Buffering", "no")
 	w.WriteHeader(http.StatusOK)
+	_, _ = fmt.Fprint(w, ": connected\n\n")
 	flusher.Flush()
 
 	subscriber, unsubscribe := api.statusEvents.subscribe()

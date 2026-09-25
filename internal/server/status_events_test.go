@@ -4,6 +4,7 @@ import (
 	"context"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
@@ -39,5 +40,8 @@ func TestStatusEventsEndpointSetsSSEHeadersAndStopsWithRequest(t *testing.T) {
 	handler.ServeHTTP(response, request)
 	if response.Code != http.StatusOK || response.Header().Get("Content-Type") != "text/event-stream" {
 		t.Fatalf("SSE response = %d %q", response.Code, response.Header().Get("Content-Type"))
+	}
+	if !strings.Contains(response.Body.String(), ": connected\n\n") {
+		t.Fatalf("SSE response did not contain connection comment: %q", response.Body.String())
 	}
 }
