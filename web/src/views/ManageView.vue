@@ -272,14 +272,14 @@ onMounted(async () => {
 <style scoped>
 :global(body) {
 	margin: 0;
-	background: #f4f1eb;
-	color: #1e2926;
-	font-family: Georgia, "Times New Roman", serif;
+	background: var(--color-canvas);
+	color: var(--color-ink);
+	font-family: var(--font-ui);
 }
 .manage-shell {
 	min-height: 100vh;
 	padding: clamp(2rem, 6vw, 5rem) clamp(1rem, 5vw, 5rem);
-	background: radial-gradient(circle at top right, #d5e4d9 0, transparent 35rem), #f4f1eb;
+	background: var(--color-canvas);
 }
 .manage-header {
 	display: flex;
@@ -291,8 +291,8 @@ onMounted(async () => {
 }
 .eyebrow {
 	margin: 0 0 0.75rem;
-	color: #a24b32;
-	font-family: "Trebuchet MS", sans-serif;
+	color: var(--color-accent);
+	font-family: var(--font-ui);
 	font-size: 0.75rem;
 	font-weight: 700;
 	letter-spacing: 0.14em;
@@ -308,8 +308,8 @@ h1 {
 }
 .back-link,
 .manage-link {
-	color: #a24b32;
-	font-family: "Trebuchet MS", sans-serif;
+	color: var(--color-accent);
+	font-family: var(--font-ui);
 	font-weight: 700;
 	text-decoration: none;
 }
@@ -326,16 +326,16 @@ h1 {
 }
 .card-list,
 .editor-card {
-	border: 1px solid #d7d3ca;
-	box-shadow: 0 1rem 2.5rem rgb(44 58 50 / 8%);
+	border: 1px solid var(--color-border);
+	box-shadow: var(--shadow-subtle);
 }
 .new-button {
 	width: 100%;
 	margin-bottom: 1rem;
 }
 .muted {
-	color: #53615b;
-	font-family: "Trebuchet MS", sans-serif;
+	color: var(--color-muted);
+	font-family: var(--font-ui);
 }
 .card-choice {
 	display: flex;
@@ -345,17 +345,17 @@ h1 {
 	gap: 0.25rem;
 	padding: 0.75rem;
 	border: 0;
-	border-top: 1px solid #e5e1d8;
+	border-top: 1px solid var(--color-border);
 	background: transparent;
-	color: #1e2926;
+	color: var(--color-ink);
 	cursor: pointer;
 	text-align: left;
 }
 .card-choice.selected {
-	background: #e1eadf;
+	background: var(--color-accent-soft);
 }
 .card-choice small {
-	color: #53615b;
+	color: var(--color-muted);
 }
 .form-grid {
 	display: grid;
@@ -366,15 +366,15 @@ label {
 	display: flex;
 	flex-direction: column;
 	gap: 0.4rem;
-	color: #53615b;
-	font-family: "Trebuchet MS", sans-serif;
+	color: var(--color-muted);
+	font-family: var(--font-ui);
 	font-size: 0.85rem;
 	font-weight: 700;
 }
 .action-editor {
 	margin-top: 2rem;
 	padding-top: 1.5rem;
-	border-top: 1px solid #e5e1d8;
+	border-top: 1px solid var(--color-border);
 }
 .action-editor h2 {
 	margin-bottom: 1rem;
@@ -389,9 +389,9 @@ label {
 	width: fit-content;
 	border: 0;
 	background: transparent;
-	color: #a24b32;
+	color: var(--color-accent);
 	cursor: pointer;
-	font-family: "Trebuchet MS", sans-serif;
+	font-family: var(--font-ui);
 	font-weight: 700;
 }
 .env-row {
@@ -404,7 +404,7 @@ label {
 	align-items: center;
 	gap: 0.75rem;
 	margin-top: 2rem;
-	font-family: "Trebuchet MS", sans-serif;
+	font-family: var(--font-ui);
 }
 .polling-grid {
 	margin-top: 2rem;

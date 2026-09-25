@@ -177,10 +177,12 @@ environment variables are repeatable rows, not an opaque JSON editor.
 
 ### 8.1 Visual direction
 
-The direction is **quiet operations**: warm light canvas, dark ink text,
-terracotta identity accent, and green/blue operational states. Avoid purple
-gradients, glass panels, decorative orbs, marketing hero sections, and nested
-cards.
+The direction is **quiet botanical operations**: an airy sage canvas, soft
+green surfaces, dark green-gray ink, and one confident natural-green action
+accent. The base palette is intentionally restrained and close to monochrome;
+blue, amber, and red appear only when they communicate a distinct operational
+state. Avoid purple gradients, glass panels, decorative orbs, marketing hero
+sections, and nested cards.
 
 ### 8.2 Shared tokens
 
@@ -188,16 +190,23 @@ Tokens are defined once and consumed by all views:
 
 ```css
 :root {
-  --color-canvas: #f4f1eb;
-  --color-surface: #fffdf8;
-  --color-ink: #1e2926;
-  --color-muted: #5f6d67;
-  --color-border: #d7d3ca;
-  --color-accent: #a24b32;
-  --color-success: #23745f;
-  --color-info: #326b8e;
-  --color-warning: #b27a27;
-  --color-danger: #a8433e;
+  --color-canvas: #f2f7f3;
+  --color-surface: #fbfdfb;
+  --color-surface-raised: #ffffff;
+  --color-ink: #1d3028;
+  --color-muted: #60746b;
+  --color-border: #d6e3da;
+  --color-border-strong: #b7cbbd;
+  --color-accent: #3e8064;
+  --color-accent-strong: #2e604b;
+  --color-accent-soft: #e5f0e8;
+  --color-success: #2f805f;
+  --color-info: #3e7184;
+  --color-info-soft: #e7f0f3;
+  --color-warning: #a87528;
+  --color-warning-soft: #f6eedc;
+  --color-danger: #b2504b;
+  --color-danger-soft: #f7e7e5;
   --radius-sm: 6px;
   --radius-md: 10px;
   --space-1: 4px;

@@ -122,7 +122,7 @@ function updateEnvironment(index: number, key: "key" | "value", value: unknown) 
 .action-editor {
 	margin-top: 2rem;
 	padding-top: 1.5rem;
-	border-top: 1px solid #e5e1d8;
+	border-top: 1px solid var(--color-border);
 }
 .action-editor h2 {
 	margin: 0 0 1rem;
@@ -138,8 +138,8 @@ label {
 	display: flex;
 	flex-direction: column;
 	gap: 0.4rem;
-	color: #53615b;
-	font-family: "Trebuchet MS", sans-serif;
+	color: var(--color-muted);
+	font-family: var(--font-ui);
 	font-size: 0.85rem;
 	font-weight: 700;
 }
@@ -152,9 +152,9 @@ label {
 	width: fit-content;
 	border: 0;
 	background: transparent;
-	color: #a24b32;
+	color: var(--color-accent);
 	cursor: pointer;
-	font-family: "Trebuchet MS", sans-serif;
+	font-family: var(--font-ui);
 	font-weight: 700;
 }
 .env-row {
