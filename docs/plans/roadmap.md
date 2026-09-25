@@ -43,6 +43,9 @@ uloží do `docs/plans/blocks/NNNN-nazev.md`. Blok se implementuje promptem
   - [0005 — Zachycení výstupu a vyhodnocení výsledku](blocks/0005-execution-result.md)
   - [0006 — Globální limit souběžných akcí](blocks/0006-execution-concurrency.md)
 
+- ADR-0006 je přijato: status historie obsahuje pouze skutečné přechody stavů
+  s dobou jejich trvání; migrace starších status historií není součástí MVP.
+
 - Bloky uvnitř fáze by měly být dost malé na jednu implementační relaci s AI
   agentem (řádově hodiny práce, ne dny) a musí mít jasné kritérium hotovosti
   (viz [Definition of Done](../devops/definition-of-done.md)).

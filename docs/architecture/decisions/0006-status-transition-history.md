@@ -1,6 +1,6 @@
 # ADR-0006: Historie statusu jako přechody stavů
 
-- **Stav**: Návrh
+- **Stav**: Přijato
 - **Datum**: 2026-09-25
 - **Nahrazuje část**: ADR-0004 týkající se ukládání každého status běhu do historie
 
@@ -38,6 +38,6 @@ v něm zařízení zůstalo.
 - Dashboard může zobrazit aktuální stav i dobu, po kterou trvá.
 - Stavový engine musí atomicky aktualizovat poslední kontrolu a případný
   přechod; odpovědnost bude v implementačním bloku fáze 4.
-- JSON schéma `history.status` se mění z `[]Run` na `[]StatusChange`; starší
-  soubory s původním formátem status běhů vyžadují migrační/ignorační pravidlo
-  v bloku persistence nebo fáze 4.
+- JSON schéma `history.status` se mění z `[]Run` na `[]StatusChange`.
+  Migrace starších souborů s původním formátem status běhů není součástí MVP;
+  kompatibilita těchto historických dat se nebude zvlášť řešit.
