@@ -71,14 +71,19 @@ Po každé změně v `internal/**/*.go` spusť `go build ./...`, `go vet ./...` 
 
 ## Proces vývoje (spec-driven, AI-agent řízený)
 
-Vývoj postupuje v cyklu: **požadavek → architektonické rozhodnutí (ADR) →
-implementační blok v roadmapě → implementace + testy → aktualizace
-dokumentace**. Pro jednotlivé kroky použij prompty v `.github/prompts/`:
+Závazný proces je popsán v
+[docs/devops/development-workflow.md](docs/devops/development-workflow.md).
+Postup je: **požadavek → requirement → ADR podle potřeby → roadmapa →
+implementační blok → schválení → implementace + testy → Definition of Done →
+uzavření a aktualizace dokumentace**.
+
+Pro jednotlivé kroky použij prompty v `.github/prompts/`:
 
 - `/new-requirement` — zápis/úprava požadavku do requirements.md
 - `/new-adr` — návrh nového architektonického rozhodnutí
 - `/plan-block` — rozpracování fáze z roadmapy do konkrétního implementačního bloku
 - `/implement-block` — implementace jednoho schváleného bloku vč. testů
 
-Neimplementuj funkčnost, která není pokrytá alespoň jedním requirementem a
-implementačním blokem v roadmapě — pokud chybí, nejdřív ho tam dopl.
+Neimplementuj funkčnost, která není pokrytá requirementem, případným přijatým
+ADR a schváleným implementačním blokem v roadmapě. Detailní pravidla stavů,
+schvalování, odchylek a Definition of Done jsou v uvedeném workflow dokumentu.

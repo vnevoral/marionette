@@ -1,5 +1,8 @@
 # Roadmapa a implementační bloky
 
+Proces plánování a implementace je závazně popsán v
+[docs/devops/development-workflow.md](../devops/development-workflow.md).
+
 Fáze odpovídají hrubému pořadí implementace. Každá fáze se před implementací
 rozpracuje promptem `/plan-block` do jednoho nebo více konkrétních
 implementačních bloků (viz [šablona](template-implementation-block.md)) a

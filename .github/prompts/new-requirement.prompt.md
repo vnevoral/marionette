@@ -7,6 +7,8 @@ agent: "agent"
 Zaznamenej nový nebo upravený požadavek do
 [docs/requirements/requirements.md](../../docs/requirements/requirements.md).
 
+Dodrž [jednotný vývojový workflow](../../docs/devops/development-workflow.md).
+Tento krok pouze připravuje dokumentaci; neplánuj ani neimplementuj kód.
 Postup:
 
 1. Zjisti od uživatele (pokud to není zřejmé ze zadání), zda jde o funkční
@@ -22,3 +24,5 @@ Postup:
    i ADR (`/new-adr`), ale sám ho nevytvářej bez potvrzení.
 6. Zkontroluj, jestli požadavek nekoliduje s existujícím ADR — pokud ano,
    upozorni na rozpor místo tichého zapsání.
+7. Na konci uveď, zda požadavek vyžaduje ADR a implementační blok; žádný z nich
+   automaticky neschvaluj.

@@ -3,7 +3,8 @@
 - **Fáze**: {číslo a název fáze z roadmap.md}
 - **Vazba na požadavky**: {FR-xx, NFR-xx}
 - **Vazba na ADR**: {ADR-xxxx, pokud relevantní}
-- **Stav**: Návrh | Schváleno | V realizaci | Hotovo
+- **Stav**: Návrh | Schváleno | Probíhá | Hotovo | Zablokováno | Zamítnuto
+- **Závislosti**: {předchozí bloky, requirements nebo ADR}
 
 ## Cíl bloku
 
@@ -13,6 +14,12 @@ Jedna až dvě věty — co po dokončení bloku bude fungovat, co ne.
 
 - Co je uvnitř (in scope)
 - Co je záměrně mimo (out of scope) — ať to agent nezkouší dodělávat navíc
+
+## Schválení
+
+- **Schválil**: {uživatel/projektový vlastník}
+- **Datum schválení**: {YYYY-MM-DD, nebo „čeká“}
+- **Poznámky k rozhodnutí**: {volitelné}
 
 ## Návrh řešení
 
@@ -28,3 +35,9 @@ kontrakt (pokud relevantní).
 
 Viz [Definition of Done](../devops/definition-of-done.md) + specifické body
 pro tento blok (pokud nějaké jsou).
+
+## Uzavření
+
+- **Stav po implementaci**: {Hotovo | Zablokováno | Zamítnuto}
+- **Ověření**: {příkazy a výsledek}
+- **Dokumentace aktualizována**: {ano/ne, odkazy}

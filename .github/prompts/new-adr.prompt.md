@@ -7,6 +7,10 @@ agent: "agent"
 Navrhni nové architektonické rozhodnutí podle
 [šablony](../../docs/architecture/decisions/template.md).
 
+Dodrž [jednotný vývojový workflow](../../docs/devops/development-workflow.md).
+Tento krok pouze připravuje ADR; neimplementuj kód ani nevytvářej schválený
+implementační blok automaticky.
+
 Postup:
 
 1. Over si v [docs/architecture/decisions/](../../docs/architecture/decisions)
@@ -22,3 +26,5 @@ Postup:
    (staré: „Nahrazeno ADR-NNNN“, nové: odkaz zpět).
 5. Aktualizuj [docs/architecture/overview.md](../../docs/architecture/overview.md),
    pokud rozhodnutí mění přehled komponent.
+6. Na konci uveď závislé requirements a navazující implementační bloky, které
+   bude třeba naplánovat po přijetí ADR.
