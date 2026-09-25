@@ -2,6 +2,7 @@ package server
 
 import (
 	"errors"
+	"log"
 	"sync"
 
 	"marionette/internal/config"
@@ -23,6 +24,11 @@ type StatusChecker interface {
 // PrimaryActionNotifier activates fast polling after a primary action is accepted.
 type PrimaryActionNotifier interface {
 	NotifyPrimaryAction(string) error
+}
+
+// CardReconciler updates background workers after card configuration changes.
+type CardReconciler interface {
+	Reconcile() error
 }
 
 // ActionQueue accepts actions for background execution and can drain them during shutdown.
@@ -66,9 +72,12 @@ func (actions *BackgroundActions) EnqueuePrimary(cardID string, action config.Ac
 		defer actions.group.Done()
 		result, err := actions.runner.Run(action)
 		if err != nil {
+			log.Printf("primary action %q failed: %v", cardID, err)
 			return
 		}
-		_ = actions.store.AppendRun(cardID, result.ToRun("primary"))
+		if err := actions.store.AppendRun(cardID, result.ToRun("primary")); err != nil {
+			log.Printf("save primary action result for %q: %v", cardID, err)
+		}
 	}()
 	return nil
 }
@@ -80,7 +89,9 @@ func (actions *BackgroundActions) EnqueueStatus(cardID string) error {
 	}
 	go func() {
 		defer actions.group.Done()
-		_, _ = actions.statusChecker.CheckNow(cardID)
+		if _, err := actions.statusChecker.CheckNow(cardID); err != nil {
+			log.Printf("status action %q failed: %v", cardID, err)
+		}
 	}()
 	return nil
 }

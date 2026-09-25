@@ -3,6 +3,7 @@ package status
 import (
 	"context"
 	"errors"
+	"reflect"
 	"sync"
 	"time"
 
@@ -56,7 +57,9 @@ func (timer realSchedulerTimer) Chan() <-chan time.Time {
 }
 
 type pollWorker struct {
-	wake chan struct{}
+	wake   chan struct{}
+	cancel context.CancelFunc
+	card   config.ActionCard
 }
 
 // Scheduler runs status checks for cards with standard polling enabled.
@@ -67,6 +70,7 @@ type Scheduler struct {
 
 	mu        sync.Mutex
 	running   bool
+	context   context.Context
 	cancel    context.CancelFunc
 	workers   map[string]*pollWorker
 	fastUntil map[string]time.Time
@@ -103,16 +107,11 @@ func (scheduler *Scheduler) Start(parent context.Context) error {
 	}
 	ctx, cancel := context.WithCancel(parent)
 	scheduler.running = true
+	scheduler.context = ctx
 	scheduler.cancel = cancel
 	scheduler.workers = make(map[string]*pollWorker)
 	for _, card := range scheduler.store.ListCards() {
-		if card.PollingIntervalSeconds <= 0 || card.Status == nil {
-			continue
-		}
-		worker := &pollWorker{wake: make(chan struct{}, 1)}
-		scheduler.workers[card.ID] = worker
-		scheduler.waitGroup.Add(1)
-		go scheduler.runWorker(ctx, card.ID, worker)
+		scheduler.startWorkerLocked(ctx, card)
 	}
 	scheduler.mu.Unlock()
 	return nil
@@ -127,11 +126,50 @@ func (scheduler *Scheduler) Stop() error {
 	}
 	cancel := scheduler.cancel
 	scheduler.running = false
+	scheduler.context = nil
 	scheduler.cancel = nil
 	scheduler.mu.Unlock()
 
 	cancel()
 	scheduler.waitGroup.Wait()
+	scheduler.mu.Lock()
+	scheduler.workers = make(map[string]*pollWorker)
+	scheduler.mu.Unlock()
+	return nil
+}
+
+// Reconcile updates polling workers to match the current cards in the store.
+func (scheduler *Scheduler) Reconcile() error {
+	scheduler.mu.Lock()
+	if !scheduler.running {
+		scheduler.mu.Unlock()
+		return ErrSchedulerStopped
+	}
+	ctx := scheduler.context
+	current := make(map[string]config.ActionCard)
+	for id, worker := range scheduler.workers {
+		current[id] = worker.card
+	}
+	desired := make(map[string]config.ActionCard)
+	for _, card := range scheduler.store.ListCards() {
+		if card.PollingIntervalSeconds > 0 && card.Status != nil {
+			desired[card.ID] = card
+		}
+	}
+	for id, worker := range scheduler.workers {
+		card, exists := desired[id]
+		if exists && reflect.DeepEqual(current[id], card) {
+			continue
+		}
+		worker.cancel()
+		delete(scheduler.workers, id)
+	}
+	for id, card := range desired {
+		if _, exists := scheduler.workers[id]; !exists {
+			scheduler.startWorkerLocked(ctx, card)
+		}
+	}
+	scheduler.mu.Unlock()
 	return nil
 }
 
@@ -182,6 +220,14 @@ func (scheduler *Scheduler) runWorker(ctx context.Context, cardID string, worker
 			scheduler.resetTimer(timer, scheduler.nextInterval(card))
 		}
 	}
+}
+
+func (scheduler *Scheduler) startWorkerLocked(parent context.Context, card config.ActionCard) {
+	workerContext, cancel := context.WithCancel(parent)
+	worker := &pollWorker{wake: make(chan struct{}, 1), cancel: cancel, card: card}
+	scheduler.workers[card.ID] = worker
+	scheduler.waitGroup.Add(1)
+	go scheduler.runWorker(workerContext, card.ID, worker)
 }
 
 func (scheduler *Scheduler) nextInterval(card config.ActionCard) time.Duration {

@@ -15,15 +15,15 @@ flowchart LR
 
 ## Komponenty (dnešní stav + plánované)
 
-| Komponenta             | Umístění                      | Odpovědnost                                                                              | Stav                                     |
-| ---------------------- | ----------------------------- | ---------------------------------------------------------------------------------------- | ---------------------------------------- |
-| HTTP server / routing  | `internal/server`             | API routy, SPA fallback                                                                  | Implementováno (health endpoint)         |
-| Embed vestavěného UI   | `internal/webui`              | `go:embed` `web/dist`                                                                    | Implementováno                           |
-| SPA (Vue 3 + PrimeVue) | `web/src`                     | Dashboard, správa karet                                                                  | Implementován skelet (health check demo) |
-| Config store           | `internal/config` (plán)      | In-memory karty + Settings (JSON perzistence); in-memory historie běhů (nepersistuje se) | Plánováno — ADR-0004 (přijato), fáze 2   |
-| Execution engine       | `internal/exec` (plán)        | Bezpečné spouštění akcí na hostu, capture výstupu                                        | Plánováno — fáze 3                       |
-| Status/health engine   | `internal/status` (plán)      | Vyhodnocení stavu karty, volitelný polling                                               | Plánováno — fáze 4                       |
-| REST API domény        | `internal/server` (rozšíření) | CRUD karet/akcí, spouštění, čtení stavu                                                  | Plánováno — fáze 5                       |
+| Komponenta             | Umístění          | Odpovědnost                                                     | Stav                                        |
+| ---------------------- | ----------------- | --------------------------------------------------------------- | ------------------------------------------- |
+| HTTP server / routing  | `internal/server` | API routy, SPA fallback                                         | Implementováno (CRUD, enqueue, status read) |
+| Embed vestavěného UI   | `internal/webui`  | `go:embed` `web/dist`                                           | Implementováno                              |
+| SPA (Vue 3 + PrimeVue) | `web/src`         | Dashboard, správa karet                                         | Implementován skelet (health check demo)    |
+| Config store           | `internal/config` | In-memory karty, Settings, JSON perzistence a historie          | Implementováno — fáze 2                     |
+| Execution engine       | `internal/exec`   | Bezpečné spouštění akcí na hostu, capture výstupu               | Implementováno — fáze 3                     |
+| Status/health engine   | `internal/status` | Vyhodnocení stavu karty, transition historie, volitelný polling | Implementováno — fáze 4                     |
+| REST API domény        | `internal/server` | CRUD karet/akcí, async enqueue, čtení stavu                     | Implementováno — fáze 5                     |
 
 ## Vztah k dokumentaci
 

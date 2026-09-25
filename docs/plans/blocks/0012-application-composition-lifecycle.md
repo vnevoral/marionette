@@ -3,7 +3,7 @@
 - **Fáze**: 5 — REST API
 - **Vazba na požadavky**: FR-15, FR-15a, FR-17, FR-35, FR-40
 - **Vazba na ADR**: ADR-0004, ADR-0006
-- **Stav**: Návrh
+- **Stav**: Hotovo
 - **Závislosti**: Bloky 0010–0011; `cmd/marionette/main.go`, scheduler, persistence
 
 ## Cíl bloku
@@ -11,7 +11,8 @@
 Aplikace sestaví všechny služby z jedné konfigurace, spustí scheduler před HTTP
 serverem a při CRUD změnách živě přepočítá polling workery. Při graceful
 shutdownu nejprve zastaví příjem nových požadavků a počká na přijaté
-background primární akce, aby se jejich historie uložila před ukončením.
+background primární i ruční status akce, aby se jejich výsledky uložily před
+ukončením.
 
 ## Rozsah
 
@@ -21,8 +22,9 @@ background primární akce, aby se jejich historie uložila před ukončením.
   - start scheduleru v application contextu;
   - `Scheduler.Reconcile` pro přidání, odebrání a retiming workerů;
   - volání reconcile po úspěšném create/update/delete karty;
-  - shutdown pořadí: zastavit přijímání HTTP, počkat na background primární
-    akce, zastavit scheduler, ukončit HTTP server a volat `SaveFileWithHistory`;
+  - shutdown pořadí: zastavit přijímání HTTP, počkat na background primární i
+    status akce, zastavit scheduler, ukončit HTTP server a volat
+    `SaveFileWithHistory`;
   - dokumentace residual risku neomezeného čekání `Scheduler.Stop`.
 - **Mimo rozsah**:
   - context-aware cancellation queued runneru;
@@ -48,9 +50,9 @@ při změně karty restartuje dotčený worker. CRUD handler ji zavolá až po �
 mutaci store.
 
 Při SIGINT/SIGTERM se nejprve zastaví přijímání nových HTTP požadavků, počká se
-na přijaté background primární akce, zastaví se scheduler, ukončí HTTP server a
-nakonec se uloží konfigurace včetně historie. Hard bounded shutdown zůstává
-mimo tento blok a je případný budoucí blok.
+na přijaté background primární i status akce, zastaví se scheduler, ukončí HTTP
+server a nakonec se uloží konfigurace včetně historie. Hard bounded shutdown
+zůstává mimo tento blok a je případný budoucí blok.
 
 ## Testovací plán
 
@@ -70,6 +72,7 @@ graceful shutdown nepřijde o historii po dokončení workerů.
 
 ## Uzavření
 
-- **Stav po implementaci**: čeká
-- **Ověření**: čeká
-- **Dokumentace aktualizována**: čeká
+- **Stav po implementaci**: Hotovo
+- **Ověření**: `go build ./...`, `go vet ./...`, `go test ./...`,
+  `go test -race ./...`, `git diff --check`
+- **Dokumentace aktualizována**: ano; architektura a roadmapa synchronizovány

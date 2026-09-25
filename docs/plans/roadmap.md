@@ -18,7 +18,7 @@ uloží do `docs/plans/blocks/NNNN-nazev.md`. Blok se implementuje promptem
 | 2    | Doménový model + config store (in-memory + JSON perzistence)                                 | **Hotovo**                                       | FR-10..14, FR-30..33, ADR-0004 |
 | 3    | Execution engine (bezpečné spouštění akcí na hostu)                                          | **Hotovo**                                       | FR-11, FR-13, NFR-01, NFR-04   |
 | 4    | Status/health-check engine (vč. volitelného pollingu)                                        | **Hotovo**                                       | FR-12, FR-15, FR-16, FR-17     |
-| 5    | REST API (CRUD karet/akcí, spuštění, čtení stavu)                                            | **Probíhá** (0010–0011 hotovo; 0012 návrh)       | FR-40, FR-41                   |
+| 5    | REST API (CRUD karet/akcí, spuštění, čtení stavu)                                            | **Hotovo**                                       | FR-40, FR-41                   |
 | 6    | Dashboard UI (karty, stavové indikátory, formuláře správy)                                   | Plánováno                                        | FR-20..23                      |
 | 7    | Balíčkování a nasazení (systemd unit, install skript, arm64 release)                         | Plánováno                                        | FR-02..04, NFR-02              |
 | 8    | Zpevnění (auth/access control, logování, chybové stavy, testy, dokumentace)                  | Plánováno                                        | NFR-01, NFR-04..06             |
@@ -59,8 +59,7 @@ uloží do `docs/plans/blocks/NNNN-nazev.md`. Blok se implementuje promptem
   - [0011 — Orchestrace primární a status akce](blocks/0011-action-orchestration.md)
   - [0012 — Kompozice aplikace, reconcile a lifecycle](blocks/0012-application-composition-lifecycle.md)
 
-  Bloky 0010–0011 jsou hotové; blok 0012 je ve stavu **Návrh** a čeká na
-  schválení před implementací.
+  Bloky 0010–0012 jsou hotové.
 
 - Bloky uvnitř fáze by měly být dost malé na jednu implementační relaci s AI
   agentem (řádově hodiny práce, ne dny) a musí mít jasné kritérium hotovosti

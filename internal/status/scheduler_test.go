@@ -225,3 +225,59 @@ func TestSchedulerStopCancelsPolling(t *testing.T) {
 	default:
 	}
 }
+
+func TestSchedulerReconcileAddsRestartsAndRemovesWorkers(t *testing.T) {
+	store := config.NewStore(config.Settings{HistorySize: 5, MaxConcurrentActions: 1})
+	checker := &fakeChecker{calls: make(chan string, 8)}
+	scheduler, err := NewScheduler(store, checker)
+	if err != nil {
+		t.Fatalf("NewScheduler() error = %v", err)
+	}
+	clock := newFakeClock()
+	scheduler.clock = clock
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	if err := scheduler.Start(ctx); err != nil {
+		t.Fatalf("Start() error = %v", err)
+	}
+
+	schedulerTestCard(t, store, "reconcile", 10, 2, 3)
+	if err := scheduler.Reconcile(); err != nil {
+		t.Fatalf("Reconcile(add) error = %v", err)
+	}
+	waitForTimer(t, clock)
+	if duration := <-clock.durations; duration != 10*time.Second {
+		t.Fatalf("initial timer duration = %v", duration)
+	}
+
+	card, ok := store.GetCard("reconcile")
+	if !ok {
+		t.Fatal("reconcile card was not stored")
+	}
+	card.PollingIntervalSeconds = 4
+	if _, err := store.UpdateCard(card.ID, card); err != nil {
+		t.Fatalf("UpdateCard() error = %v", err)
+	}
+	if err := scheduler.Reconcile(); err != nil {
+		t.Fatalf("Reconcile(update) error = %v", err)
+	}
+	if duration := <-clock.durations; duration != 4*time.Second {
+		t.Fatalf("restarted timer duration = %v", duration)
+	}
+
+	if err := store.DeleteCard(card.ID); err != nil {
+		t.Fatalf("DeleteCard() error = %v", err)
+	}
+	if err := scheduler.Reconcile(); err != nil {
+		t.Fatalf("Reconcile(delete) error = %v", err)
+	}
+	clock.Advance(time.Minute)
+	select {
+	case cardID := <-checker.calls:
+		t.Fatalf("removed worker checked card %q", cardID)
+	default:
+	}
+	if err := scheduler.Stop(); err != nil {
+		t.Fatalf("Stop() error = %v", err)
+	}
+}

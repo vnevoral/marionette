@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"log"
 	"net/http"
 	"os"
@@ -10,7 +11,9 @@ import (
 	"time"
 
 	"marionette/internal/config"
+	execengine "marionette/internal/exec"
 	"marionette/internal/server"
+	"marionette/internal/status"
 )
 
 func main() {
@@ -30,14 +33,42 @@ func main() {
 		return changedStore.SaveFile(configPath)
 	}
 
+	executor := execengine.NewExecutor()
+	runner, err := execengine.NewRunner(store.GetSettings(), executor)
+	if err != nil {
+		log.Fatalf("create execution runner: %v", err)
+	}
+	statusService, err := status.NewStatusCheckService(store, runner)
+	if err != nil {
+		log.Fatalf("create status service: %v", err)
+	}
+	scheduler, err := status.NewScheduler(store, statusService)
+	if err != nil {
+		log.Fatalf("create status scheduler: %v", err)
+	}
+	backgroundActions, err := server.NewBackgroundActions(store, runner, statusService)
+	if err != nil {
+		log.Fatalf("create background action queue: %v", err)
+	}
+	applicationContext, cancelApplication := context.WithCancel(context.Background())
+	defer cancelApplication()
+	if err := scheduler.Start(applicationContext); err != nil {
+		log.Fatalf("start status scheduler: %v", err)
+	}
+
 	addr := os.Getenv("MARIONETTE_ADDR")
 	if addr == "" {
 		addr = ":8080"
 	}
 
 	srv := &http.Server{
-		Addr:              addr,
-		Handler:           server.NewRouter(),
+		Addr: addr,
+		Handler: server.NewRouterWithDependencies(server.RouterDependencies{
+			Store:      store,
+			Actions:    backgroundActions,
+			Notifier:   scheduler,
+			Reconciler: scheduler,
+		}),
 		ReadHeaderTimeout: 5 * time.Second,
 	}
 
@@ -58,6 +89,10 @@ func main() {
 		log.Printf("HTTP server shutdown failed: %v", err)
 	}
 	cancel()
+	backgroundActions.Close()
+	if err := scheduler.Stop(); err != nil && !errors.Is(err, status.ErrSchedulerStopped) {
+		log.Printf("status scheduler shutdown failed: %v", err)
+	}
 	if err := store.SaveFileWithHistory(configPath); err != nil {
 		log.Printf("config save failed: %v", err)
 	}

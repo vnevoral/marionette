@@ -18,9 +18,10 @@ const maxJSONBodyBytes = 1 << 20
 
 // RouterDependencies contains application services used by API routes.
 type RouterDependencies struct {
-	Store    *config.Store
-	Actions  ActionQueue
-	Notifier PrimaryActionNotifier
+	Store      *config.Store
+	Actions    ActionQueue
+	Notifier   PrimaryActionNotifier
+	Reconciler CardReconciler
 }
 
 // NewRouter builds the top-level HTTP handler for the application. A store
@@ -40,9 +41,10 @@ func NewRouterWithDependencies(dependencies RouterDependencies) http.Handler {
 	mux.HandleFunc("GET /api/health", handleHealth)
 	if dependencies.Store != nil {
 		handler := cardAPI{
-			store:    dependencies.Store,
-			actions:  dependencies.Actions,
-			notifier: dependencies.Notifier,
+			store:      dependencies.Store,
+			actions:    dependencies.Actions,
+			notifier:   dependencies.Notifier,
+			reconciler: dependencies.Reconciler,
 		}
 		mux.HandleFunc("GET /api/cards", handler.listCards)
 		mux.HandleFunc("POST /api/cards", handler.createCard)
@@ -64,9 +66,10 @@ func NewRouterWithDependencies(dependencies RouterDependencies) http.Handler {
 }
 
 type cardAPI struct {
-	store    *config.Store
-	actions  ActionQueue
-	notifier PrimaryActionNotifier
+	store      *config.Store
+	actions    ActionQueue
+	notifier   PrimaryActionNotifier
+	reconciler CardReconciler
 }
 
 func (api cardAPI) listCards(w http.ResponseWriter, _ *http.Request) {
@@ -86,6 +89,12 @@ func (api cardAPI) createCard(w http.ResponseWriter, request *http.Request) {
 		}
 		writeError(w, http.StatusBadRequest, err)
 		return
+	}
+	if api.reconciler != nil {
+		if err := api.reconciler.Reconcile(); err != nil {
+			writeError(w, http.StatusInternalServerError, err)
+			return
+		}
 	}
 	writeJSON(w, http.StatusCreated, created)
 }
@@ -113,6 +122,12 @@ func (api cardAPI) updateCard(w http.ResponseWriter, request *http.Request) {
 		writeError(w, http.StatusBadRequest, err)
 		return
 	}
+	if api.reconciler != nil {
+		if err := api.reconciler.Reconcile(); err != nil {
+			writeError(w, http.StatusInternalServerError, err)
+			return
+		}
+	}
 	writeJSON(w, http.StatusOK, updated)
 }
 
@@ -124,6 +139,12 @@ func (api cardAPI) deleteCard(w http.ResponseWriter, request *http.Request) {
 		}
 		writeError(w, http.StatusInternalServerError, err)
 		return
+	}
+	if api.reconciler != nil {
+		if err := api.reconciler.Reconcile(); err != nil {
+			writeError(w, http.StatusInternalServerError, err)
+			return
+		}
 	}
 	w.WriteHeader(http.StatusNoContent)
 }
