@@ -26,6 +26,8 @@ const status = ref<StatusSnapshot>();
 const runs = ref<Run[]>([]);
 const history = ref<StatusChange[]>([]);
 const loading = ref(true);
+const runsLoading = ref(true);
+const historyLoading = ref(true);
 const notFound = ref(false);
 const error = ref("");
 const sectionErrors = ref<Record<string, string>>({});
@@ -108,14 +110,19 @@ async function loadDetail() {
 		loading.value = false;
 		return;
 	}
-
-	const results = await Promise.allSettled([getRuns(cardID.value), getStatusHistory(cardID.value)]);
-	const [runsResult, historyResult] = results;
-	if (runsResult.status === "fulfilled") runs.value = runsResult.value ?? [];
-	else sectionErrors.value.runs = "Run history is unavailable";
-	if (historyResult.status === "fulfilled") history.value = historyResult.value ?? [];
-	else sectionErrors.value.history = "Status history is unavailable";
 	loading.value = false;
+
+	void Promise.allSettled([getRuns(cardID.value), getStatusHistory(cardID.value)]).then(
+		(results) => {
+			const [runsResult, historyResult] = results;
+			if (runsResult.status === "fulfilled") runs.value = runsResult.value ?? [];
+			else sectionErrors.value.runs = "Run history is unavailable";
+			if (historyResult.status === "fulfilled") history.value = historyResult.value ?? [];
+			else sectionErrors.value.history = "Status history is unavailable";
+			runsLoading.value = false;
+			historyLoading.value = false;
+		},
+	);
 }
 
 async function runAction(action: "primary" | "status") {
@@ -211,15 +218,14 @@ onMounted(loadDetail);
 			<section class="detail-grid grid" aria-label="Card summary">
 				<div class="col-12 md:col-6 p-2">
 					<div class="detail-panel summary-panel p-6 h-full">
-						<div class="panel-heading">
+						<div class="panel-heading current-status-heading">
 							<h2>Current status</h2>
-							<i class="pi pi-heart" aria-hidden="true"></i>
+							<StatusBadge
+								:label="currentStatusView().label"
+								:icon="currentStatusView().icon"
+								:tone="currentStatusView().tone"
+							/>
 						</div>
-						<StatusBadge
-							:label="currentStatusView().label"
-							:icon="currentStatusView().icon"
-							:tone="currentStatusView().tone"
-						/>
 						<dl v-if="card.status" class="summary-list">
 							<div>
 								<dt>Last checked</dt>
@@ -282,6 +288,9 @@ onMounted(loadDetail);
 					<span class="panel-count">{{ runs.length }}</span>
 				</div>
 				<p v-if="sectionErrors.runs" class="section-error">{{ sectionErrors.runs }}</p>
+				<div v-else-if="runsLoading" class="section-loading" role="status">
+					Loading recent runs...
+				</div>
 				<p v-else-if="!runs.length" class="empty-copy">No primary runs recorded yet.</p>
 				<div v-else class="run-list flex flex-column gap-3">
 					<article
@@ -312,6 +321,9 @@ onMounted(loadDetail);
 					<span class="panel-count">{{ history.length }}</span>
 				</div>
 				<p v-if="sectionErrors.history" class="section-error">{{ sectionErrors.history }}</p>
+				<div v-else-if="historyLoading" class="section-loading" role="status">
+					Loading status history...
+				</div>
 				<p v-else-if="!history.length" class="empty-copy">No status transitions recorded yet.</p>
 				<div v-else class="timeline flex flex-column gap-3">
 					<article
@@ -465,6 +477,11 @@ dd {
 }
 .action-hint,
 .empty-copy {
+	margin: var(--space-4) 0 0;
+	color: var(--color-muted);
+	font-size: 0.9rem;
+}
+.section-loading {
 	margin: var(--space-4) 0 0;
 	color: var(--color-muted);
 	font-size: 0.9rem;

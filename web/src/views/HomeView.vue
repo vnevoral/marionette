@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from "vue";
+import { computed, onMounted, onUnmounted, ref } from "vue";
 import { RouterLink } from "vue-router";
 import Button from "primevue/button";
 import Card from "primevue/card";
@@ -31,6 +31,7 @@ const error = ref("");
 const defaultFastPollingIntervalSeconds = 10;
 const defaultFastPollingWindowSeconds = 120;
 let statusRefreshGeneration = 0;
+let statusPollTimer: number | undefined;
 
 const healthyCount = computed(
 	() => cards.value.filter((card) => statuses.value[card.id]?.state === "ok").length,
@@ -177,7 +178,16 @@ function requestLabel(cardID: string) {
 	return requests.value[cardID]?.message ?? "";
 }
 
-onMounted(loadDashboard);
+onMounted(() => {
+	void loadDashboard();
+	statusPollTimer = window.setInterval(() => {
+		if (cards.value.length) void refreshStatuses(cards.value);
+	}, 5000);
+});
+
+onUnmounted(() => {
+	if (statusPollTimer !== undefined) window.clearInterval(statusPollTimer);
+});
 </script>
 
 <template>
