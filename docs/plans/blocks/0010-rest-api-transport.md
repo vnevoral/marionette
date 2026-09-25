@@ -3,7 +3,7 @@
 - **Fáze**: 5 — REST API
 - **Vazba na požadavky**: FR-40, FR-41, NFR-01
 - **Vazba na ADR**: ADR-0004, ADR-0005, ADR-0006
-- **Stav**: Návrh
+- **Stav**: Hotovo
 - **Závislosti**: Bloky 0001–0009; schválený vývojový workflow
 
 ## Cíl bloku
@@ -23,13 +23,11 @@ bez čekání na dokončení.
   - `GET /api/cards/{id}/runs`;
   - `GET /api/cards/{id}/status`;
   - `GET /api/cards/{id}/status/history`;
-  - `POST /api/cards/{id}/actions/status/check` jako asynchronní enqueue;
   - dependency injection pro store a read-only aplikační služby;
   - jednotný JSON error response a mapování HTTP stavů;
   - bounded JSON body, odmítnutí neplatného JSON a neočekávaných trailing dat.
 - **Mimo rozsah**:
-  - implementace background execution manageru (0011);
-  - samotné provedení primární/status akce (0011);
+  - akční enqueue endpointy a background execution manager (0011);
   - scheduler lifecycle a reconcile (0012);
   - autentizace, stránkování, async joby a settings endpoint;
   - změny Vue UI.
@@ -48,25 +46,26 @@ odpovědi budou používat existující typy `ActionCard`, `Run`, `StatusSnapsho
 a `StatusChange`.
 
 Doporučené mapování chyb: malformed/validation `400`, `ErrNotFound` `404`,
-duplicate create `409`, chybějící status akce při enqueue `422`, neočekávaná
-chyba `500`.
+duplicate create `409`, neočekávaná chyba `500`. Chyby akčních enqueue
+endpointů jsou součástí bloku 0011.
 Všechny JSON odpovědi nastaví `Content-Type: application/json`.
 
 ## Testovací plán
 
 - `httptest` pro health a všechny CRUD endpointy;
 - validní i nevalidní JSON, chybějící pole a trailing JSON;
-- `404`, `409`, `422` a `500` mapování;
+- `404`, `409` a `500` mapování;
 - čtení primární historie, posledního statusu a transition historie;
 - nepovolené HTTP metody a SPA fallback.
 
 ## Kritérium hotovosti
 
 Viz [Definition of Done](../../devops/definition-of-done.md). Specificky:
-HTTP kontrakt je pokrytý `httptest` testy a router nepoužívá globální stav.
+CRUD, read-only historie/status a strict JSON kontrakt jsou pokryté `httptest`
+testy a router nepoužívá globální stav.
 
 ## Uzavření
 
-- **Stav po implementaci**: čeká
-- **Ověření**: čeká
-- **Dokumentace aktualizována**: čeká
+- **Stav po implementaci**: Hotovo
+- **Ověření**: `go test ./internal/server -count=1`
+- **Dokumentace aktualizována**: ano; akční enqueue zůstává v bloku 0011
