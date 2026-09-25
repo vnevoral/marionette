@@ -22,10 +22,11 @@ uloží do `docs/plans/blocks/NNNN-nazev.md`. Blok se implementuje promptem
 | 6    | Dashboard UI (karty, stavové indikátory, formuláře správy)                                   | **Hotovo**                                       | FR-20..23                      |
 | 7    | Balíčkování a nasazení (systemd unit, install skript, arm64 release)                         | Plánováno                                        | FR-02..04, NFR-02              |
 | 8    | Zpevnění (auth/access control, logování, chybové stavy, testy, dokumentace)                  | Plánováno                                        | NFR-01, NFR-04..06             |
+| 9    | UX redesign a sdílený design systém                                                          | Plánováno                                        | FR-24..29, NFR-08..10          |
 
 ## Poznámky k plánování
 
-- Fáze 1 je uzavřena: `docs/requirements/requirements.md` je na v0.2 (otevřené
+- Fáze 1 je uzavřena: `docs/requirements/requirements.md` je na v0.5 (otevřené
   otázky vyřešeny, viz sekce 7 dokumentu) a
   [ADR-0004](../architecture/decisions/0004-action-card-domain-model.md) je
   přijato vč. historie běhů, pravidla na výstup, pollingu a limitu
@@ -64,6 +65,11 @@ uloží do `docs/plans/blocks/NNNN-nazev.md`. Blok se implementuje promptem
 - Fáze 6 začíná blokem 0013:
   - [0013 — Dashboard karet a ovládání akcí](blocks/0013-dashboard-overview.md)
   - [0014 — Správa akčních karet](blocks/0014-card-management.md)
+
+- Fáze 9 je připravena jako samostatná UX/design oblast. [ADR-0007](../architecture/decisions/0007-ui-design-system-and-ux.md)
+  je přijato a výchozím jazykem UI je angličtina. Před implementací UX bloků
+  se schválí detailní návrh obrazovek a interakcí v
+  [UX specifikaci](../ux/ui-ux-specification.md).
 
 - Bloky uvnitř fáze by měly být dost malé na jednu implementační relaci s AI
   agentem (řádově hodiny práce, ne dny) a musí mít jasné kritérium hotovosti

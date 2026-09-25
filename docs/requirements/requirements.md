@@ -1,8 +1,9 @@
-# Požadavky na Marionette (SRS) — v0.4
+# Požadavky na Marionette (SRS) — v0.5
 
-> Stav: **zpřesněno** (fáze 1, 2026-09-25; doplněno o dva polling intervaly a
+> Stav: **zpřesněno** (fáze 1 a UX specifikace, 2026-09-25; doplněno o dva polling intervaly a
 > vynucenou terminaci akcí, 2026-09-25; doplněno o perzistenci historie běhů
 > při řízeném ukončení, 2026-09-25; řízení status akcí interním schedulerem,
+> 2026-09-25; doplněno o UX požadavky FR-24 až FR-29 a NFR-08 až NFR-10,
 > 2026-09-25). Otevřené otázky z v0.1 byly rozhodnuty
 > s vlastníkem projektu, viz [Rozhodnutí fáze 1](#7-rozhodnutí-fáze-1),
 > [Rozhodnutí — polling a terminace](#9-rozhodnutí-polling-a-terminace-2026-09-25)
@@ -107,6 +108,30 @@ spustitelný soubor.
 - **FR-23**: UI je postaveno na Vue 3 + PrimeVue (viz
   [ADR-0003](../architecture/decisions/0003-vue-primevue-frontend.md)).
 
+- **FR-24**: UI má jednotnou informační architekturu pro operátora a
+  administrátora. Dashboard slouží pro rychlé sledování a spuštění akcí,
+  správa karet pro konfiguraci a detail karty pro historii a diagnostiku.
+  Navigace mezi těmito kontexty je dostupná z každé hlavní obrazovky.
+- **FR-25**: UI používá jednotný design systém s pojmenovanými tokeny pro
+  barvy, typografii, spacing, rozměry ovládacích prvků, povrchy a stavy.
+  Stavové barvy mají stejný význam v tagu, ikoně, textu i případném grafu;
+  stav nesmí být komunikován pouze barvou.
+- **FR-26**: Názvy stavů, akcí, tlačítek, chyb, potvrzení a prázdných stavů
+  používají jednotný slovník. Rozhraní používá jeden zvolený jazyk napříč
+  všemi obrazovkami; míchání jazyků a technických interních názvů v běžném
+  uživatelském textu není přípustné.
+- **FR-27**: Každá asynchronní operace rozlišuje stav požadavku (čeká,
+  přijato, probíhá, dokončeno, selhalo) a poslední známý stav zařízení.
+  Uživatel dostane lokální zpětnou vazbu, serverovou chybu a možnost opakovat
+  načtení bez ztráty neuložených změn.
+- **FR-28**: Hlavní workflow jsou použitelné klávesnicí a na dotykové
+  obrazovce. Interaktivní prvky mají viditelný focus, popisný název a
+  dostatečný kontrast; ikona bez textu má tooltip nebo jiný dostupný popis.
+- **FR-29**: Dashboard, správa i detail jsou použitelné na šířkách od 320 px
+  po desktop bez horizontálního scrollu, překrytí nebo změny významu ovládacích
+  prvků. Hustota informací se přizpůsobí kontextu: dashboard je skenovatelný,
+  formulář čitelný a historie porovnatelná.
+
 ### 3.4 Konfigurace a perzistence
 
 - **FR-30**: Veškerá konfigurace (karty, akce) je uložena v jediném
@@ -167,6 +192,15 @@ args...)` se strukturovanými argumenty, nikdy skládáním shell příkazu ze
 - **NFR-07 Ochrana slabého HW při souběhu**: Počet současně běžících akcí je
   omezen konfigurovatelným limitem (výchozí 4, viz FR-18), aby polling více
   karet najednou nezahltil Raspberry Pi.
+- **NFR-08 Vizuální konzistence**: Nové i upravené obrazovky používají sdílený
+  shell, tokeny a komponentové vzory; lokální ad-hoc barvy, typografie a
+  spacing se nepřidávají bez zdůvodnění v design dokumentaci.
+- **NFR-09 Přístupnost**: UI splňuje základní pravidla WCAG 2.2 AA pro kontrast,
+  focus, názvy ovládacích prvků, klávesové ovládání a změny stavu; kritické
+  workflow jsou ověřeny alespoň klávesnicí a na mobilní šířce.
+- **NFR-10 UX ověřitelnost**: Každý UX blok má popsané stavy loading, empty,
+  error, success a destructive action a před uzavřením projde screenshot nebo
+  manuální smoke test hlavních workflow.
 
 ## 5. Omezení a předpoklady
 
