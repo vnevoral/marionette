@@ -18,6 +18,10 @@ type Store struct {
 	settings Settings
 	cards    map[string]ActionCard
 	history  map[string]map[string][]Run
+
+	// OnChange is called after a successful configuration mutation. It is not
+	// called for AppendRun because run history is saved only at shutdown.
+	OnChange func(*Store) error
 }
 
 // NewStore creates an empty store. Invalid settings are replaced with the
@@ -66,56 +70,73 @@ func (store *Store) GetCard(id string) (ActionCard, bool) {
 // CreateCard validates and stores a card. A missing ID is generated.
 func (store *Store) CreateCard(card ActionCard) (ActionCard, error) {
 	store.mu.Lock()
-	defer store.mu.Unlock()
 
 	if card.ID == "" {
 		id, err := generateCardID()
 		if err != nil {
+			store.mu.Unlock()
 			return ActionCard{}, fmt.Errorf("generate card id: %w", err)
 		}
 		card.ID = id
 	}
 	if err := card.Validate(); err != nil {
+		store.mu.Unlock()
 		return ActionCard{}, err
 	}
 	if _, exists := store.cards[card.ID]; exists {
+		store.mu.Unlock()
 		return ActionCard{}, fmt.Errorf("card %q already exists", card.ID)
 	}
 
 	card = cloneCard(card)
 	store.cards[card.ID] = card
-	return cloneCard(card), nil
+	created := cloneCard(card)
+	store.mu.Unlock()
+	if err := store.notifyChange(); err != nil {
+		return created, fmt.Errorf("persist card creation: %w", err)
+	}
+	return created, nil
 }
 
 // UpdateCard validates and replaces an existing card while retaining the
 // identifier supplied by the caller.
 func (store *Store) UpdateCard(id string, card ActionCard) (ActionCard, error) {
 	store.mu.Lock()
-	defer store.mu.Unlock()
 
 	if _, exists := store.cards[id]; !exists {
+		store.mu.Unlock()
 		return ActionCard{}, ErrNotFound
 	}
 	card.ID = id
 	if err := card.Validate(); err != nil {
+		store.mu.Unlock()
 		return ActionCard{}, err
 	}
 
 	card = cloneCard(card)
 	store.cards[id] = card
-	return cloneCard(card), nil
+	updated := cloneCard(card)
+	store.mu.Unlock()
+	if err := store.notifyChange(); err != nil {
+		return updated, fmt.Errorf("persist card update: %w", err)
+	}
+	return updated, nil
 }
 
 // DeleteCard removes a card and all run history associated with it.
 func (store *Store) DeleteCard(id string) error {
 	store.mu.Lock()
-	defer store.mu.Unlock()
 
 	if _, exists := store.cards[id]; !exists {
+		store.mu.Unlock()
 		return ErrNotFound
 	}
 	delete(store.cards, id)
 	delete(store.history, id)
+	store.mu.Unlock()
+	if err := store.notifyChange(); err != nil {
+		return fmt.Errorf("persist card deletion: %w", err)
+	}
 	return nil
 }
 
@@ -134,13 +155,15 @@ func (store *Store) UpdateSettings(settings Settings) error {
 	}
 
 	store.mu.Lock()
-	defer store.mu.Unlock()
-
 	store.settings = settings
 	for cardID, histories := range store.history {
 		for actionKind, runs := range histories {
 			store.history[cardID][actionKind] = trimRuns(runs, settings.HistorySize)
 		}
+	}
+	store.mu.Unlock()
+	if err := store.notifyChange(); err != nil {
+		return fmt.Errorf("persist settings update: %w", err)
 	}
 	return nil
 }
@@ -175,6 +198,13 @@ func (store *Store) GetRuns(cardID string, actionKind string) ([]Run, error) {
 	}
 	runs := store.history[cardID][actionKind]
 	return append([]Run(nil), runs...), nil
+}
+
+func (store *Store) notifyChange() error {
+	if store.OnChange == nil {
+		return nil
+	}
+	return store.OnChange(store)
 }
 
 func generateCardID() (string, error) {

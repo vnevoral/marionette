@@ -12,7 +12,7 @@ uloží do `docs/plans/blocks/NNNN-nazev.md`. Blok se implementuje promptem
 | ---- | -------------------------------------------------------------------------------------------- | ------------------------------------------------ | ------------------------------ |
 | 0    | Bootstrap projektu (repo, Go+Vue+PrimeVue skelet, Makefile, embed, devops/agent scaffolding) | **Hotovo**                                       | FR-01..04 (základ)             |
 | 1    | Zpřesnění požadavků a architektury                                                           | **Hotovo** (requirements v0.2, ADR-0004 přijato) | vše (SRS review)               |
-| 2    | Doménový model + config store (in-memory + JSON perzistence)                                 | **Probíhá** (0001–0002 hotovo; 0003 čeká)        | FR-10..14, FR-30..33, ADR-0004 |
+| 2    | Doménový model + config store (in-memory + JSON perzistence)                                 | **Hotovo**                                       | FR-10..14, FR-30..33, ADR-0004 |
 | 3    | Execution engine (bezpečné spouštění akcí na hostu)                                          | Plánováno                                        | FR-11, FR-13, NFR-01, NFR-04   |
 | 4    | Status/health-check engine (vč. volitelného pollingu)                                        | Plánováno                                        | FR-12, FR-15, FR-16            |
 | 5    | REST API (CRUD karet/akcí, spuštění, čtení stavu)                                            | Plánováno                                        | FR-40, FR-41                   |
@@ -27,9 +27,8 @@ uloží do `docs/plans/blocks/NNNN-nazev.md`. Blok se implementuje promptem
   [ADR-0004](../architecture/decisions/0004-action-card-domain-model.md) je
   přijato vč. historie běhů, pravidla na výstup, pollingu a limitu
   souběžnosti.
-- Fáze 2 je rozpracována do implementačních bloků a **schválena** vlastníkem
-  projektu (2026-09-25). Bloky 0001 a 0002 jsou hotové; blok 0003 čeká na
-  implementaci promptem `/implement-block` v uvedeném pořadí:
+- Fáze 2 byla rozpracována do implementačních bloků a **schválena** vlastníkem
+  projektu (2026-09-25). Bloky 0001–0003 jsou hotové:
   - [0001 — Doménové typy a validace konfigurace](blocks/0001-config-domain-types.md)
   - [0002 — In-memory config store (CRUD karet + historie běhů)](blocks/0002-config-inmemory-store.md)
   - [0003 — JSON perzistence konfigurace, historie a načtení při startu](blocks/0003-config-json-persistence.md)

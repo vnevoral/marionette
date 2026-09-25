@@ -3,7 +3,7 @@
 - **Fáze**: 2 — Doménový model + config store (in-memory + JSON perzistence)
 - **Vazba na požadavky**: FR-30, FR-31, FR-33, FR-34, FR-35
 - **Vazba na ADR**: ADR-0004
-- **Stav**: Schváleno
+- **Stav**: Hotovo
 
 ## Cíl bloku
 
