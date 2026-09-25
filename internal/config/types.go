@@ -149,6 +149,33 @@ type Run struct {
 	Outcome    RunOutcome    `json:"outcome"`
 }
 
+// StatusState is the interpreted state of a card's status action.
+type StatusState string
+
+const (
+	// StatusStateUnknown means that no valid status result is currently known.
+	StatusStateUnknown StatusState = "unknown"
+	// StatusStateOK means that the status action reports a healthy state.
+	StatusStateOK StatusState = "ok"
+	// StatusStateFail means that the status action reports an unhealthy state.
+	StatusStateFail StatusState = "fail"
+)
+
+// StatusChange records one interval in a card status state history.
+type StatusChange struct {
+	State     StatusState   `json:"state"`
+	StartedAt time.Time     `json:"startedAt"`
+	EndedAt   *time.Time    `json:"endedAt,omitempty"`
+	Duration  time.Duration `json:"duration"`
+}
+
+// StatusSnapshot contains the latest status check and its interpreted state.
+type StatusSnapshot struct {
+	State     StatusState `json:"state"`
+	CheckedAt time.Time   `json:"checkedAt"`
+	LastCheck Run         `json:"lastCheck"`
+}
+
 // Settings contains global configuration for history and action concurrency.
 type Settings struct {
 	HistorySize          int `json:"historySize"`

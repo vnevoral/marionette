@@ -319,3 +319,81 @@ func ExampleStore_GetRuns() {
 	fmt.Println(len(runs), runs[0].ExitCode)
 	// Output: 1 0
 }
+
+func TestStoreStatusTransitionsIgnoreRepeatedChecks(t *testing.T) {
+	settings := validSettings()
+	settings.HistorySize = 3
+	store := NewStore(settings)
+	card, err := store.CreateCard(validCard())
+	if err != nil {
+		t.Fatalf("CreateCard() error = %v", err)
+	}
+	firstAt := time.Date(2026, time.September, 25, 12, 0, 0, 0, time.UTC)
+	check := func(state StatusState, checkedAt time.Time) {
+		t.Helper()
+		err := store.UpdateStatus(card.ID, StatusSnapshot{
+			State:     state,
+			CheckedAt: checkedAt,
+			LastCheck: Run{ActionKind: "status", StartedAt: checkedAt, Outcome: RunOutcomeOK},
+		})
+		if err != nil {
+			t.Fatalf("UpdateStatus(%q) error = %v", state, err)
+		}
+	}
+
+	check(StatusStateOK, firstAt)
+	check(StatusStateOK, firstAt.Add(5*time.Second))
+	changes, err := store.GetStatusChanges(card.ID)
+	if err != nil || len(changes) != 1 || changes[0].State != StatusStateOK || changes[0].EndedAt != nil {
+		t.Fatalf("repeated status changes = %#v, error = %v", changes, err)
+	}
+
+	check(StatusStateFail, firstAt.Add(10*time.Second))
+	check(StatusStateOK, firstAt.Add(25*time.Second))
+	changes, err = store.GetStatusChanges(card.ID)
+	if err != nil || len(changes) != 3 {
+		t.Fatalf("status changes = %#v, error = %v", changes, err)
+	}
+	if changes[0].State != StatusStateOK || changes[0].StartedAt != firstAt.Add(25*time.Second) || changes[0].EndedAt != nil {
+		t.Fatalf("current status change = %#v", changes[0])
+	}
+	if changes[1].State != StatusStateFail || changes[1].Duration != 15*time.Second {
+		t.Fatalf("fail status duration = %#v", changes[1])
+	}
+	if changes[2].State != StatusStateOK || changes[2].Duration != 10*time.Second {
+		t.Fatalf("ok status duration = %#v", changes[2])
+	}
+
+	snapshot, ok := store.GetStatus(card.ID)
+	if !ok || snapshot.State != StatusStateOK || !snapshot.CheckedAt.Equal(firstAt.Add(25*time.Second)) {
+		t.Fatalf("status snapshot = %#v, exists = %t", snapshot, ok)
+	}
+	changes[1].EndedAt = nil
+	again, _ := store.GetStatusChanges(card.ID)
+	if again[1].EndedAt == nil {
+		t.Fatal("GetStatusChanges() returned shared EndedAt pointer")
+	}
+}
+
+func TestStoreStatusHistoryTrimsWithSettings(t *testing.T) {
+	store := NewStore(validSettings())
+	card, err := store.CreateCard(validCard())
+	if err != nil {
+		t.Fatalf("CreateCard() error = %v", err)
+	}
+	base := time.Date(2026, time.September, 25, 12, 0, 0, 0, time.UTC)
+	for index, state := range []StatusState{StatusStateOK, StatusStateFail, StatusStateOK} {
+		if err := store.UpdateStatus(card.ID, StatusSnapshot{State: state, CheckedAt: base.Add(time.Duration(index) * time.Second)}); err != nil {
+			t.Fatalf("UpdateStatus() error = %v", err)
+		}
+	}
+	settings := validSettings()
+	settings.HistorySize = 2
+	if err := store.UpdateSettings(settings); err != nil {
+		t.Fatalf("UpdateSettings() error = %v", err)
+	}
+	changes, err := store.GetStatusChanges(card.ID)
+	if err != nil || len(changes) != 2 {
+		t.Fatalf("trimmed status changes = %#v, error = %v", changes, err)
+	}
+}

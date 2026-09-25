@@ -95,12 +95,13 @@ func TestSaveFileWithHistoryRoundTrip(t *testing.T) {
 	}
 	startedAt := time.Date(2026, time.September, 25, 12, 0, 0, 0, time.UTC)
 	primary := Run{ActionKind: "primary", StartedAt: startedAt, Duration: 2 * time.Second, ExitCode: 0, Output: "ok", Outcome: RunOutcomeOK}
-	status := Run{ActionKind: "status", StartedAt: startedAt.Add(time.Second), Duration: time.Second, ExitCode: 1, Output: "down", Truncated: true, Outcome: RunOutcomeFail}
+	statusAt := startedAt.Add(time.Second)
+	status := StatusSnapshot{State: StatusStateFail, CheckedAt: statusAt, LastCheck: Run{ActionKind: "status", StartedAt: statusAt, Duration: time.Second, ExitCode: 1, Output: "down", Truncated: true, Outcome: RunOutcomeFail}}
 	if err := store.AppendRun(created.ID, primary); err != nil {
 		t.Fatalf("AppendRun(primary) error = %v", err)
 	}
-	if err := store.AppendRun(created.ID, status); err != nil {
-		t.Fatalf("AppendRun(status) error = %v", err)
+	if err := store.UpdateStatus(created.ID, status); err != nil {
+		t.Fatalf("UpdateStatus() error = %v", err)
 	}
 	if err := store.SaveFileWithHistory(path); err != nil {
 		t.Fatalf("SaveFileWithHistory() error = %v", err)
@@ -114,11 +115,15 @@ func TestSaveFileWithHistoryRoundTrip(t *testing.T) {
 	if err != nil {
 		t.Fatalf("GetRuns(primary) error = %v", err)
 	}
-	loadedStatus, err := loaded.GetRuns(created.ID, "status")
+	loadedStatus, err := loaded.GetStatusChanges(created.ID)
 	if err != nil {
-		t.Fatalf("GetRuns(status) error = %v", err)
+		t.Fatalf("GetStatusChanges() error = %v", err)
 	}
-	if !reflect.DeepEqual(loadedPrimary, []Run{primary}) || !reflect.DeepEqual(loadedStatus, []Run{status}) {
+	loadedSnapshot, exists := loaded.GetStatus(created.ID)
+	if !exists || loadedSnapshot != status {
+		t.Fatalf("loaded status snapshot = %#v, exists = %t", loadedSnapshot, exists)
+	}
+	if !reflect.DeepEqual(loadedPrimary, []Run{primary}) || len(loadedStatus) != 1 || loadedStatus[0].State != status.State || !loadedStatus[0].StartedAt.Equal(status.CheckedAt) {
 		t.Fatalf("loaded history differs: primary=%#v status=%#v", loadedPrimary, loadedStatus)
 	}
 }

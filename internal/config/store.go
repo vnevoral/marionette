@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"sort"
 	"sync"
+	"time"
 )
 
 // ErrNotFound indicates that a requested card does not exist in the store.
@@ -14,11 +15,13 @@ var ErrNotFound = errors.New("config item not found")
 
 // Store keeps action-card configuration and run history in memory.
 type Store struct {
-	mu        sync.RWMutex
-	persistMu sync.Mutex
-	settings  Settings
-	cards     map[string]ActionCard
-	history   map[string]map[string][]Run
+	mu            sync.RWMutex
+	persistMu     sync.Mutex
+	settings      Settings
+	cards         map[string]ActionCard
+	history       map[string]map[string][]Run
+	statuses      map[string]StatusSnapshot
+	statusHistory map[string][]StatusChange
 
 	// OnChange is called after a successful configuration mutation. It is not
 	// called for AppendRun because run history is saved only at shutdown.
@@ -36,9 +39,11 @@ func NewStore(settings Settings) *Store {
 	}
 
 	return &Store{
-		settings: settings,
-		cards:    make(map[string]ActionCard),
-		history:  make(map[string]map[string][]Run),
+		settings:      settings,
+		cards:         make(map[string]ActionCard),
+		history:       make(map[string]map[string][]Run),
+		statuses:      make(map[string]StatusSnapshot),
+		statusHistory: make(map[string][]StatusChange),
 	}
 }
 
@@ -134,6 +139,8 @@ func (store *Store) DeleteCard(id string) error {
 	}
 	delete(store.cards, id)
 	delete(store.history, id)
+	delete(store.statuses, id)
+	delete(store.statusHistory, id)
 	store.mu.Unlock()
 	if err := store.notifyChange(); err != nil {
 		return fmt.Errorf("persist card deletion: %w", err)
@@ -161,6 +168,9 @@ func (store *Store) UpdateSettings(settings Settings) error {
 		for actionKind, runs := range histories {
 			store.history[cardID][actionKind] = trimRuns(runs, settings.HistorySize)
 		}
+	}
+	for cardID, changes := range store.statusHistory {
+		store.statusHistory[cardID] = trimStatusChanges(changes, settings.HistorySize)
 	}
 	store.mu.Unlock()
 	if err := store.notifyChange(); err != nil {
@@ -201,6 +211,68 @@ func (store *Store) GetRuns(cardID string, actionKind string) ([]Run, error) {
 	return append([]Run(nil), runs...), nil
 }
 
+// GetStatus returns the latest status snapshot for a card.
+func (store *Store) GetStatus(cardID string) (StatusSnapshot, bool) {
+	store.mu.RLock()
+	defer store.mu.RUnlock()
+
+	if _, exists := store.cards[cardID]; !exists {
+		return StatusSnapshot{}, false
+	}
+	snapshot, exists := store.statuses[cardID]
+	return cloneStatusSnapshot(snapshot), exists
+}
+
+// GetStatusChanges returns the newest status transitions first.
+func (store *Store) GetStatusChanges(cardID string) ([]StatusChange, error) {
+	store.mu.RLock()
+	defer store.mu.RUnlock()
+
+	if _, exists := store.cards[cardID]; !exists {
+		return nil, ErrNotFound
+	}
+	changes := store.statusHistory[cardID]
+	return cloneStatusChanges(changes), nil
+}
+
+// UpdateStatus stores the latest status check and records a transition only
+// when the interpreted state differs from the previous state.
+func (store *Store) UpdateStatus(cardID string, snapshot StatusSnapshot) error {
+	if snapshot.State != StatusStateUnknown && snapshot.State != StatusStateOK && snapshot.State != StatusStateFail {
+		return fmt.Errorf("unsupported status state %q", snapshot.State)
+	}
+	if snapshot.CheckedAt.IsZero() {
+		snapshot.CheckedAt = time.Now()
+	}
+
+	store.mu.Lock()
+	defer store.mu.Unlock()
+	if _, exists := store.cards[cardID]; !exists {
+		return ErrNotFound
+	}
+
+	previous, exists := store.statuses[cardID]
+	if exists && previous.State == snapshot.State {
+		store.statuses[cardID] = cloneStatusSnapshot(snapshot)
+		return nil
+	}
+
+	changes := store.statusHistory[cardID]
+	if len(changes) > 0 {
+		last := &changes[0]
+		if snapshot.CheckedAt.Before(last.StartedAt) {
+			return fmt.Errorf("status check time precedes current status change")
+		}
+		endedAt := snapshot.CheckedAt
+		last.EndedAt = &endedAt
+		last.Duration = endedAt.Sub(last.StartedAt)
+	}
+	change := StatusChange{State: snapshot.State, StartedAt: snapshot.CheckedAt}
+	store.statusHistory[cardID] = trimStatusChanges(append([]StatusChange{change}, changes...), store.settings.HistorySize)
+	store.statuses[cardID] = cloneStatusSnapshot(snapshot)
+	return nil
+}
+
 func (store *Store) notifyChange() error {
 	store.persistMu.Lock()
 	defer store.persistMu.Unlock()
@@ -224,6 +296,29 @@ func trimRuns(runs []Run, limit int) []Run {
 		return runs
 	}
 	return runs[:limit]
+}
+
+func trimStatusChanges(changes []StatusChange, limit int) []StatusChange {
+	if len(changes) <= limit {
+		return changes
+	}
+	return changes[:limit]
+}
+
+func cloneStatusSnapshot(snapshot StatusSnapshot) StatusSnapshot {
+	return snapshot
+}
+
+func cloneStatusChanges(changes []StatusChange) []StatusChange {
+	cloned := make([]StatusChange, len(changes))
+	copy(cloned, changes)
+	for index := range cloned {
+		if changes[index].EndedAt != nil {
+			endedAt := *changes[index].EndedAt
+			cloned[index].EndedAt = &endedAt
+		}
+	}
+	return cloned
 }
 
 func cloneCard(card ActionCard) ActionCard {
