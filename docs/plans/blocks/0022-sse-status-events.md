@@ -3,7 +3,7 @@
 - **Fáze**: 10 — Realtime status delivery
 - **Vazba na požadavky**: FR-20, FR-27, FR-40, FR-42, NFR-03, NFR-06, NFR-11
 - **Vazba na ADR**: ADR-0008 (SSE status event stream)
-- **Stav**: Probíhá
+- **Stav**: Hotovo
 - **Závislosti**: FR-42/NFR-11, existující status projection a scheduler (bloky 0007–0009), REST API (bloky 0010–0012), Dashboard (blok 0013)
 
 ## Cíl bloku
@@ -68,6 +68,7 @@ z Definition of Done projdou.
 
 ## Uzavření
 
-- **Stav po implementaci**: {Hotovo | Zablokováno | Zamítnuto}
-- **Ověření**: {příkazy a výsledek}
-- **Dokumentace aktualizována**: {ano/ne, odkazy}
+- **Stav po implementaci**: Hotovo
+- **Ověření**: `go build ./...`, `go vet ./...`, `go test -race ./...`,
+  `npm run lint -- --quiet`, `npm run build`, `git diff --check` — vše úspěšné.
+- **Dokumentace aktualizována**: ano; ADR-0008, roadmapa, FR-42/NFR-11.
