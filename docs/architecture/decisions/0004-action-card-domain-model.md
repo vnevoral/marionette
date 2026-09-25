@@ -1,6 +1,6 @@
 # ADR-0004: Doménový model akčních karet a JSON konfigurace
 
-- **Stav**: Přijato
+- **Stav**: Přijato (historie statusu zpřesněna v ADR-0006)
 - **Datum**: 2026-09-25 (aktualizováno po zpřesnění požadavků na v0.2, v0.3 a v0.4)
 
 ## Kontext
@@ -37,12 +37,16 @@ explicitní vynucenou terminaci akce po timeoutu (FR-19).
     **primární akce** karty platí `FastPollingIntervalSeconds`, než se
     polling vrátí na `PollingIntervalSeconds`.
     Zrychlené okno se aktivuje **pouze** pokud má karta `PollingIntervalSeconds
-      > 0`(standardní polling zapnutý) — bez něj`FastPollingIntervalSeconds`/
-    `FastPollingWindowSeconds` nemají efekt (FR-15a).
-  - `Run` — jedno spuštění akce: exit kód, zachycený výstup (max 4 KB, s
-    příznakem `Truncated`), čas startu/konce, odvozený výsledek
-    (`ok`/`fail`/`timeout`) dle `OutputRule` (`timeout`, pokud engine akci
-    vynuceně ukončil dle `TimeoutSec`).
+    > 0`(standardní polling zapnutý) — bez něj`FastPollingIntervalSeconds`/
+`FastPollingWindowSeconds` nemají efekt (FR-15a).
+  - `Run` — jedno spuštění primární nebo status akce: exit kód, zachycený
+    výstup (max 4 KB, s příznakem `Truncated`), čas startu/konce, odvozený
+    výsledek (`ok`/`fail`/`timeout`) dle `OutputRule` (`timeout`, pokud engine
+    akci vynuceně ukončil dle `TimeoutSec`). Status běhy slouží jako poslední
+    kontrola, ne jako dlouhodobá historie každého pollingu.
+  - `StatusChange` — skutečný přechod stavu status akce, s novým stavem,
+    začátkem a koncem nebo dobou trvání; opakované kontroly beze změny se
+    neukládají do historie (ADR-0006).
 - Config store (`internal/config`, přesný název upřesní implementační blok) je
   in-memory struktura držící **dvě oddělené věci**:
   1. **Konfigurace** (persistovaná do JSON): seznam `ActionCard` a globální
@@ -51,12 +55,12 @@ explicitní vynucenou terminaci akce po timeoutu (FR-19).
      (create/update/delete karty nebo změna `Settings`) — zápis do
      dočasného souboru a atomické přejmenování (`rename`), cesta dle
      `MARIONETTE_CONFIG` (default `./marionette.json`, viz FR-34).
-  2. **Historie běhů** (`Run`, per akce, ring buffer velikosti
-     `Settings.HistorySize`): během běhu aplikace se drží **jen v paměti** a
-     `AppendRun` sama o sobě na disk nezapisuje. Důvod: jde o provozní/log
-     data měnící se při každém běhu (i při automatickém pollingu po
-     10–60 s) — persistovat při každém zápisu by znamenalo časté zápisy na
-     SD kartu Raspberry Pi (opotřebení, NFR-03).
+  2. **Historie primárních běhů** (`Run`, ring buffer velikosti
+     `Settings.HistorySize`) a **historie změn statusu** (`StatusChange`,
+     samostatný limit posledních změn): během běhu se drží **jen v paměti** a
+     průběžně se na disk nezapisují. Poslední status kontrola se drží jako
+     aktuální projekce mimo historii. Důvodem je, že polling po 10–60 s
+     vytváří mnoho shodných kontrol bez informační hodnoty.
      **Výjimka (FR-35)**: při **řízeném ukončení** aplikace (graceful
      shutdown po SIGINT/SIGTERM) se aktuální obsah historie jednorázově
      uloží do stejného konfiguračního souboru (nový top-level klíč
@@ -65,7 +69,7 @@ explicitní vynucenou terminaci akce po timeoutu (FR-19).
      napájení), poslední uložená historie zůstane stará/chybějící —
      akceptované riziko, není cuklá pojistka pro každý jednotlivý běh.
      JSON struktura souboru: `{"settings": Settings, "cards": []ActionCard,
-"history": {cardID: {"primary": []Run, "status": []Run}}}` — klíč
+"history": {cardID: {"primary": []Run, "status": []StatusChange}}}` — klíč
      `history` je volitelný (starší/ručně vytvořené soubory bez něj se
      načítají s prázdnou historií).
 - Spouštění akcí je oddělené od config store (samostatný „execution engine“
@@ -77,7 +81,8 @@ explicitní vynucenou terminaci akce po timeoutu (FR-19).
   frontě (FR-18), nezahazují se.
 - Polling: samostatný scheduler (fáze 4) udržuje pro každou kartu s aktivním
   `PollingIntervalSeconds` časovač, který přes execution engine (a jeho
-  semafor) spouští `StatusAction` a zapisuje `Run` do historie. Po každém
+  semafor) spouští `StatusAction`, aktualizuje poslední status projekci a při
+  skutečné změně stavu zapíše `StatusChange` do historie. Po každém
   spuštění **primární** akce scheduler přepne časovač dané karty na
   `FastPollingIntervalSeconds` a naplánuje návrat na `PollingIntervalSeconds`
   po `FastPollingWindowSeconds` (implementační detail — jednoduchý časový

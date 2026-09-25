@@ -81,9 +81,12 @@ spustitelný soubor.
   spuštěného procesu ze strany execution enginu (nikdy k jeho ponechání běžet
   na pozadí) — ochrana proti nekontrolovanému hromadění nedokončených
   procesů na slabém hardwaru (NFR-04, NFR-07).
-- **FR-17**: Pro každou akci (primární i status) se uchovává historie
-  posledních **N běhů** (výchozí N = 20, konfigurovatelné globálně). UI karty
-  zobrazuje aktuální/poslední stav, historie je dostupná jako detail/log.
+- **FR-17**: Pro primární akci se uchovává historie posledních **N běhů**
+  (výchozí N = 20, konfigurovatelné globálně). Status akce má odděleně
+  poslední výsledek kontroly pro aktuální stav a historii pouze skutečných
+  přechodů stavů. Každý přechod obsahuje nový stav, začátek a konec nebo dobu
+  trvání; opakované kontroly se stejným stavem nový historický záznam
+  nevytvářejí. UI zobrazuje aktuální stav, dobu jeho trvání a historii změn.
 - **FR-18**: Počet akcí spuštěných současně v rámci celé aplikace (ruční
   spuštění i polling dohromady) je omezen konfigurovatelným limitem, výchozí
   **4**; akce nad limit čekají ve frontě, žádná se neztrácí.
@@ -114,7 +117,8 @@ spustitelný soubor.
   prostředí `MARIONETTE_CONFIG` (výchozí `./marionette.json`), analogicky k
   již existující `MARIONETTE_ADDR` (výchozí `:8080`) pro HTTP adresu/port.
 - **FR-35**: Při **řízeném ukončení aplikace** (přijetí SIGINT/SIGTERM a
-  doběhnutí graceful shutdown) se aktuální historie běhů (FR-17) uloží na
+  doběhnutí graceful shutdown) se historie primárních běhů a historie změn
+  statusu (FR-17) uloží na
   disk společně s konfigurací. Při startu aplikace se historie načte
   společně s konfigurací, pokud je k dispozici a platná — díky tomu se při
   řízeném vypnutí/restartu (např. update binárky, restart systemd služby)

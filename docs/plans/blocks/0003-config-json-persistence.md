@@ -19,7 +19,7 @@ vytvoří/načte a při shutdownu uloží.
 
 - **Uvnitř**:
   - Formát souboru: `{"settings": Settings, "cards": []ActionCard,
-"history": {cardID: {"primary": []Run, "status": []Run}}}` — klíč
+"history": {cardID: {"primary": []Run, "status": []StatusChange}}}` — klíč
     `history` je volitelný při čtení (chybí-li, historie je prázdná).
   - `LoadFile(path string) (*Store, error)` — pokud soubor neexistuje,
     vrátí prázdný `Store` s výchozím `Settings` (`DefaultHistorySize`,
@@ -65,8 +65,8 @@ Atomický zápis: `os.CreateTemp(dir, "marionette-*.json")`, zapsat, `Sync`,
 - `LoadFile` na poškozeném JSON → chyba + prázdný store (ne panic).
 - Round-trip `SaveFile` → `LoadFile`: karty a settings shodné, historie
   prázdná (protože `SaveFile` historii neukládá).
-- Round-trip `SaveFileWithHistory` → `LoadFile`: karty, settings i historie
-  (primární i status) shodné.
+  - Round-trip `SaveFileWithHistory` → `LoadFile`: karty, settings, primární
+    historie běhů i historie přechodů statusu shodné.
 - `LoadFile` na souboru s validními `settings`/`cards`, ale poškozeným
   `history` → načte se konfigurace, historie zůstane prázdná, zaloguje se
   varování (ne fatální chyba).

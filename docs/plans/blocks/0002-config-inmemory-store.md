@@ -1,4 +1,4 @@
-# Implementační blok: In-memory config store (CRUD karet + historie běhů)
+# Implementační blok: In-memory config store (CRUD karet + historie primárních běhů)
 
 - **Fáze**: 2 — Doménový model + config store (in-memory + JSON perzistence)
 - **Vazba na požadavky**: FR-10, FR-17, FR-18, FR-31, FR-32, NFR-05, NFR-07
@@ -9,8 +9,10 @@
 
 Po dokončení existuje thread-safe in-memory `Store` v `internal/config`
 poskytující CRUD nad `ActionCard` a `Settings` a ukládající historii běhů
-(`Run`) per akce jako ring buffer omezený `Settings.HistorySize`. Vše čistě
-v paměti — bez čtení/zápisu na disk (to řeší blok 0003).
+primární akce (`Run`) jako ring buffer omezený `Settings.HistorySize`. Vše
+čistě v paměti — bez čtení/zápisu na disk (to řeší blok 0003). Poslední
+status kontrola a historie přechodů statusu jsou samostatný kontrakt ADR-0006,
+který se dopracuje ve fázi 4.
 
 ## Rozsah
 
@@ -28,12 +30,11 @@ v paměti — bez čtení/zápisu na disk (to řeší blok 0003).
   - `GetSettings() Settings`, `UpdateSettings(s Settings) error` — validuje;
     pokud se `HistorySize` zmenší, existující historie se ořízne na nový
     limit (zahodí nejstarší záznamy).
-  - `AppendRun(cardID string, run Run) error` — přidá běh do ring bufferu
-    dané karty+`run.ActionKind` (samostatná historie pro primární a status
-    akci), udrží max `Settings.HistorySize` posledních záznamů.
+  - `AppendRun(cardID string, run Run) error` — přidá běh primární akce do
+    ring bufferu a udrží max `Settings.HistorySize` posledních záznamů.
   - `GetRuns(cardID string, actionKind string) ([]Run, error)` — vrátí kopii
-    historie (od nejstaršího po nejnovější nebo obráceně — zvolit a
-    zdokumentovat, doporučeno nejnovější první).
+    historie primárních běhů; status přechody se řeší samostatnou logikou
+    fáze 4 podle ADR-0006.
   - Veškeré návratové hodnoty jsou kopie (žádné sdílené mutable struktury
     mezi voláními), aby volající nemohl obejít mutex.
 - **Mimo rozsah**: JSON perzistence a atomický zápis (blok 0003), spouštění
@@ -49,7 +50,7 @@ type Store struct {
     mu       sync.RWMutex
     settings Settings
     cards    map[string]ActionCard
-    history  map[string]map[string][]Run // cardID -> actionKind -> ring buffer
+    history  map[string]map[string][]Run // cardID -> actionKind -> primary run history
 }
 ```
 
@@ -62,7 +63,7 @@ není potřeba kruhový index).
 - CRUD: create/get/update/delete happy path + `ErrNotFound` na
   update/delete neexistující karty, duplicitní ID na create.
 - `AppendRun`/`GetRuns`: naplnění přes limit `HistorySize` ořízne nejstarší
-  záznamy; historie primární a status akce se navzájem neovlivňuje.
+  primární běhy.
 - `UpdateSettings` se zmenšujícím `HistorySize` ořízne existující historie
   všech karet.
 - Souběžný přístup: test s `go test -race` spouštějící CRUD a `AppendRun`
