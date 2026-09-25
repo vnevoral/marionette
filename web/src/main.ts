@@ -5,6 +5,7 @@ import App from "./App.vue";
 import router from "./router";
 
 import "primeicons/primeicons.css";
+import "primeflex/primeflex.css";
 import "./styles/tokens.css";
 
 const app = createApp(App);

@@ -173,7 +173,9 @@ onMounted(async () => {
 
 <template>
 	<main class="manage-shell">
-		<header class="manage-header">
+		<header
+			class="manage-header flex flex-column md:flex-row align-items-start md:align-items-end justify-content-between gap-6 mb-6"
+		>
 			<div>
 				<p class="eyebrow">MARIONETTE CONTROL</p>
 				<h1>Manage cards</h1>
@@ -182,8 +184,8 @@ onMounted(async () => {
 		</header>
 		<Message v-if="error" severity="error" :closable="false">{{ error }}</Message>
 		<Message v-if="notice" severity="success" :closable="false">{{ notice }}</Message>
-		<div class="manage-layout">
-			<Card class="card-list">
+		<div class="manage-layout grid">
+			<Card class="card-list col-12 lg:col-4">
 				<template #title>Cards</template>
 				<template #content>
 					<Button
@@ -194,7 +196,10 @@ onMounted(async () => {
 						@click="newCard"
 					/>
 					<div v-if="loading" class="muted">Loading...</div>
-					<div v-else-if="!cards.length" class="empty-list">
+					<div
+						v-else-if="!cards.length"
+						class="empty-list flex flex-column align-items-start gap-3 p-4"
+					>
 						<p class="muted">No cards configured.</p>
 						<Button label="New card" icon="pi pi-plus" @click="newCard" />
 					</div>
@@ -204,12 +209,12 @@ onMounted(async () => {
 						class="card-row"
 						:class="{ selected: selectedID === card.id }"
 					>
-						<div class="card-row-info">
+						<div class="card-row-info flex flex-column gap-1">
 							<strong>{{ card.name }}</strong>
 							<small>{{ card.id }}</small>
 							<span>{{ card.status ? "Status check enabled" : "No status check" }}</span>
 						</div>
-						<div class="card-row-actions">
+						<div class="card-row-actions flex align-items-center gap-1">
 							<Button
 								label="Edit"
 								icon="pi pi-pencil"
@@ -230,14 +235,20 @@ onMounted(async () => {
 					</article>
 				</template>
 			</Card>
-			<Card class="editor-card">
+			<Card class="editor-card col-12 lg:col-8">
 				<template #title>{{ selectedID ? "Edit card" : "New card" }}</template>
 				<template #content>
-					<div class="form-grid">
-						<label>ID <InputText v-model="form.id" :disabled="Boolean(selectedID)" /></label>
-						<label>Name <InputText v-model="form.name" /></label>
-						<label>Description <Textarea v-model="form.description" rows="2" /></label>
-						<label>Icon <InputText v-model="form.icon" placeholder="pi pi-desktop" /></label>
+					<div class="form-grid grid">
+						<label class="col-12 md:col-6"
+							>ID <InputText v-model="form.id" :disabled="Boolean(selectedID)"
+						/></label>
+						<label class="col-12 md:col-6">Name <InputText v-model="form.name" /></label>
+						<label class="col-12"
+							>Description <Textarea v-model="form.description" rows="2"
+						/></label>
+						<label class="col-12 md:col-6"
+							>Icon <InputText v-model="form.icon" placeholder="pi pi-desktop"
+						/></label>
 					</div>
 					<ActionEditor
 						v-model="form.primary"
@@ -267,22 +278,22 @@ onMounted(async () => {
 						@add-argument="addArgument('status')"
 						@add-environment="addEnvironment('status')"
 					/>
-					<div class="form-grid polling-grid">
-						<label
+					<div class="form-grid polling-grid grid">
+						<label class="col-12 md:col-4"
 							>Polling interval (seconds)
 							<InputNumber v-model="form.pollingIntervalSeconds" :min="0"
 						/></label>
-						<label
+						<label class="col-12 md:col-4"
 							>Fast interval (seconds)
 							<InputNumber v-model="form.fastPollingIntervalSeconds" :min="0"
 						/></label>
-						<label
+						<label class="col-12 md:col-4"
 							>Fast window (seconds) <InputNumber v-model="form.fastPollingWindowSeconds" :min="0"
 						/></label>
 					</div>
 				</template>
 				<template #footer>
-					<div class="editor-actions">
+					<div class="editor-actions flex flex-wrap gap-3">
 						<Button label="Save card" icon="pi pi-check" :loading="saving" @click="save" />
 					</div>
 				</template>
@@ -302,14 +313,6 @@ onMounted(async () => {
 	min-height: 100vh;
 	padding: clamp(2rem, 6vw, 5rem) clamp(1rem, 5vw, 5rem);
 	background: var(--color-canvas);
-}
-.manage-header {
-	display: flex;
-	align-items: end;
-	justify-content: space-between;
-	max-width: 78rem;
-	margin: 0 auto 2rem;
-	gap: 2rem;
 }
 .eyebrow {
 	margin: 0 0 0.75rem;
@@ -339,13 +342,6 @@ h1 {
 	align-self: center;
 	margin-left: auto;
 }
-.manage-layout {
-	display: grid;
-	grid-template-columns: minmax(15rem, 20rem) minmax(0, 1fr);
-	gap: 1.25rem;
-	max-width: 78rem;
-	margin: 0 auto;
-}
 .card-list,
 .editor-card {
 	border: 1px solid var(--color-border);
@@ -360,10 +356,6 @@ h1 {
 	font-family: var(--font-ui);
 }
 .card-row {
-	display: flex;
-	align-items: center;
-	justify-content: space-between;
-	gap: 0.75rem;
 	padding: 0.85rem 0;
 	border-top: 1px solid var(--color-border);
 	background: transparent;
@@ -377,9 +369,7 @@ h1 {
 	background: var(--color-accent-soft);
 }
 .card-row-info {
-	display: grid;
 	min-width: 0;
-	gap: 0.2rem;
 }
 .card-row-info strong {
 	overflow: hidden;
@@ -391,25 +381,8 @@ h1 {
 	color: var(--color-muted);
 	font-size: 0.75rem;
 }
-.card-row-actions {
-	display: flex;
-	flex-shrink: 0;
-	align-items: center;
-	gap: 0.25rem;
-}
-.empty-list {
-	display: grid;
-	justify-items: start;
-	gap: 0.75rem;
-	padding: 1rem 0;
-}
 .empty-list p {
 	margin: 0;
-}
-.form-grid {
-	display: grid;
-	grid-template-columns: repeat(auto-fit, minmax(min(100%, 15rem), 1fr));
-	gap: 1rem;
 }
 label {
 	display: flex;
@@ -458,18 +431,7 @@ label {
 .polling-grid {
 	margin-top: 2rem;
 }
-.editor-actions {
-	display: flex;
-	flex-wrap: wrap;
-	gap: 0.75rem;
-}
 @media (max-width: 48rem) {
-	.manage-header,
-	.manage-layout {
-		grid-template-columns: 1fr;
-		flex-direction: column;
-		align-items: stretch;
-	}
 	.manage-link {
 		margin-left: 0;
 	}

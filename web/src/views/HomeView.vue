@@ -145,7 +145,9 @@ onMounted(loadDashboard);
 
 <template>
 	<main class="overview-page">
-		<header class="page-header">
+		<header
+			class="page-header flex flex-column md:flex-row align-items-start md:align-items-end justify-content-between gap-6 mb-8"
+		>
 			<div>
 				<p class="eyebrow">MARIONETTE CONTROL</p>
 				<h1>Overview</h1>
@@ -154,7 +156,7 @@ onMounted(loadDashboard);
 					<span v-if="cards.length"> · {{ healthyCount }} healthy</span>
 				</p>
 			</div>
-			<div class="page-actions">
+			<div class="page-actions flex flex-wrap align-items-center gap-3">
 				<Button
 					label="Refresh"
 					icon="pi pi-refresh"
@@ -171,7 +173,7 @@ onMounted(loadDashboard);
 		</header>
 
 		<Message v-if="error" severity="error" :closable="false">
-			<div class="message-content">
+			<div class="message-content flex align-items-center flex-wrap justify-content-between gap-3">
 				<span>{{ error }}</span>
 				<Button label="Try again" text size="small" @click="loadDashboard" />
 			</div>
@@ -182,55 +184,70 @@ onMounted(loadDashboard);
 			<span>Loading cards...</span>
 		</div>
 
-		<section v-else-if="cards.length" class="card-grid" aria-labelledby="cards-heading">
+		<section v-else-if="cards.length" class="grid" aria-labelledby="cards-heading">
 			<h2 id="cards-heading" class="sr-only">Action cards</h2>
-			<Card v-for="card in cards" :key="card.id" class="action-card">
-				<template #header>
-					<div class="card-banner">
-						<span class="card-icon" aria-hidden="true">{{ card.icon || "◈" }}</span>
-						<Tag :severity="statusView(card).severity">
-							<i :class="statusView(card).icon" aria-hidden="true"></i>
-							<span>{{ statusView(card).label }}</span>
-						</Tag>
-					</div>
-				</template>
-				<template #title>{{ card.name }}</template>
-				<template #subtitle>{{ checkedLabel(card.id) }}</template>
-				<template #content>
-					<p class="card-description">{{ card.description || "No description provided." }}</p>
-					<p v-if="requestLabel(card.id)" class="request-feedback" role="status" aria-live="polite">
-						{{ requestLabel(card.id) }}
-					</p>
-				</template>
-				<template #footer>
-					<div class="card-actions">
-						<Button
-							label="Run action"
-							icon="pi pi-play"
-							:loading="
-								requests[card.id]?.action === 'primary' && requests[card.id]?.state !== 'error'
-							"
-							:disabled="Boolean(requests[card.id])"
-							@click="runAction(card, 'primary')"
-						/>
-						<Button
-							v-if="card.status"
-							label="Check status"
-							icon="pi pi-heart"
-							severity="secondary"
-							outlined
-							:loading="
-								requests[card.id]?.action === 'status' && requests[card.id]?.state !== 'error'
-							"
-							:disabled="Boolean(requests[card.id])"
-							@click="runAction(card, 'status')"
-						/>
-					</div>
-				</template>
-			</Card>
+			<div v-for="card in cards" :key="card.id" class="col-12 md:col-6 lg:col-4">
+				<Card class="action-card h-full">
+					<template #header>
+						<div class="card-banner">
+							<span class="card-icon" aria-hidden="true">{{ card.icon || "◈" }}</span>
+							<Tag :severity="statusView(card).severity">
+								<i :class="statusView(card).icon" aria-hidden="true"></i>
+								<span>{{ statusView(card).label }}</span>
+							</Tag>
+						</div>
+					</template>
+					<template #title>{{ card.name }}</template>
+					<template #subtitle>{{ checkedLabel(card.id) }}</template>
+					<template #content>
+						<p class="card-description">{{ card.description || "No description provided." }}</p>
+						<p
+							v-if="requestLabel(card.id)"
+							class="request-feedback"
+							role="status"
+							aria-live="polite"
+						>
+							{{ requestLabel(card.id) }}
+						</p>
+					</template>
+					<template #footer>
+						<div class="card-actions flex flex-wrap align-items-center gap-3">
+							<RouterLink class="details-link" :to="`/cards/${encodeURIComponent(card.id)}`">
+								<span>View details</span>
+								<i class="pi pi-arrow-up-right" aria-hidden="true"></i>
+							</RouterLink>
+							<Button
+								label="Run action"
+								icon="pi pi-play"
+								:loading="
+									requests[card.id]?.action === 'primary' && requests[card.id]?.state !== 'error'
+								"
+								:disabled="Boolean(requests[card.id])"
+								@click="runAction(card, 'primary')"
+							/>
+							<Button
+								v-if="card.status"
+								label="Check status"
+								icon="pi pi-heart"
+								severity="secondary"
+								outlined
+								:loading="
+									requests[card.id]?.action === 'status' && requests[card.id]?.state !== 'error'
+								"
+								:disabled="Boolean(requests[card.id])"
+								@click="runAction(card, 'status')"
+							/>
+						</div>
+					</template>
+				</Card>
+			</div>
 		</section>
 
-		<section v-else class="empty-state" aria-labelledby="empty-title">
+		<section
+			v-else
+			class="empty-state flex flex-column align-items-center justify-content-center gap-3 p-8 text-center"
+			aria-labelledby="empty-title"
+		>
 			<div class="empty-icon" aria-hidden="true"><i class="pi pi-inbox"></i></div>
 			<h2 id="empty-title">No action cards yet</h2>
 			<p>Create your first card to start monitoring and controlling a service.</p>
@@ -248,14 +265,6 @@ onMounted(loadDashboard);
 	min-height: calc(100vh - 72px);
 	margin: 0 auto;
 	padding: clamp(var(--space-6), 5vw, 64px) clamp(var(--space-4), 5vw, 64px);
-}
-
-.page-header {
-	display: flex;
-	align-items: end;
-	justify-content: space-between;
-	gap: var(--space-8);
-	margin-bottom: var(--space-8);
 }
 
 .eyebrow {
@@ -282,15 +291,6 @@ h1 {
 	margin: var(--space-3) 0 0;
 	color: var(--color-muted);
 	font-size: 1rem;
-}
-
-.page-actions,
-.card-actions,
-.message-content {
-	display: flex;
-	align-items: center;
-	flex-wrap: wrap;
-	gap: var(--space-3);
 }
 
 .page-actions :deep(.p-button),
@@ -321,12 +321,6 @@ h1 {
 
 .message-content {
 	justify-content: space-between;
-}
-
-.card-grid {
-	display: grid;
-	grid-template-columns: repeat(3, minmax(0, 1fr));
-	gap: var(--space-4);
 }
 
 .action-card {
@@ -400,21 +394,13 @@ h1 {
 	font-weight: 700;
 }
 
-.loading-state,
-.empty-state {
-	display: grid;
-	place-items: center;
-	gap: var(--space-3);
-	min-height: 320px;
-	text-align: center;
-}
-
 .loading-state {
+	min-height: 320px;
 	color: var(--color-muted);
 }
 
 .empty-state {
-	padding: var(--space-8);
+	min-height: 320px;
 }
 
 .empty-state p {
@@ -446,9 +432,6 @@ h1 {
 }
 
 @media (max-width: 64rem) {
-	.card-grid {
-		grid-template-columns: repeat(2, minmax(0, 1fr));
-	}
 }
 
 @media (max-width: 48rem) {
@@ -456,27 +439,9 @@ h1 {
 		padding: var(--space-6) var(--space-4);
 	}
 
-	.page-header {
-		align-items: stretch;
-		flex-direction: column;
-		gap: var(--space-6);
-	}
-
-	.page-actions {
-		align-items: stretch;
-	}
-
 	.page-actions > * {
 		flex: 1;
 		justify-content: center;
-	}
-
-	.card-grid {
-		grid-template-columns: 1fr;
-	}
-
-	.card-actions > * {
-		flex: 1;
 	}
 }
 

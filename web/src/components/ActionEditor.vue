@@ -62,34 +62,34 @@ function updateEnvironment(index: number, key: "key" | "value", value: unknown) 
 <template>
 	<section class="action-editor">
 		<h2>{{ title }}</h2>
-		<div class="form-grid">
-			<label
+		<div class="form-grid grid">
+			<label class="col-12 md:col-6"
 				>Command <InputText :model-value="modelValue.command" @update:model-value="updateCommand"
 			/></label>
-			<label
+			<label class="col-12 md:col-6"
 				>Working directory
 				<InputText :model-value="modelValue.dir" @update:model-value="updateDirectory"
 			/></label>
-			<label
+			<label class="col-12 md:col-6 lg:col-4"
 				>Timeout (seconds)
 				<InputNumber
 					:model-value="modelValue.timeoutSec"
 					:min="1"
 					@update:model-value="updateTimeout"
 			/></label>
-			<label
+			<label class="col-12 md:col-6 lg:col-4"
 				>Output rule
 				<Select
 					:model-value="modelValue.rule.type"
 					:options="['exit_code', 'match', 'not_match']"
 					@update:model-value="updateRuleType"
 			/></label>
-			<label v-if="modelValue.rule.type !== 'exit_code'"
+			<label v-if="modelValue.rule.type !== 'exit_code'" class="col-12 md:col-6 lg:col-4"
 				>Regex pattern
 				<InputText :model-value="modelValue.rule.pattern" @update:model-value="updatePattern"
 			/></label>
 		</div>
-		<div class="dynamic-block">
+		<div class="dynamic-block flex flex-column gap-2 mt-4">
 			<strong>Arguments</strong>
 			<InputText
 				v-for="(argument, index) in args"
@@ -99,15 +99,17 @@ function updateEnvironment(index: number, key: "key" | "value", value: unknown) 
 			/>
 			<button type="button" @click="emit('add-argument')">+ Add argument</button>
 		</div>
-		<div class="dynamic-block">
+		<div class="dynamic-block flex flex-column gap-2 mt-4">
 			<strong>Environment</strong>
-			<div v-for="(row, index) in environment" :key="index" class="env-row">
+			<div v-for="(row, index) in environment" :key="index" class="env-row grid">
 				<InputText
+					class="col-12 md:col-4"
 					placeholder="KEY"
 					:model-value="row.key"
 					@update:model-value="updateEnvironment(index, 'key', $event)"
 				/>
 				<InputText
+					class="col-12 md:col-8"
 					placeholder="value"
 					:model-value="row.value"
 					@update:model-value="updateEnvironment(index, 'value', $event)"
@@ -129,11 +131,6 @@ function updateEnvironment(index: number, key: "key" | "value", value: unknown) 
 	font-size: 1.35rem;
 	font-weight: 500;
 }
-.form-grid {
-	display: grid;
-	grid-template-columns: repeat(auto-fit, minmax(min(100%, 15rem), 1fr));
-	gap: 1rem;
-}
 label {
 	display: flex;
 	flex-direction: column;
@@ -143,11 +140,6 @@ label {
 	font-size: 0.85rem;
 	font-weight: 700;
 }
-.dynamic-block {
-	display: grid;
-	gap: 0.5rem;
-	margin-top: 1rem;
-}
 .dynamic-block button {
 	width: fit-content;
 	border: 0;
@@ -156,10 +148,5 @@ label {
 	cursor: pointer;
 	font-family: var(--font-ui);
 	font-weight: 700;
-}
-.env-row {
-	display: grid;
-	grid-template-columns: 1fr 2fr;
-	gap: 0.5rem;
 }
 </style>

@@ -73,6 +73,9 @@ uloží do `docs/plans/blocks/NNNN-nazev.md`. Blok se implementuje promptem
   První schválený blok je [0015 — UX-01: Design tokeny a AppShell](blocks/0015-ux-foundation.md).
   Následuje [0016 — UX-02: Overview a action feedback](blocks/0016-ux-overview.md).
   Následuje [0017 — UX-03: Management CRUD workflow](blocks/0017-ux-management-crud.md).
+  Následuje [0018 — UX-04: Detail karty, běhy a status timeline](blocks/0018-ux-card-detail.md).
+  PrimeFlex layout foundation je zachycen v [0019](blocks/0019-primeflex-layout-foundation.md).
+  Následuje [0020 — PrimeFlex view migration](blocks/0020-primeflex-view-migration.md).
 
 - Bloky uvnitř fáze by měly být dost malé na jednu implementační relaci s AI
   agentem (řádově hodiny práce, ne dny) a musí mít jasné kritérium hotovosti

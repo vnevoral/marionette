@@ -62,6 +62,10 @@ export function listCards(): Promise<ActionCard[]> {
 	return request<ActionCard[]>("/api/cards");
 }
 
+export function getCard(cardID: string): Promise<ActionCard> {
+	return request<ActionCard>(`/api/cards/${encodeURIComponent(cardID)}`);
+}
+
 export function createCard(card: ActionCard): Promise<ActionCard> {
 	return request<ActionCard>("/api/cards", {
 		method: "POST",
@@ -84,6 +88,21 @@ export function deleteCard(cardID: string): Promise<void> {
 
 export function getStatus(cardID: string): Promise<StatusSnapshot> {
 	return request<StatusSnapshot>(`/api/cards/${encodeURIComponent(cardID)}/status`);
+}
+
+export function getRuns(cardID: string): Promise<Run[]> {
+	return request<Run[]>(`/api/cards/${encodeURIComponent(cardID)}/runs`);
+}
+
+export interface StatusChange {
+	state: StatusState;
+	startedAt: string;
+	endedAt?: string;
+	duration: number;
+}
+
+export function getStatusHistory(cardID: string): Promise<StatusChange[]> {
+	return request<StatusChange[]>(`/api/cards/${encodeURIComponent(cardID)}/status/history`);
 }
 
 export function enqueuePrimary(cardID: string): Promise<void> {

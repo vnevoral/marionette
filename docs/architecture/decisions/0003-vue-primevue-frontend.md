@@ -13,8 +13,9 @@ na slabší hardware.
 ## Rozhodnutí
 
 Frontend je Vue 3 (Composition API, `<script setup>`) s komponentovou
-knihovnou **PrimeVue v4** (téma Aura z `@primevue/themes`) a ikonami
-`primeicons`. Routing řeší `vue-router`. Build nástroj je Vite.
+knihovnou **PrimeVue v4** (téma Aura z `@primevue/themes`), layout utility
+vrstvou **PrimeFlex v4** a ikonami `primeicons`. Routing řeší `vue-router`.
+Build nástroj je Vite.
 
 PrimeVue major verze se drží na stabilní `v4` větvi (npm dist-tag
 `v4-stable`) — vyšší major verze se nepřijímají automaticky, ale až po
@@ -36,6 +37,8 @@ ověření changelogu/migrace a aktualizaci tohoto ADR.
 - Veškeré nové UI komponenty přednostně skládat z PrimeVue prvků
   (`Card`, `Button`, `Tag`/`Badge`, `DataTable`, `Dialog`, formulářové vstupy)
   místo psaní vlastního HTML/CSS od nuly.
+- Obecný layout, grid, flex, spacing a responsive breakpointy řešit přes
+  PrimeFlex; vlastní CSS používat pro produktové kompozice a design tokeny.
 - Upgrade na PrimeVue v5 (nebo jinou budoucí major verzi) vyžaduje nové ADR,
   které zhodnotí breaking changes a licenční/balíčkové změny (v5 mění
   strukturu závislostí na `@primeuix/*` balíčky).
