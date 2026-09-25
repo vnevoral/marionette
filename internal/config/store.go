@@ -1,0 +1,214 @@
+package config
+
+import (
+	"crypto/rand"
+	"encoding/hex"
+	"errors"
+	"fmt"
+	"sort"
+	"sync"
+)
+
+// ErrNotFound indicates that a requested card does not exist in the store.
+var ErrNotFound = errors.New("config item not found")
+
+// Store keeps action-card configuration and run history in memory.
+type Store struct {
+	mu       sync.RWMutex
+	settings Settings
+	cards    map[string]ActionCard
+	history  map[string]map[string][]Run
+}
+
+// NewStore creates an empty store. Invalid settings are replaced with the
+// recommended default settings because the constructor cannot return an error.
+func NewStore(settings Settings) *Store {
+	if err := settings.Validate(); err != nil {
+		settings = Settings{
+			HistorySize:          DefaultHistorySize,
+			MaxConcurrentActions: DefaultMaxConcurrentActions,
+		}
+	}
+
+	return &Store{
+		settings: settings,
+		cards:    make(map[string]ActionCard),
+		history:  make(map[string]map[string][]Run),
+	}
+}
+
+// ListCards returns all cards sorted by ID. Returned cards are independent
+// copies and can be safely mutated by the caller.
+func (store *Store) ListCards() []ActionCard {
+	store.mu.RLock()
+	defer store.mu.RUnlock()
+
+	cards := make([]ActionCard, 0, len(store.cards))
+	for _, card := range store.cards {
+		cards = append(cards, cloneCard(card))
+	}
+	sort.Slice(cards, func(i, j int) bool { return cards[i].ID < cards[j].ID })
+	return cards
+}
+
+// GetCard returns a card copy and whether the card exists.
+func (store *Store) GetCard(id string) (ActionCard, bool) {
+	store.mu.RLock()
+	defer store.mu.RUnlock()
+
+	card, ok := store.cards[id]
+	if !ok {
+		return ActionCard{}, false
+	}
+	return cloneCard(card), true
+}
+
+// CreateCard validates and stores a card. A missing ID is generated.
+func (store *Store) CreateCard(card ActionCard) (ActionCard, error) {
+	store.mu.Lock()
+	defer store.mu.Unlock()
+
+	if card.ID == "" {
+		id, err := generateCardID()
+		if err != nil {
+			return ActionCard{}, fmt.Errorf("generate card id: %w", err)
+		}
+		card.ID = id
+	}
+	if err := card.Validate(); err != nil {
+		return ActionCard{}, err
+	}
+	if _, exists := store.cards[card.ID]; exists {
+		return ActionCard{}, fmt.Errorf("card %q already exists", card.ID)
+	}
+
+	card = cloneCard(card)
+	store.cards[card.ID] = card
+	return cloneCard(card), nil
+}
+
+// UpdateCard validates and replaces an existing card while retaining the
+// identifier supplied by the caller.
+func (store *Store) UpdateCard(id string, card ActionCard) (ActionCard, error) {
+	store.mu.Lock()
+	defer store.mu.Unlock()
+
+	if _, exists := store.cards[id]; !exists {
+		return ActionCard{}, ErrNotFound
+	}
+	card.ID = id
+	if err := card.Validate(); err != nil {
+		return ActionCard{}, err
+	}
+
+	card = cloneCard(card)
+	store.cards[id] = card
+	return cloneCard(card), nil
+}
+
+// DeleteCard removes a card and all run history associated with it.
+func (store *Store) DeleteCard(id string) error {
+	store.mu.Lock()
+	defer store.mu.Unlock()
+
+	if _, exists := store.cards[id]; !exists {
+		return ErrNotFound
+	}
+	delete(store.cards, id)
+	delete(store.history, id)
+	return nil
+}
+
+// GetSettings returns the current global settings.
+func (store *Store) GetSettings() Settings {
+	store.mu.RLock()
+	defer store.mu.RUnlock()
+	return store.settings
+}
+
+// UpdateSettings validates and replaces the global settings. Histories are
+// trimmed to the newest records when the history limit is reduced.
+func (store *Store) UpdateSettings(settings Settings) error {
+	if err := settings.Validate(); err != nil {
+		return err
+	}
+
+	store.mu.Lock()
+	defer store.mu.Unlock()
+
+	store.settings = settings
+	for cardID, histories := range store.history {
+		for actionKind, runs := range histories {
+			store.history[cardID][actionKind] = trimRuns(runs, settings.HistorySize)
+		}
+	}
+	return nil
+}
+
+// AppendRun adds a run to the card and action history, retaining only the
+// newest Settings.HistorySize records.
+func (store *Store) AppendRun(cardID string, run Run) error {
+	store.mu.Lock()
+	defer store.mu.Unlock()
+
+	if _, exists := store.cards[cardID]; !exists {
+		return ErrNotFound
+	}
+	if store.history[cardID] == nil {
+		store.history[cardID] = make(map[string][]Run)
+	}
+
+	runs := store.history[cardID][run.ActionKind]
+	runs = append([]Run{run}, runs...)
+	store.history[cardID][run.ActionKind] = trimRuns(runs, store.settings.HistorySize)
+	return nil
+}
+
+// GetRuns returns the newest run first. The returned slice is an independent
+// copy and an unknown action kind returns an empty slice without an error.
+func (store *Store) GetRuns(cardID string, actionKind string) ([]Run, error) {
+	store.mu.RLock()
+	defer store.mu.RUnlock()
+
+	if _, exists := store.cards[cardID]; !exists {
+		return nil, ErrNotFound
+	}
+	runs := store.history[cardID][actionKind]
+	return append([]Run(nil), runs...), nil
+}
+
+func generateCardID() (string, error) {
+	var bytes [16]byte
+	if _, err := rand.Read(bytes[:]); err != nil {
+		return "", err
+	}
+	return "card-" + hex.EncodeToString(bytes[:]), nil
+}
+
+func trimRuns(runs []Run, limit int) []Run {
+	if len(runs) <= limit {
+		return runs
+	}
+	return runs[:limit]
+}
+
+func cloneCard(card ActionCard) ActionCard {
+	card.Primary = cloneAction(card.Primary)
+	if card.Status != nil {
+		status := cloneAction(*card.Status)
+		card.Status = &status
+	}
+	return card
+}
+
+func cloneAction(action Action) Action {
+	action.Args = append([]string(nil), action.Args...)
+	if action.Env != nil {
+		clonedEnv := make(map[string]string, len(action.Env))
+		for key, value := range action.Env {
+			clonedEnv[key] = value
+		}
+		action.Env = clonedEnv
+	}
+	return action
+}
