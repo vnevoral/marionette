@@ -8,17 +8,17 @@ uloží do `docs/plans/blocks/NNNN-nazev.md`. Blok se implementuje promptem
 
 ## Přehled fází
 
-| Fáze | Název                                                                                        | Stav                                                       | Vazba na požadavky             |
-| ---- | -------------------------------------------------------------------------------------------- | ---------------------------------------------------------- | ------------------------------ |
-| 0    | Bootstrap projektu (repo, Go+Vue+PrimeVue skelet, Makefile, embed, devops/agent scaffolding) | **Hotovo**                                                 | FR-01..04 (základ)             |
-| 1    | Zpřesnění požadavků a architektury                                                           | **Hotovo** (requirements v0.2, ADR-0004 přijato)           | vše (SRS review)               |
-| 2    | Doménový model + config store (in-memory + JSON perzistence)                                 | **Hotovo**                                                 | FR-10..14, FR-30..33, ADR-0004 |
-| 3    | Execution engine (bezpečné spouštění akcí na hostu)                                          | **Naplánováno** (ADR-0005, bloky 0004–0006 ve stavu Návrh) | FR-11, FR-13, NFR-01, NFR-04   |
-| 4    | Status/health-check engine (vč. volitelného pollingu)                                        | Plánováno                                                  | FR-12, FR-15, FR-16            |
-| 5    | REST API (CRUD karet/akcí, spuštění, čtení stavu)                                            | Plánováno                                                  | FR-40, FR-41                   |
-| 6    | Dashboard UI (karty, stavové indikátory, formuláře správy)                                   | Plánováno                                                  | FR-20..23                      |
-| 7    | Balíčkování a nasazení (systemd unit, install skript, arm64 release)                         | Plánováno                                                  | FR-02..04, NFR-02              |
-| 8    | Zpevnění (auth/access control, logování, chybové stavy, testy, dokumentace)                  | Plánováno                                                  | NFR-01, NFR-04..06             |
+| Fáze | Název                                                                                        | Stav                                             | Vazba na požadavky             |
+| ---- | -------------------------------------------------------------------------------------------- | ------------------------------------------------ | ------------------------------ |
+| 0    | Bootstrap projektu (repo, Go+Vue+PrimeVue skelet, Makefile, embed, devops/agent scaffolding) | **Hotovo**                                       | FR-01..04 (základ)             |
+| 1    | Zpřesnění požadavků a architektury                                                           | **Hotovo** (requirements v0.2, ADR-0004 přijato) | vše (SRS review)               |
+| 2    | Doménový model + config store (in-memory + JSON perzistence)                                 | **Hotovo**                                       | FR-10..14, FR-30..33, ADR-0004 |
+| 3    | Execution engine (bezpečné spouštění akcí na hostu)                                          | **Probíhá** (0004 hotovo; 0005–0006 čekají)      | FR-11, FR-13, NFR-01, NFR-04   |
+| 4    | Status/health-check engine (vč. volitelného pollingu)                                        | Plánováno                                        | FR-12, FR-15, FR-16            |
+| 5    | REST API (CRUD karet/akcí, spuštění, čtení stavu)                                            | Plánováno                                        | FR-40, FR-41                   |
+| 6    | Dashboard UI (karty, stavové indikátory, formuláře správy)                                   | Plánováno                                        | FR-20..23                      |
+| 7    | Balíčkování a nasazení (systemd unit, install skript, arm64 release)                         | Plánováno                                        | FR-02..04, NFR-02              |
+| 8    | Zpevnění (auth/access control, logování, chybové stavy, testy, dokumentace)                  | Plánováno                                        | NFR-01, NFR-04..06             |
 
 ## Poznámky k plánování
 

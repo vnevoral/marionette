@@ -1,6 +1,6 @@
 # ADR-0005: Bezpečné spouštění akcí a limit souběžnosti
 
-- **Stav**: Návrh
+- **Stav**: Přijato
 - **Datum**: 2026-09-25
 
 ## Kontext
