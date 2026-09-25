@@ -27,7 +27,7 @@
 	--space-6: 24px;
 	--space-8: 32px;
 	--font-ui: "Avenir Next", "Segoe UI", sans-serif;
-	--font-display: Georgia, "Times New Roman", serif;
+	--font-display: "Avenir Next", "Segoe UI", sans-serif;
 
 	--p-primary-color: var(--color-accent);
 	--p-primary-contrast-color: #ffffff;

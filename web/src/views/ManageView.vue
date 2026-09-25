@@ -226,7 +226,6 @@ onMounted(async () => {
 					>
 						<div class="card-row-info flex flex-column gap-1">
 							<strong>{{ card.name }}</strong>
-							<small>{{ card.id }}</small>
 							<span>{{ card.status ? "Status check enabled" : "No status check" }}</span>
 						</div>
 						<div class="card-row-actions flex align-items-center gap-1">
@@ -254,9 +253,6 @@ onMounted(async () => {
 				<template #title>{{ selectedID ? "Edit card" : "New card" }}</template>
 				<template #content>
 					<div class="form-grid grid">
-						<label class="col-12 md:col-6"
-							>ID <InputText v-model="form.id" :disabled="Boolean(selectedID)"
-						/></label>
 						<label class="col-12 md:col-6">Name <InputText v-model="form.name" /></label>
 						<label class="col-12"
 							>Description <Textarea v-model="form.description" rows="2"

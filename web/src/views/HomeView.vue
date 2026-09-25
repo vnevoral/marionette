@@ -29,6 +29,7 @@ const error = ref("");
 
 const defaultFastPollingIntervalSeconds = 10;
 const defaultFastPollingWindowSeconds = 120;
+let statusRefreshGeneration = 0;
 
 const healthyCount = computed(
 	() => cards.value.filter((card) => statuses.value[card.id]?.state === "ok").length,
@@ -51,11 +52,32 @@ async function loadDashboard() {
 		statuses.value = nextStatuses;
 		statusErrors.value = {};
 		loading.value = false;
+		void refreshStatuses(loadedCards);
 	} catch (loadError) {
 		error.value = loadError instanceof Error ? loadError.message : "Unable to load cards";
 		loading.value = false;
 	} finally {
 		loading.value = false;
+	}
+}
+
+async function refreshStatuses(cardsToRefresh: ActionCard[]) {
+	const generation = ++statusRefreshGeneration;
+	const statusResults = await Promise.all(
+		cardsToRefresh
+			.filter((card) => card.status)
+			.map(async (card) => {
+				try {
+					return [card.id, await getStatus(card.id), false] as const;
+				} catch {
+					return [card.id, undefined, true] as const;
+				}
+			}),
+	);
+	if (generation !== statusRefreshGeneration) return;
+	for (const [cardID, snapshot, failed] of statusResults) {
+		if (snapshot) statuses.value[cardID] = snapshot;
+		statusErrors.value[cardID] = failed;
 	}
 }
 
@@ -112,19 +134,29 @@ async function runAction(card: ActionCard, action: ActionKind) {
 function statusView(card: ActionCard) {
 	const request = requests.value[card.id];
 	if (request?.state === "queued" || request?.state === "running") {
-		return { label: request.message, icon: "pi pi-spin pi-spinner", severity: "info" };
+		return {
+			label: request.message,
+			icon: "pi pi-spin pi-spinner",
+			severity: "info",
+			tone: "info",
+		};
 	}
 	const state = statuses.value[card.id]?.state;
-	if (state === "ok") return { label: "Healthy", icon: "pi pi-check-circle", severity: "success" };
+	if (state === "ok")
+		return { label: "Healthy", icon: "pi pi-check-circle", severity: "success", tone: "healthy" };
 	if (state === "fail")
-		return { label: "Problem", icon: "pi pi-exclamation-triangle", severity: "danger" };
-	return { label: "Unknown", icon: "pi pi-question-circle", severity: "secondary" };
-}
-
-function checkedLabel(cardID: string) {
-	if (statusErrors.value[cardID]) return "Status data unavailable";
-	const checkedAt = statuses.value[cardID]?.checkedAt;
-	return checkedAt ? `Last checked ${new Date(checkedAt).toLocaleString()}` : "Not checked yet";
+		return {
+			label: "Problem",
+			icon: "pi pi-exclamation-triangle",
+			severity: "danger",
+			tone: "problem",
+		};
+	return {
+		label: "Unknown",
+		icon: "pi pi-question-circle",
+		severity: "secondary",
+		tone: "unknown",
+	};
 }
 
 function requestLabel(cardID: string) {
@@ -184,7 +216,10 @@ onMounted(loadDashboard);
 							<div class="card-icon" aria-hidden="true">
 								<i :class="card.icon || 'pi pi-desktop'" />
 							</div>
-							<Tag :severity="statusView(card).severity">
+							<Tag
+								:severity="statusView(card).severity"
+								:class="`status-tag status-${statusView(card).tone}`"
+							>
 								<i :class="statusView(card).icon" aria-hidden="true"></i>
 								<span>{{ statusView(card).label }}</span>
 							</Tag>
@@ -193,10 +228,8 @@ onMounted(loadDashboard);
 					<template #title>
 						<div class="card-title-row">
 							<span class="card-title">{{ card.name }}</span>
-							<span class="card-id">{{ card.id }}</span>
 						</div>
 					</template>
-					<template #subtitle>{{ checkedLabel(card.id) }}</template>
 					<template #content>
 						<p class="card-description">{{ card.description || "No description provided." }}</p>
 						<p
@@ -209,32 +242,34 @@ onMounted(loadDashboard);
 						</p>
 					</template>
 					<template #footer>
-						<div class="card-actions flex flex-wrap align-items-center gap-3">
+						<div class="card-footer">
 							<RouterLink class="details-link" :to="`/cards/${encodeURIComponent(card.id)}`">
 								<span>View details</span>
 								<i class="pi pi-arrow-up-right" aria-hidden="true"></i>
 							</RouterLink>
-							<Button
-								label="Run action"
-								icon="pi pi-play"
-								:loading="
-									requests[card.id]?.action === 'primary' && requests[card.id]?.state !== 'error'
-								"
-								:disabled="Boolean(requests[card.id])"
-								@click="runAction(card, 'primary')"
-							/>
-							<Button
-								v-if="card.status"
-								label="Check status"
-								icon="pi pi-heart"
-								severity="secondary"
-								outlined
-								:loading="
-									requests[card.id]?.action === 'status' && requests[card.id]?.state !== 'error'
-								"
-								:disabled="Boolean(requests[card.id])"
-								@click="runAction(card, 'status')"
-							/>
+							<div class="card-action-buttons">
+								<Button
+									label="Run action"
+									icon="pi pi-play"
+									:loading="
+										requests[card.id]?.action === 'primary' && requests[card.id]?.state !== 'error'
+									"
+									:disabled="Boolean(requests[card.id])"
+									@click="runAction(card, 'primary')"
+								/>
+								<Button
+									v-if="card.status"
+									label="Check status"
+									icon="pi pi-heart"
+									severity="secondary"
+									outlined
+									:loading="
+										requests[card.id]?.action === 'status' && requests[card.id]?.state !== 'error'
+									"
+									:disabled="Boolean(requests[card.id])"
+									@click="runAction(card, 'status')"
+								/>
+							</div>
 						</div>
 					</template>
 				</Card>
@@ -381,16 +416,6 @@ h1 {
 	white-space: nowrap;
 }
 
-.card-id {
-	overflow: hidden;
-	color: var(--color-muted);
-	font-family: var(--font-ui);
-	font-size: 0.75rem;
-	font-weight: 500;
-	text-overflow: ellipsis;
-	white-space: nowrap;
-}
-
 .action-card :deep(.p-card-title) {
 	margin: 0;
 	font-family: var(--font-display);
@@ -398,17 +423,71 @@ h1 {
 	font-weight: 500;
 }
 
-.action-card :deep(.p-card-subtitle) {
-	color: var(--color-muted);
-	font-family: var(--font-ui);
-	font-size: 0.82rem;
-}
-
 .card-description {
-	min-height: 3rem;
 	margin: 0;
 	color: var(--color-muted);
 	line-height: 1.5;
+}
+
+.card-footer {
+	display: flex;
+	flex-direction: column;
+	gap: var(--space-3);
+}
+
+.details-link {
+	display: inline-flex;
+	align-items: center;
+	align-self: flex-start;
+	gap: var(--space-2);
+	color: var(--color-accent-strong);
+	font-size: 0.88rem;
+	font-weight: 700;
+	text-decoration: none;
+}
+
+.details-link:hover {
+	color: var(--color-ink);
+	text-decoration: underline;
+}
+
+.card-action-buttons {
+	display: flex;
+	flex-wrap: wrap;
+	gap: var(--space-2);
+}
+
+.card-action-buttons :deep(.p-button) {
+	flex: 1 1 auto;
+}
+
+.card-banner :deep(.status-tag) {
+	border: 1px solid transparent;
+	font-weight: 800;
+}
+
+.card-banner :deep(.status-healthy) {
+	border-color: #1f6b50;
+	background: #1f6b50;
+	color: #ffffff;
+}
+
+.card-banner :deep(.status-problem) {
+	border-color: #9f3f3a;
+	background: #9f3f3a;
+	color: #ffffff;
+}
+
+.card-banner :deep(.status-unknown) {
+	border-color: var(--color-border-strong);
+	background: var(--color-surface-raised);
+	color: var(--color-ink);
+}
+
+.card-banner :deep(.status-info) {
+	border-color: var(--color-info);
+	background: var(--color-info);
+	color: #ffffff;
 }
 
 .request-feedback {
@@ -475,13 +554,13 @@ h1 {
 
 @media (max-width: 24rem) {
 	.page-actions,
-	.card-actions {
+	.card-action-buttons {
 		flex-direction: column;
 		align-items: stretch;
 	}
 
 	.page-actions > *,
-	.card-actions > * {
+	.card-action-buttons > * {
 		width: 100%;
 	}
 }
