@@ -14,10 +14,11 @@ var ErrNotFound = errors.New("config item not found")
 
 // Store keeps action-card configuration and run history in memory.
 type Store struct {
-	mu       sync.RWMutex
-	settings Settings
-	cards    map[string]ActionCard
-	history  map[string]map[string][]Run
+	mu        sync.RWMutex
+	persistMu sync.Mutex
+	settings  Settings
+	cards     map[string]ActionCard
+	history   map[string]map[string][]Run
 
 	// OnChange is called after a successful configuration mutation. It is not
 	// called for AppendRun because run history is saved only at shutdown.
@@ -201,6 +202,9 @@ func (store *Store) GetRuns(cardID string, actionKind string) ([]Run, error) {
 }
 
 func (store *Store) notifyChange() error {
+	store.persistMu.Lock()
+	defer store.persistMu.Unlock()
+
 	if store.OnChange == nil {
 		return nil
 	}

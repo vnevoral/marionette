@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"sync"
 	"testing"
+	"time"
 )
 
 func TestStoreCRUD(t *testing.T) {
@@ -212,6 +213,60 @@ func TestStoreConcurrentAccess(t *testing.T) {
 	}
 	if len(runs) != DefaultHistorySize {
 		t.Fatalf("GetRuns() length = %d, want %d", len(runs), DefaultHistorySize)
+	}
+}
+
+func TestStoreSerializesOnChangeHooks(t *testing.T) {
+	store := NewStore(validSettings())
+	firstStarted := make(chan struct{})
+	releaseFirst := make(chan struct{})
+	secondStarted := make(chan struct{}, 1)
+	var calls int
+	var callsMu sync.Mutex
+	store.OnChange = func(*Store) error {
+		callsMu.Lock()
+		calls++
+		callNumber := calls
+		callsMu.Unlock()
+		if callNumber == 1 {
+			close(firstStarted)
+			<-releaseFirst
+			return nil
+		}
+		secondStarted <- struct{}{}
+		return nil
+	}
+
+	firstDone := make(chan struct{})
+	go func() {
+		card := validCard()
+		card.ID = "first"
+		_, _ = store.CreateCard(card)
+		close(firstDone)
+	}()
+	<-firstStarted
+
+	secondDone := make(chan struct{})
+	go func() {
+		card := validCard()
+		card.ID = "second"
+		_, _ = store.CreateCard(card)
+		close(secondDone)
+	}()
+
+	select {
+	case <-secondStarted:
+		t.Fatal("second OnChange callback started before the first completed")
+	case <-time.After(20 * time.Millisecond):
+	}
+	close(releaseFirst)
+	<-firstDone
+	<-secondDone
+
+	select {
+	case <-secondStarted:
+	case <-time.After(time.Second):
+		t.Fatal("second OnChange callback did not complete")
 	}
 }
 
