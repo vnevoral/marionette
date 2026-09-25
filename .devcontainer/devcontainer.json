@@ -1,0 +1,52 @@
+{
+	"name": "marionette-dev",
+	"build": {
+		"dockerfile": "Dockerfile",
+		"context": ".."
+	},
+	"features": {
+		"ghcr.io/devcontainers/features/node:1": {
+			"version": "20"
+		},
+		"ghcr.io/devcontainers/features/git:1": {}
+	},
+	"customizations": {
+		"vscode": {
+			"extensions": [
+				"golang.go",
+				"Vue.volar",
+				"dbaeumer.vscode-eslint",
+				"esbenp.prettier-vscode",
+				"editorconfig.editorconfig",
+				"ms-azuretools.vscode-docker"
+			],
+			"settings": {
+				"go.toolsManagement.autoUpdate": true,
+				"go.useLanguageServer": true,
+				"go.lintTool": "golangci-lint",
+				"go.formatTool": "gofumpt",
+				"editor.formatOnSave": true,
+				"[go]": {
+					"editor.defaultFormatter": "golang.go"
+				},
+				"[vue]": {
+					"editor.defaultFormatter": "esbenp.prettier-vscode"
+				},
+				"[typescript]": {
+					"editor.defaultFormatter": "esbenp.prettier-vscode"
+				}
+			}
+		}
+	},
+	"forwardPorts": [8080, 5173],
+	"portsAttributes": {
+		"8080": {
+			"label": "Go backend (embedded UI)"
+		},
+		"5173": {
+			"label": "Vite dev server (UI)"
+		}
+	},
+	"postCreateCommand": "bash .devcontainer/post-create.sh",
+	"remoteUser": "vscode"
+}
