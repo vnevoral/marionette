@@ -3,8 +3,10 @@ package execengine
 import (
 	"context"
 	"errors"
+	"io"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -22,10 +24,21 @@ func (factory *fakeFactory) New(_ context.Context, action config.Action) (Proces
 }
 
 type fakeProcess struct {
-	err error
+	err    error
+	stdout string
+	stderr string
+	writer io.Writer
 }
 
-func (process fakeProcess) Run() error {
+func (process *fakeProcess) SetOutput(writer io.Writer) {
+	process.writer = writer
+}
+
+func (process *fakeProcess) Run() error {
+	if process.writer != nil {
+		_, _ = io.WriteString(process.writer, process.stdout)
+		_, _ = io.WriteString(process.writer, process.stderr)
+	}
 	return process.err
 }
 
@@ -38,7 +51,7 @@ func validAction() config.Action {
 }
 
 func TestExecutorRunsActionAndCapturesTiming(t *testing.T) {
-	factory := &fakeFactory{process: fakeProcess{}}
+	factory := &fakeFactory{process: &fakeProcess{}}
 	executor, err := NewExecutorWithFactory(factory)
 	if err != nil {
 		t.Fatalf("NewExecutorWithFactory() error = %v", err)
@@ -65,7 +78,7 @@ func TestExecutorRunsActionAndCapturesTiming(t *testing.T) {
 
 func TestExecutorReturnsFailureForProcessError(t *testing.T) {
 	processError := errors.New("process failed")
-	executor, err := NewExecutorWithFactory(&fakeFactory{process: fakeProcess{err: processError}})
+	executor, err := NewExecutorWithFactory(&fakeFactory{process: &fakeProcess{err: processError}})
 	if err != nil {
 		t.Fatalf("NewExecutorWithFactory() error = %v", err)
 	}
@@ -80,7 +93,7 @@ func TestExecutorReturnsFailureForProcessError(t *testing.T) {
 }
 
 func TestExecutorRejectsInvalidAction(t *testing.T) {
-	executor, err := NewExecutorWithFactory(&fakeFactory{process: fakeProcess{}})
+	executor, err := NewExecutorWithFactory(&fakeFactory{process: &fakeProcess{}})
 	if err != nil {
 		t.Fatalf("NewExecutorWithFactory() error = %v", err)
 	}
@@ -93,6 +106,81 @@ func TestExecutorRejectsInvalidAction(t *testing.T) {
 func TestExecutorRejectsNilFactory(t *testing.T) {
 	if _, err := NewExecutorWithFactory(nil); err == nil {
 		t.Fatal("NewExecutorWithFactory(nil) returned nil error")
+	}
+}
+
+func TestExecutorCapturesCombinedOutputAtLimit(t *testing.T) {
+	process := &fakeProcess{
+		stdout: strings.Repeat("a", outputLimit),
+	}
+	executor, err := NewExecutorWithFactory(&fakeFactory{process: process})
+	if err != nil {
+		t.Fatalf("NewExecutorWithFactory() error = %v", err)
+	}
+
+	result, err := executor.Execute(validAction())
+	if err != nil {
+		t.Fatalf("Execute() error = %v", err)
+	}
+	if len(result.Output) != outputLimit || result.Truncated {
+		t.Fatalf("exact-limit result = len(%d), truncated(%t)", len(result.Output), result.Truncated)
+	}
+
+	process.stdout = strings.Repeat("b", outputLimit)
+	process.stderr = "stderr-after-limit"
+	result, err = executor.Execute(validAction())
+	if err != nil {
+		t.Fatalf("Execute() second error = %v", err)
+	}
+	if len(result.Output) != outputLimit || !result.Truncated {
+		t.Fatalf("over-limit result = len(%d), truncated(%t)", len(result.Output), result.Truncated)
+	}
+}
+
+func TestExecutorEvaluatesOutputRules(t *testing.T) {
+	tests := []struct {
+		name   string
+		rule   config.OutputRule
+		output string
+		want   config.RunOutcome
+	}{
+		{name: "exit code", rule: config.OutputRule{Type: config.OutputRuleExitCode}, output: "anything", want: config.RunOutcomeOK},
+		{name: "match success", rule: config.OutputRule{Type: config.OutputRuleMatch, Pattern: "ready"}, output: "device ready", want: config.RunOutcomeOK},
+		{name: "match failure", rule: config.OutputRule{Type: config.OutputRuleMatch, Pattern: "ready"}, output: "device down", want: config.RunOutcomeFail},
+		{name: "not match success", rule: config.OutputRule{Type: config.OutputRuleNotMatch, Pattern: "error"}, output: "device ready", want: config.RunOutcomeOK},
+		{name: "not match failure", rule: config.OutputRule{Type: config.OutputRuleNotMatch, Pattern: "error"}, output: "device error", want: config.RunOutcomeFail},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			got, err := Evaluate(test.rule, 0, test.output)
+			if err != nil || got != test.want {
+				t.Fatalf("Evaluate() = %q, error = %v, want %q", got, err, test.want)
+			}
+		})
+	}
+}
+
+func TestEvaluateNonZeroExitAlwaysFails(t *testing.T) {
+	got, err := Evaluate(config.OutputRule{Type: config.OutputRuleMatch, Pattern: "ready"}, 1, "ready")
+	if err != nil || got != config.RunOutcomeFail {
+		t.Fatalf("Evaluate() = %q, error = %v, want fail", got, err)
+	}
+}
+
+func TestResultToRun(t *testing.T) {
+	startedAt := time.Now()
+	result := Result{
+		StartedAt: startedAt,
+		Duration:  2 * time.Second,
+		ExitCode:  0,
+		Outcome:   config.RunOutcomeOK,
+		Output:    "ready",
+		Truncated: true,
+	}
+	run := result.ToRun("primary")
+	if run.ActionKind != "primary" || !run.StartedAt.Equal(startedAt) || run.Duration != result.Duration || run.Output != result.Output || !run.Truncated || run.Outcome != result.Outcome {
+		t.Fatalf("ToRun() = %#v", run)
 	}
 }
 

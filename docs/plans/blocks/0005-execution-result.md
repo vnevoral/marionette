@@ -3,7 +3,7 @@
 - **Fáze**: 3 — Execution engine
 - **Vazba na požadavky**: FR-13, FR-14, FR-17
 - **Vazba na ADR**: ADR-0005
-- **Stav**: Návrh
+- **Stav**: Hotovo
 
 ## Cíl bloku
 
