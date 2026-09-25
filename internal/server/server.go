@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"io/fs"
+	"log"
 	"net/http"
 	"strings"
 
@@ -83,6 +84,11 @@ func (api cardAPI) createCard(w http.ResponseWriter, request *http.Request) {
 	}
 	created, err := api.store.CreateCard(card)
 	if err != nil {
+		var persistenceErr *config.PersistenceError
+		if errors.As(err, &persistenceErr) {
+			writeError(w, http.StatusInternalServerError, err)
+			return
+		}
 		if strings.Contains(err.Error(), "already exists") {
 			writeError(w, http.StatusConflict, err)
 			return
@@ -115,6 +121,11 @@ func (api cardAPI) updateCard(w http.ResponseWriter, request *http.Request) {
 	}
 	updated, err := api.store.UpdateCard(request.PathValue("id"), card)
 	if err != nil {
+		var persistenceErr *config.PersistenceError
+		if errors.As(err, &persistenceErr) {
+			writeError(w, http.StatusInternalServerError, err)
+			return
+		}
 		if errors.Is(err, config.ErrNotFound) {
 			writeError(w, http.StatusNotFound, err)
 			return
@@ -188,13 +199,16 @@ func (api cardAPI) enqueuePrimary(w http.ResponseWriter, request *http.Request) 
 		return
 	}
 	if err := api.actions.EnqueuePrimary(cardID, card.Primary); err != nil {
-		writeError(w, http.StatusInternalServerError, err)
+		status := http.StatusInternalServerError
+		if errors.Is(err, ErrActionQueueFull) {
+			status = http.StatusServiceUnavailable
+		}
+		writeError(w, status, err)
 		return
 	}
 	if api.notifier != nil {
 		if err := api.notifier.NotifyPrimaryAction(cardID); err != nil {
-			writeError(w, http.StatusInternalServerError, err)
-			return
+			log.Printf("notify primary action %q for fast polling: %v", cardID, err)
 		}
 	}
 	writeJSON(w, http.StatusAccepted, acceptedAction{CardID: cardID, ActionKind: "primary", Status: "accepted"})
@@ -212,7 +226,11 @@ func (api cardAPI) enqueueStatus(w http.ResponseWriter, request *http.Request) {
 		return
 	}
 	if err := api.actions.EnqueueStatus(cardID); err != nil {
-		writeError(w, http.StatusInternalServerError, err)
+		status := http.StatusInternalServerError
+		if errors.Is(err, ErrActionQueueFull) {
+			status = http.StatusServiceUnavailable
+		}
+		writeError(w, status, err)
 		return
 	}
 	writeJSON(w, http.StatusAccepted, acceptedAction{CardID: cardID, ActionKind: "status", Status: "accepted"})
@@ -259,6 +277,10 @@ func spaHandler(root fs.FS) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		path := r.URL.Path
 		if path != "/" {
+			if strings.HasPrefix(path, "/api/") || path == "/api" {
+				writeError(w, http.StatusNotFound, config.ErrNotFound)
+				return
+			}
 			if _, err := fs.Stat(root, path[1:]); err == nil {
 				fileServer.ServeHTTP(w, r)
 				return

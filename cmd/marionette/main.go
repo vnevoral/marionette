@@ -61,14 +61,15 @@ func main() {
 		addr = ":8080"
 	}
 
+	handler := server.NewRequestTracker(server.NewRouterWithDependencies(server.RouterDependencies{
+		Store:      store,
+		Actions:    backgroundActions,
+		Notifier:   scheduler,
+		Reconciler: scheduler,
+	}))
 	srv := &http.Server{
-		Addr: addr,
-		Handler: server.NewRouterWithDependencies(server.RouterDependencies{
-			Store:      store,
-			Actions:    backgroundActions,
-			Notifier:   scheduler,
-			Reconciler: scheduler,
-		}),
+		Addr:              addr,
+		Handler:           handler,
 		ReadHeaderTimeout: 5 * time.Second,
 	}
 
@@ -87,8 +88,10 @@ func main() {
 	shutdownContext, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	if err := srv.Shutdown(shutdownContext); err != nil {
 		log.Printf("HTTP server shutdown failed: %v", err)
+		_ = srv.Close()
 	}
 	cancel()
+	handler.Wait()
 	backgroundActions.Close()
 	if err := scheduler.Stop(); err != nil && !errors.Is(err, status.ErrSchedulerStopped) {
 		log.Printf("status scheduler shutdown failed: %v", err)

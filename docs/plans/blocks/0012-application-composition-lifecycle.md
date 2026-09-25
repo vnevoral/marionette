@@ -49,10 +49,10 @@ Scheduler dostane reconcile operaci, která je race-safe vůči `Start`/`Stop` a
 při změně karty restartuje dotčený worker. CRUD handler ji zavolá až po úspěšné
 mutaci store.
 
-Při SIGINT/SIGTERM se nejprve zastaví přijímání nových HTTP požadavků, počká se
-na přijaté background primární i status akce, zastaví se scheduler, ukončí HTTP
-server a nakonec se uloží konfigurace včetně historie. Hard bounded shutdown
-zůstává mimo tento blok a je případný budoucí blok.
+Při SIGINT/SIGTERM se nejprve zastaví přijímání nových HTTP požadavků a dokončí
+se aktivní handlery, poté se počká na přijaté background primární i status akce,
+zastaví se scheduler a nakonec se uloží konfigurace včetně historie. Hard
+bounded shutdown zůstává mimo tento blok a je případný budoucí blok.
 
 ## Testovací plán
 

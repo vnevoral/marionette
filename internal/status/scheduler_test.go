@@ -281,3 +281,29 @@ func TestSchedulerReconcileAddsRestartsAndRemovesWorkers(t *testing.T) {
 		t.Fatalf("Stop() error = %v", err)
 	}
 }
+
+func TestSchedulerRestartClearsFastPollingWindow(t *testing.T) {
+	scheduler, clock, _, cancel := newTestScheduler(t, "restart", 10, 2, 30)
+	defer cancel()
+	waitForTimer(t, clock)
+	<-clock.durations
+	if err := scheduler.NotifyPrimaryAction("restart"); err != nil {
+		t.Fatalf("NotifyPrimaryAction() error = %v", err)
+	}
+	if duration := <-clock.durations; duration != 2*time.Second {
+		t.Fatalf("fast timer duration = %v", duration)
+	}
+	if err := scheduler.Stop(); err != nil {
+		t.Fatalf("Stop() error = %v", err)
+	}
+	if err := scheduler.Start(context.Background()); err != nil {
+		t.Fatalf("restart Start() error = %v", err)
+	}
+	waitForTimer(t, clock)
+	if duration := <-clock.durations; duration != 10*time.Second {
+		t.Fatalf("restart timer duration = %v, want standard interval", duration)
+	}
+	if err := scheduler.Stop(); err != nil {
+		t.Fatalf("final Stop() error = %v", err)
+	}
+}

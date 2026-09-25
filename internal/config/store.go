@@ -13,6 +13,21 @@ import (
 // ErrNotFound indicates that a requested card does not exist in the store.
 var ErrNotFound = errors.New("config item not found")
 
+// PersistenceError indicates that a store mutation succeeded in memory but
+// could not be persisted to the configured backing file.
+type PersistenceError struct {
+	Operation string
+	Err       error
+}
+
+func (err *PersistenceError) Error() string {
+	return fmt.Sprintf("persist %s: %v", err.Operation, err.Err)
+}
+
+func (err *PersistenceError) Unwrap() error {
+	return err.Err
+}
+
 // Store keeps action-card configuration and run history in memory.
 type Store struct {
 	mu            sync.RWMutex
@@ -99,7 +114,7 @@ func (store *Store) CreateCard(card ActionCard) (ActionCard, error) {
 	created := cloneCard(card)
 	store.mu.Unlock()
 	if err := store.notifyChange(); err != nil {
-		return created, fmt.Errorf("persist card creation: %w", err)
+		return created, &PersistenceError{Operation: "card creation", Err: err}
 	}
 	return created, nil
 }
@@ -124,7 +139,7 @@ func (store *Store) UpdateCard(id string, card ActionCard) (ActionCard, error) {
 	updated := cloneCard(card)
 	store.mu.Unlock()
 	if err := store.notifyChange(); err != nil {
-		return updated, fmt.Errorf("persist card update: %w", err)
+		return updated, &PersistenceError{Operation: "card update", Err: err}
 	}
 	return updated, nil
 }
@@ -143,7 +158,7 @@ func (store *Store) DeleteCard(id string) error {
 	delete(store.statusHistory, id)
 	store.mu.Unlock()
 	if err := store.notifyChange(); err != nil {
-		return fmt.Errorf("persist card deletion: %w", err)
+		return &PersistenceError{Operation: "card deletion", Err: err}
 	}
 	return nil
 }
@@ -174,7 +189,7 @@ func (store *Store) UpdateSettings(settings Settings) error {
 	}
 	store.mu.Unlock()
 	if err := store.notifyChange(); err != nil {
-		return fmt.Errorf("persist settings update: %w", err)
+		return &PersistenceError{Operation: "settings update", Err: err}
 	}
 	return nil
 }

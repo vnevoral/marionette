@@ -10,6 +10,7 @@ import (
 )
 
 var ErrActionQueueClosed = errors.New("action queue is closed")
+var ErrActionQueueFull = errors.New("action queue is full")
 
 // ActionRunner executes one configured action through the shared concurrency limit.
 type ActionRunner interface {
@@ -44,9 +45,11 @@ type BackgroundActions struct {
 	statusChecker StatusChecker
 	store         *config.Store
 
-	mu     sync.Mutex
-	closed bool
-	group  sync.WaitGroup
+	mu      sync.Mutex
+	closed  bool
+	jobs    chan func()
+	group   sync.WaitGroup
+	pending sync.WaitGroup
 }
 
 // NewBackgroundActions creates an asynchronous action queue.
@@ -60,16 +63,24 @@ func NewBackgroundActions(store *config.Store, runner ActionRunner, statusChecke
 	if statusChecker == nil {
 		return nil, errors.New("status checker is required")
 	}
-	return &BackgroundActions{store: store, runner: runner, statusChecker: statusChecker}, nil
+	workers := store.GetSettings().MaxConcurrentActions
+	queueCapacity := workers * 4
+	actions := &BackgroundActions{
+		store:         store,
+		runner:        runner,
+		statusChecker: statusChecker,
+		jobs:          make(chan func(), queueCapacity),
+	}
+	for range workers {
+		actions.group.Add(1)
+		go actions.runWorker()
+	}
+	return actions, nil
 }
 
 // EnqueuePrimary schedules a primary action without waiting for process completion.
 func (actions *BackgroundActions) EnqueuePrimary(cardID string, action config.Action) error {
-	if err := actions.begin(); err != nil {
-		return err
-	}
-	go func() {
-		defer actions.group.Done()
+	return actions.enqueue(func() {
 		result, err := actions.runner.Run(action)
 		if err != nil {
 			log.Printf("primary action %q failed: %v", cardID, err)
@@ -78,45 +89,55 @@ func (actions *BackgroundActions) EnqueuePrimary(cardID string, action config.Ac
 		if err := actions.store.AppendRun(cardID, result.ToRun("primary")); err != nil {
 			log.Printf("save primary action result for %q: %v", cardID, err)
 		}
-	}()
-	return nil
+	})
 }
 
 // EnqueueStatus schedules a manual status action without waiting for its result.
 func (actions *BackgroundActions) EnqueueStatus(cardID string) error {
-	if err := actions.begin(); err != nil {
-		return err
-	}
-	go func() {
-		defer actions.group.Done()
+	return actions.enqueue(func() {
 		if _, err := actions.statusChecker.CheckNow(cardID); err != nil {
 			log.Printf("status action %q failed: %v", cardID, err)
 		}
-	}()
-	return nil
+	})
 }
 
 // Close rejects new actions and waits for accepted actions to finish.
 func (actions *BackgroundActions) Close() {
 	actions.mu.Lock()
 	actions.closed = true
+	close(actions.jobs)
 	actions.mu.Unlock()
 	actions.Wait()
+	actions.group.Wait()
 }
 
 // Wait waits for all actions accepted before Close.
 func (actions *BackgroundActions) Wait() {
-	actions.group.Wait()
+	actions.pending.Wait()
 }
 
-func (actions *BackgroundActions) begin() error {
+func (actions *BackgroundActions) enqueue(job func()) error {
 	actions.mu.Lock()
 	defer actions.mu.Unlock()
 	if actions.closed {
 		return ErrActionQueueClosed
 	}
-	actions.group.Add(1)
-	return nil
+	actions.pending.Add(1)
+	select {
+	case actions.jobs <- job:
+		return nil
+	default:
+		actions.pending.Done()
+		return ErrActionQueueFull
+	}
+}
+
+func (actions *BackgroundActions) runWorker() {
+	defer actions.group.Done()
+	for job := range actions.jobs {
+		job()
+		actions.pending.Done()
+	}
 }
 
 type actionQueueDependencies struct {

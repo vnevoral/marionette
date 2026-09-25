@@ -225,6 +225,12 @@ func (notifier *fakePrimaryNotifier) NotifyPrimaryAction(cardID string) error {
 	return nil
 }
 
+type failingPrimaryNotifier struct{}
+
+func (failingPrimaryNotifier) NotifyPrimaryAction(string) error {
+	return errors.New("scheduler unavailable")
+}
+
 func TestRouterEnqueuesActionsWithoutWaiting(t *testing.T) {
 	store := config.NewStore(config.Settings{HistorySize: 5, MaxConcurrentActions: 1})
 	createServerCard(t, store, "enqueue")
@@ -267,6 +273,49 @@ func TestRouterRejectsStatusEnqueueWithoutStatusAction(t *testing.T) {
 	handler.ServeHTTP(response, httptest.NewRequest(http.MethodPost, "/api/cards/without-status/actions/status/check", nil))
 	if response.Code != http.StatusUnprocessableEntity {
 		t.Fatalf("status enqueue response = %d", response.Code)
+	}
+}
+
+func TestRouterKeepsAcceptedPrimaryActionWhenFastPollingNotificationFails(t *testing.T) {
+	store := config.NewStore(config.Settings{HistorySize: 5, MaxConcurrentActions: 1})
+	createServerCard(t, store, "notify-failure")
+	queue := &fakeActionQueue{primaryCalls: make(chan string, 1), statusCalls: make(chan string, 1)}
+	handler := NewRouterWithDependencies(RouterDependencies{
+		Store:    store,
+		Actions:  queue,
+		Notifier: failingPrimaryNotifier{},
+	})
+	response := httptest.NewRecorder()
+	handler.ServeHTTP(response, httptest.NewRequest(http.MethodPost, "/api/cards/notify-failure/actions/primary", nil))
+	if response.Code != http.StatusAccepted {
+		t.Fatalf("primary enqueue response = %d", response.Code)
+	}
+	if cardID := <-queue.primaryCalls; cardID != "notify-failure" {
+		t.Fatalf("primary enqueue card ID = %q", cardID)
+	}
+}
+
+func TestRouterReturnsJSONNotFoundForUnknownAPIPath(t *testing.T) {
+	handler := NewRouter(config.NewStore(config.Settings{HistorySize: 5, MaxConcurrentActions: 1}))
+	response := httptest.NewRecorder()
+	handler.ServeHTTP(response, httptest.NewRequest(http.MethodGet, "/api/not-a-route", nil))
+	if response.Code != http.StatusNotFound || response.Header().Get("Content-Type") != "application/json" {
+		t.Fatalf("unknown API response = %d %q", response.Code, response.Header().Get("Content-Type"))
+	}
+}
+
+func TestRouterMapsPersistenceFailureToInternalServerError(t *testing.T) {
+	store := config.NewStore(config.Settings{HistorySize: 5, MaxConcurrentActions: 1})
+	store.OnChange = func(*config.Store) error {
+		return errors.New("disk full")
+	}
+	handler := NewRouter(store)
+	response := requestJSON(t, handler, http.MethodPost, "/api/cards", validServerCard("persist-failure"))
+	if response.Code != http.StatusInternalServerError {
+		t.Fatalf("persistence failure response = %d", response.Code)
+	}
+	if _, exists := store.GetCard("persist-failure"); !exists {
+		t.Fatal("card mutation was unexpectedly rolled back")
 	}
 }
 

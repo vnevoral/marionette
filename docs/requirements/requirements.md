@@ -195,7 +195,7 @@ promítnuty do FR/NFR výše:
 | Autentizace/autorizace         | Žádná v MVP; předpoklad důvěryhodné sítě (NFR-01).                                               |
 | Vyhodnocení status akce        | Exit kód + volitelné pravidlo na výstup (regex) (FR-14).                                         |
 | Historie běhů                  | Posledních N běhů, výchozí N = 20 (FR-17).                                                       |
-| Automatický polling            | Volitelný, per karta, výchozí interval 30 s (FR-15).                                             |
+| Automatický polling            | Volitelný, per karta, výchozí interval 60 s (FR-15).                                             |
 | Validace příkazů               | Bez whitelistingu; jen strukturované argumenty, žádný shell string (NFR-01).                     |
 | Limit výstupu akce             | 4 KB kombinovaně stdout+stderr, zbytek se ořízne (FR-13).                                        |
 | Cesta ke config souboru / port | `MARIONETTE_CONFIG` (default `./marionette.json`) / `MARIONETTE_ADDR` (default `:8080`) (FR-34). |
