@@ -3,7 +3,7 @@
 - **Fáze**: 4 — Status/health-check engine
 - **Vazba na požadavky**: FR-12, FR-14, FR-17, FR-19
 - **Vazba na ADR**: ADR-0005, ADR-0006
-- **Stav**: Schváleno
+- **Stav**: Hotovo
 
 ## Cíl bloku
 

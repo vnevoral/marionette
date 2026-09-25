@@ -14,7 +14,7 @@ uloží do `docs/plans/blocks/NNNN-nazev.md`. Blok se implementuje promptem
 | 1    | Zpřesnění požadavků a architektury                                                           | **Hotovo** (requirements v0.2, ADR-0004 přijato) | vše (SRS review)               |
 | 2    | Doménový model + config store (in-memory + JSON perzistence)                                 | **Hotovo**                                       | FR-10..14, FR-30..33, ADR-0004 |
 | 3    | Execution engine (bezpečné spouštění akcí na hostu)                                          | **Hotovo**                                       | FR-11, FR-13, NFR-01, NFR-04   |
-| 4    | Status/health-check engine (vč. volitelného pollingu)                                        | **Probíhá** (0007 hotovo; 0008–0009 čekají)      | FR-12, FR-15, FR-16, FR-17     |
+| 4    | Status/health-check engine (vč. volitelného pollingu)                                        | **Probíhá** (0007–0008 hotovo; 0009 čeká)        | FR-12, FR-15, FR-16, FR-17     |
 | 5    | REST API (CRUD karet/akcí, spuštění, čtení stavu)                                            | Plánováno                                        | FR-40, FR-41                   |
 | 6    | Dashboard UI (karty, stavové indikátory, formuláře správy)                                   | Plánováno                                        | FR-20..23                      |
 | 7    | Balíčkování a nasazení (systemd unit, install skript, arm64 release)                         | Plánováno                                        | FR-02..04, NFR-02              |
@@ -46,9 +46,8 @@ uloží do `docs/plans/blocks/NNNN-nazev.md`. Blok se implementuje promptem
 - ADR-0006 je přijato: status historie obsahuje pouze skutečné přechody stavů
   s dobou jejich trvání; migrace starších status historií není součástí MVP.
 
-- Fáze 4 je rozpracována do bloků 0007–0009 a bude se implementovat v pořadí:
-  0007 (status projekce a přechody) → 0008 (jedna status kontrola) → 0009
-  (standardní a zrychlený polling scheduler).
+- Fáze 4 je rozpracována do bloků 0007–0009. Bloky 0007–0008 jsou hotové;
+  zbývá 0009 (standardní a zrychlený polling scheduler).
 
 - Bloky uvnitř fáze by měly být dost malé na jednu implementační relaci s AI
   agentem (řádově hodiny práce, ne dny) a musí mít jasné kritérium hotovosti
