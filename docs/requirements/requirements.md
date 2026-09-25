@@ -1,6 +1,7 @@
-# Požadavky na Marionette (SRS) — v0.5
+# Požadavky na Marionette (SRS) — v0.6
 
-> Stav: **zpřesněno** (fáze 1 a UX specifikace, 2026-09-25; doplněno o dva polling intervaly a
+> Stav: **zpřesněno** (fáze 1 a UX specifikace, 2026-09-25; doplněno o SSE stream
+> pro živé změny statusů, 2026-09-25; doplněno o dva polling intervaly a
 > vynucenou terminaci akcí, 2026-09-25; doplněno o perzistenci historie běhů
 > při řízeném ukončení, 2026-09-25; řízení status akcí interním schedulerem,
 > 2026-09-25; doplněno o UX požadavky FR-24 až FR-29 a NFR-08 až NFR-10,
@@ -165,6 +166,14 @@ spustitelný soubor.
   spouštění akcí a čtení historie/posledního výsledku.
 - **FR-41**: `GET /api/health` (již existuje) slouží jako liveness endpoint
   procesu samotného (odlišné od status akcí uživatelských karet).
+- **FR-42**: Backend poskytuje Server-Sent Events stream pro živé změny stavů
+  karet. Připojený klient se přihlásí k endpointu pro události a při každé
+  změně status projekce obdrží událost obsahující identifikátor karty a novou
+  `StatusSnapshot`; opakované kontroly beze změny stavu událost nevytvářejí.
+  Stream posílá pravidelný heartbeat, podporuje opětovné připojení klienta a
+  klient při dočasné nedostupnosti streamu použije REST read-only API jako
+  fallback. REST API zůstává zdrojem pro počáteční načtení obrazovky a
+  synchronní načtení aktuální projekce.
 
 ## 4. Nefunkční požadavky
 
@@ -201,6 +210,10 @@ args...)` se strukturovanými argumenty, nikdy skládáním shell příkazu ze
 - **NFR-10 UX ověřitelnost**: Každý UX blok má popsané stavy loading, empty,
   error, success a destructive action a před uzavřením projde screenshot nebo
   manuální smoke test hlavních workflow.
+- **NFR-11 Realtime aktualizace**: SSE stream pro změny statusů nesmí blokovat
+  REST API ani běh status scheduleru. Odpojení klienta nesmí vytvářet
+  neomezenou práci ani růst paměti na serveru; připojení má být možné bezpečně
+  ukončit při zavření stránky nebo aplikace.
 
 ## 5. Omezení a předpoklady
 
