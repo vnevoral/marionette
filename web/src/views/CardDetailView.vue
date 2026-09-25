@@ -1,13 +1,13 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from "vue";
-import { RouterLink, useRoute } from "vue-router";
+import { RouterLink, useRoute, useRouter } from "vue-router";
 import Button from "primevue/button";
 import Message from "primevue/message";
 import ProgressSpinner from "primevue/progressspinner";
-import Tag from "primevue/tag";
 import {
 	enqueuePrimary,
 	enqueueStatus,
+	deleteCard,
 	getCard,
 	getRuns,
 	getStatus,
@@ -17,8 +17,10 @@ import {
 	type StatusChange,
 	type StatusSnapshot,
 } from "@/api";
+import StatusBadge from "@/components/StatusBadge.vue";
 
 const route = useRoute();
+const router = useRouter();
 const card = ref<ActionCard>();
 const status = ref<StatusSnapshot>();
 const runs = ref<Run[]>([]);
@@ -29,6 +31,7 @@ const error = ref("");
 const sectionErrors = ref<Record<string, string>>({});
 const requestMessage = ref("");
 const actionLoading = ref<"primary" | "status" | "">("");
+type StatusTone = "healthy" | "problem" | "unknown" | "info" | "warning";
 
 const cardID = computed(() => String(route.params.id));
 
@@ -43,11 +46,34 @@ function formatDate(value?: string) {
 	return new Date(value).toLocaleString();
 }
 
-function stateView(state = "unknown") {
-	if (state === "ok") return { label: "Healthy", icon: "pi pi-check-circle", severity: "success" };
+function stateView(state = "unknown"): {
+	label: string;
+	icon: string;
+	severity: "success" | "danger" | "secondary";
+	tone: StatusTone;
+} {
+	if (state === "ok")
+		return { label: "Healthy", icon: "pi pi-check-circle", severity: "success", tone: "healthy" };
 	if (state === "fail")
-		return { label: "Problem", icon: "pi pi-exclamation-triangle", severity: "danger" };
-	return { label: "Unknown", icon: "pi pi-question-circle", severity: "secondary" };
+		return {
+			label: "Problem",
+			icon: "pi pi-exclamation-triangle",
+			severity: "danger",
+			tone: "problem",
+		};
+	return {
+		label: "Unknown",
+		icon: "pi pi-question-circle",
+		severity: "secondary",
+		tone: "unknown",
+	};
+}
+
+function currentStatusView() {
+	if (!card.value?.status) {
+		return { label: "No status check", icon: "pi pi-minus-circle", tone: "unknown" as const };
+	}
+	return stateView(status.value?.state);
 }
 
 function outcomeLabel(outcome: Run["outcome"]) {
@@ -56,10 +82,16 @@ function outcomeLabel(outcome: Run["outcome"]) {
 	return "Failed";
 }
 
-function outcomeSeverity(outcome: Run["outcome"]) {
-	if (outcome === "ok") return "success";
-	if (outcome === "timeout") return "warn";
-	return "danger";
+function outcomeTone(outcome: Run["outcome"]): StatusTone {
+	if (outcome === "ok") return "healthy";
+	if (outcome === "timeout") return "warning";
+	return "problem";
+}
+
+function outcomeIcon(outcome: Run["outcome"]) {
+	if (outcome === "ok") return "pi pi-check-circle";
+	if (outcome === "timeout") return "pi pi-clock";
+	return "pi pi-times-circle";
 }
 
 async function loadDetail() {
@@ -105,6 +137,18 @@ async function runAction(action: "primary" | "status") {
 	}
 }
 
+async function removeCard() {
+	if (!card.value || !window.confirm(`Delete ${card.value.name}?`)) return;
+	requestMessage.value = "Deleting card...";
+	try {
+		await deleteCard(cardID.value);
+		await router.push("/");
+	} catch (deleteError) {
+		requestMessage.value =
+			deleteError instanceof Error ? deleteError.message : "Unable to delete card";
+	}
+}
+
 onMounted(loadDetail);
 </script>
 
@@ -142,12 +186,21 @@ onMounted(loadDetail);
 						<p>{{ card.description || "No description provided." }}</p>
 					</div>
 				</div>
-				<div class="detail-actions flex align-items-center gap-4">
-					<Tag :severity="stateView(status?.state).severity">
-						<i :class="stateView(status?.state).icon" aria-hidden="true"></i>
-						<span>{{ stateView(status?.state).label }}</span>
-					</Tag>
-					<RouterLink class="edit-link" :to="`/manage`">Edit card</RouterLink>
+				<div class="detail-actions flex align-items-center gap-3">
+					<RouterLink
+						class="edit-button primary-action-button"
+						:to="`/cards/${encodeURIComponent(card.id)}/edit`"
+					>
+						<i class="pi pi-pencil" aria-hidden="true" />
+						<span>Edit card</span>
+					</RouterLink>
+					<Button
+						label="Delete card"
+						icon="pi pi-trash"
+						severity="danger"
+						text
+						@click="removeCard"
+					/>
 				</div>
 			</header>
 
@@ -162,8 +215,12 @@ onMounted(loadDetail);
 							<h2>Current status</h2>
 							<i class="pi pi-heart" aria-hidden="true"></i>
 						</div>
-						<p class="summary-state">{{ stateView(status?.state).label }}</p>
-						<dl class="summary-list">
+						<StatusBadge
+							:label="currentStatusView().label"
+							:icon="currentStatusView().icon"
+							:tone="currentStatusView().tone"
+						/>
+						<dl v-if="card.status" class="summary-list">
 							<div>
 								<dt>Last checked</dt>
 								<dd>{{ formatDate(status?.checkedAt) }}</dd>
@@ -179,6 +236,9 @@ onMounted(loadDetail);
 								</dd>
 							</div>
 						</dl>
+						<p v-else class="status-empty-copy">
+							Status monitoring is not configured for this card.
+						</p>
 						<p v-if="sectionErrors.status" class="section-error">{{ sectionErrors.status }}</p>
 					</div>
 				</div>
@@ -193,6 +253,7 @@ onMounted(loadDetail);
 							<Button
 								label="Run action"
 								icon="pi pi-play"
+								class="primary-action-button"
 								:loading="actionLoading === 'primary'"
 								:disabled="Boolean(actionLoading)"
 								@click="runAction('primary')"
@@ -229,9 +290,10 @@ onMounted(loadDetail);
 						class="run-row flex flex-column gap-2"
 					>
 						<div class="run-main">
-							<Tag
-								:value="outcomeLabel(run.outcome)"
-								:severity="outcomeSeverity(run.outcome)"
+							<StatusBadge
+								:label="outcomeLabel(run.outcome)"
+								:icon="outcomeIcon(run.outcome)"
+								:tone="outcomeTone(run.outcome)"
 							/><strong>{{ formatDate(run.startedAt) }}</strong
 							><span>{{ formatDuration(run.duration) }}</span>
 						</div>
@@ -257,9 +319,12 @@ onMounted(loadDetail);
 						:key="`${change.startedAt}-${index}`"
 						class="timeline-row flex align-items-start gap-3"
 					>
-						<span class="timeline-dot" :class="`state-${change.state}`" aria-hidden="true"></span>
+						<StatusBadge
+							:label="stateView(change.state).label"
+							:icon="stateView(change.state).icon"
+							:tone="stateView(change.state).tone"
+						/>
 						<div>
-							<strong>{{ stateView(change.state).label }}</strong>
 							<p>{{ formatDate(change.startedAt) }} · {{ formatDuration(change.duration) }}</p>
 						</div>
 					</article>
@@ -271,22 +336,36 @@ onMounted(loadDetail);
 
 <style scoped>
 .detail-page {
-	max-width: 1200px;
+	max-width: var(--page-max-width);
 	margin: 0 auto;
-	padding: clamp(var(--space-6), 5vw, 64px) clamp(var(--space-4), 5vw, 64px);
+	padding: var(--page-padding-y) var(--page-padding-x);
 	color: var(--color-ink);
 }
 .detail-back {
 	margin-bottom: var(--space-6);
 }
 .detail-back a,
-.edit-link {
+.edit-link,
+.edit-button {
 	display: inline-flex;
 	align-items: center;
 	gap: var(--space-2);
 	color: var(--color-accent-strong);
-	font-weight: 700;
+	font-weight: var(--font-weight-medium);
 	text-decoration: none;
+}
+
+.edit-button {
+	min-height: 40px;
+	padding: 0 var(--space-4);
+	border: 1px solid var(--color-accent);
+	border-radius: var(--radius-sm);
+}
+
+.edit-button:hover {
+	border-color: var(--color-accent-strong);
+	background: #d8ebdc;
+	color: var(--color-accent-strong);
 }
 .detail-identity {
 	min-width: 0;
@@ -306,7 +385,7 @@ onMounted(loadDetail);
 	margin: 0 0 var(--space-2);
 	color: var(--color-accent);
 	font-size: 0.75rem;
-	font-weight: 800;
+	font-weight: var(--font-weight-semibold);
 	letter-spacing: 0.14em;
 }
 h1,
@@ -329,7 +408,7 @@ h1 {
 	border-left: 3px solid var(--color-info);
 	background: var(--color-info-soft);
 	color: var(--color-info);
-	font-weight: 700;
+	font-weight: var(--font-weight-medium);
 }
 .detail-panel {
 	border: 1px solid var(--color-border);
@@ -359,18 +438,16 @@ h1 {
 	background: var(--color-accent-soft);
 	color: var(--color-accent-strong);
 	font-size: 0.8rem;
-	font-weight: 800;
-}
-.summary-state {
-	margin: 0 0 var(--space-4);
-	color: var(--color-accent-strong);
-	font-family: var(--font-display);
-	font-size: 2rem;
+	font-weight: var(--font-weight-semibold);
 }
 .summary-list {
 	display: grid;
 	gap: var(--space-3);
 	margin: 0;
+}
+.status-empty-copy {
+	margin: var(--space-4) 0 0;
+	color: var(--color-muted);
 }
 .summary-list div {
 	display: flex;
@@ -425,21 +502,6 @@ dd {
 .timeline-row {
 	padding: var(--space-3) 0;
 	border-top: 1px solid var(--color-border);
-}
-.timeline-dot {
-	width: 12px;
-	height: 12px;
-	flex-shrink: 0;
-	margin-top: 5px;
-	border-radius: 50%;
-	background: var(--color-muted);
-	box-shadow: 0 0 0 4px var(--color-canvas);
-}
-.timeline-dot.state-ok {
-	background: var(--color-success);
-}
-.timeline-dot.state-fail {
-	background: var(--color-danger);
 }
 .timeline-row p {
 	margin: var(--space-1) 0 0;

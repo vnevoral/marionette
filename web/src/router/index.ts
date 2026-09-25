@@ -1,7 +1,7 @@
 import { createRouter, createWebHistory } from "vue-router";
 import HomeView from "@/views/HomeView.vue";
-import ManageView from "@/views/ManageView.vue";
 import CardDetailView from "@/views/CardDetailView.vue";
+import CardEditView from "@/views/CardEditView.vue";
 
 const router = createRouter({
 	history: createWebHistory(),
@@ -12,14 +12,19 @@ const router = createRouter({
 			component: HomeView,
 		},
 		{
-			path: "/manage",
-			name: "manage",
-			component: ManageView,
+			path: "/cards/new/edit",
+			name: "card-new",
+			component: CardEditView,
 		},
 		{
 			path: "/cards/:id",
 			name: "card-detail",
 			component: CardDetailView,
+		},
+		{
+			path: "/cards/:id/edit",
+			name: "card-edit",
+			component: CardEditView,
 		},
 	],
 });

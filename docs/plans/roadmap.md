@@ -22,7 +22,7 @@ uloží do `docs/plans/blocks/NNNN-nazev.md`. Blok se implementuje promptem
 | 6    | Dashboard UI (karty, stavové indikátory, formuláře správy)                                   | **Hotovo**                                       | FR-20..23                      |
 | 7    | Balíčkování a nasazení (systemd unit, install skript, arm64 release)                         | Plánováno                                        | FR-02..04, NFR-02              |
 | 8    | Zpevnění (auth/access control, logování, chybové stavy, testy, dokumentace)                  | Plánováno                                        | NFR-01, NFR-04..06             |
-| 9    | UX redesign a sdílený design systém                                                          | Plánováno                                        | FR-24..29, NFR-08..10          |
+| 9    | UX redesign a sdílený design systém                                                          | **Probíhá** (UX-05)                              | FR-24..29, NFR-08..10          |
 
 ## Poznámky k plánování
 
@@ -76,6 +76,8 @@ uloží do `docs/plans/blocks/NNNN-nazev.md`. Blok se implementuje promptem
   Následuje [0018 — UX-04: Detail karty, běhy a status timeline](blocks/0018-ux-card-detail.md).
   PrimeFlex layout foundation je zachycen v [0019](blocks/0019-primeflex-layout-foundation.md).
   Následuje [0020 — PrimeFlex view migration](blocks/0020-primeflex-view-migration.md).
+  Aktuální pokračování fáze je [0021 — UX-05: Vizuální konzistence,
+  accessibility a responsive audit](blocks/0021-ux-consistency-accessibility.md).
 
 - Bloky uvnitř fáze by měly být dost malé na jednu implementační relaci s AI
   agentem (řádově hodiny práce, ne dny) a musí mít jasné kritérium hotovosti

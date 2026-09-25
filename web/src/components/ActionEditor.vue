@@ -138,7 +138,7 @@ label {
 	color: var(--color-muted);
 	font-family: var(--font-ui);
 	font-size: 0.85rem;
-	font-weight: 700;
+	font-weight: var(--font-weight-medium);
 }
 .dynamic-block button {
 	width: fit-content;
@@ -147,6 +147,6 @@ label {
 	color: var(--color-accent);
 	cursor: pointer;
 	font-family: var(--font-ui);
-	font-weight: 700;
+	font-weight: var(--font-weight-medium);
 }
 </style>

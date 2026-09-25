@@ -37,13 +37,12 @@ is not available only as a link buried inside a card.
 
 ### 2.2 Screens
 
-| Route         | Screen       | Purpose                                           |
-| ------------- | ------------ | ------------------------------------------------- |
-| `/`           | Overview     | Scan all cards and trigger primary operations     |
-| `/cards/:id`  | Card detail  | Current state, last result, runs, and transitions |
-| `/manage`     | Manage cards | List, create, edit, and delete cards              |
-| `/manage/new` | New card     | Empty creation form                               |
-| `/manage/:id` | Edit card    | Existing card configuration                       |
+| Route             | Screen      | Purpose                                           |
+| ----------------- | ----------- | ------------------------------------------------- |
+| `/`               | Overview    | Scan all cards and trigger primary operations     |
+| `/cards/:id`      | Card detail | Current state, last result, runs, and transitions |
+| `/cards/new/edit` | New card    | Empty creation form                               |
+| `/cards/:id/edit` | Edit card   | Existing card configuration                       |
 
 ## 3. Product language and vocabulary
 
@@ -143,13 +142,13 @@ The body contains:
 - **Status history**: chronological transition timeline with duration;
 - **Configuration**: link to edit, not inline configuration in diagnostics.
 
-## 7. Manage cards
+## 7. Card editing
 
 ### 7.1 List
 
-The management view contains a searchable card list with name, state, and
-last update. The primary page action is **New card**. Each item offers **Edit**
-and **Delete**.
+The Dashboard is the card list and the primary page action is **New card**.
+Card Detail provides **Edit card** and **Delete card** actions. Editing is a
+standalone workflow and does not combine a card list with a configuration form.
 
 ### 7.2 Form sections
 

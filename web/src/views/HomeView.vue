@@ -5,7 +5,6 @@ import Button from "primevue/button";
 import Card from "primevue/card";
 import Message from "primevue/message";
 import ProgressSpinner from "primevue/progressspinner";
-import Tag from "primevue/tag";
 import {
 	enqueuePrimary,
 	enqueueStatus,
@@ -14,9 +13,11 @@ import {
 	type ActionCard,
 	type StatusSnapshot,
 } from "@/api";
+import StatusBadge from "@/components/StatusBadge.vue";
 
 type ActionKind = "primary" | "status";
 type RequestState = "queued" | "running" | "success" | "error";
+type StatusTone = "healthy" | "problem" | "unknown" | "info" | "warning";
 
 const cards = ref<ActionCard[]>([]);
 const statuses = ref<Record<string, StatusSnapshot>>({});
@@ -131,7 +132,12 @@ async function runAction(card: ActionCard, action: ActionKind) {
 	}
 }
 
-function statusView(card: ActionCard) {
+function statusView(card: ActionCard): {
+	label: string;
+	icon: string;
+	severity: "success" | "danger" | "secondary" | "info";
+	tone: StatusTone;
+} {
 	if (!card.status) {
 		return {
 			label: "No status check",
@@ -196,7 +202,7 @@ onMounted(loadDashboard);
 					:loading="loading"
 					@click="loadDashboard"
 				/>
-				<RouterLink v-if="cards.length" class="new-card-link" to="/manage">
+				<RouterLink v-if="cards.length" class="primary-action-link" to="/cards/new/edit">
 					<i class="pi pi-plus" aria-hidden="true"></i>
 					<span>New card</span>
 				</RouterLink>
@@ -224,13 +230,11 @@ onMounted(loadDashboard);
 							<div class="card-icon" aria-hidden="true">
 								<i :class="card.icon || 'pi pi-desktop'" />
 							</div>
-							<Tag
-								:severity="statusView(card).severity"
-								:class="`status-tag status-${statusView(card).tone}`"
-							>
-								<i :class="statusView(card).icon" aria-hidden="true"></i>
-								<span>{{ statusView(card).label }}</span>
-							</Tag>
+							<StatusBadge
+								:label="statusView(card).label"
+								:icon="statusView(card).icon"
+								:tone="statusView(card).tone"
+							/>
 						</div>
 					</template>
 					<template #title>
@@ -259,6 +263,7 @@ onMounted(loadDashboard);
 								<Button
 									label="Run action"
 									icon="pi pi-play"
+									class="primary-action-button"
 									:loading="
 										requests[card.id]?.action === 'primary' && requests[card.id]?.state !== 'error'
 									"
@@ -292,7 +297,7 @@ onMounted(loadDashboard);
 			<div class="empty-icon" aria-hidden="true"><i class="pi pi-inbox"></i></div>
 			<h2 id="empty-title">No action cards yet</h2>
 			<p>Create your first card to start monitoring and controlling a service.</p>
-			<RouterLink class="empty-action" to="/manage">
+			<RouterLink class="primary-action-link empty-action" to="/cards/new/edit">
 				<i class="pi pi-plus" aria-hidden="true"></i>
 				<span>Create your first card</span>
 			</RouterLink>
@@ -302,16 +307,16 @@ onMounted(loadDashboard);
 
 <style scoped>
 .overview-page {
-	max-width: 1200px;
+	max-width: var(--page-max-width);
 	margin: 0 auto;
-	padding: clamp(var(--space-6), 5vw, 64px) clamp(var(--space-4), 5vw, 64px);
+	padding: var(--page-padding-y) var(--page-padding-x);
 }
 
 .eyebrow {
 	margin: 0 0 var(--space-3);
 	color: var(--color-accent);
 	font-size: 0.75rem;
-	font-weight: 800;
+	font-weight: var(--font-weight-semibold);
 	letter-spacing: 0.14em;
 }
 
@@ -335,13 +340,13 @@ h1 {
 
 .page-actions :deep(.p-button),
 .card-actions :deep(.p-button),
-.new-card-link,
+.primary-action-link,
 .empty-action {
 	font-family: var(--font-ui);
-	font-weight: 700;
+	font-weight: var(--font-weight-medium);
 }
 
-.new-card-link,
+.primary-action-link,
 .empty-action {
 	display: inline-flex;
 	align-items: center;
@@ -349,14 +354,21 @@ h1 {
 	min-height: 42px;
 	padding: 0 var(--space-4);
 	border-radius: var(--radius-sm);
-	background: var(--color-accent);
-	color: #ffffff;
+	border: 1px solid var(--color-accent);
+	background: var(--color-accent-soft);
+	color: var(--color-accent-strong);
 	text-decoration: none;
 }
 
-.new-card-link:hover,
+.primary-action-link {
+	font-weight: var(--font-weight-medium);
+}
+
+.primary-action-link:hover,
 .empty-action:hover {
-	background: var(--color-accent-strong);
+	border-color: var(--color-accent-strong);
+	background: #d8ebdc;
+	color: var(--color-accent-strong);
 }
 
 .message-content {
@@ -450,7 +462,7 @@ h1 {
 	gap: var(--space-2);
 	color: var(--color-accent-strong);
 	font-size: 0.88rem;
-	font-weight: 700;
+	font-weight: var(--font-weight-medium);
 	text-decoration: none;
 }
 
@@ -469,35 +481,6 @@ h1 {
 	flex: 1 1 auto;
 }
 
-.card-banner :deep(.status-tag) {
-	border: 1px solid transparent;
-	font-weight: 800;
-}
-
-.card-banner :deep(.status-healthy) {
-	border-color: #1f6b50;
-	background: #1f6b50;
-	color: #ffffff;
-}
-
-.card-banner :deep(.status-problem) {
-	border-color: #9f3f3a;
-	background: #9f3f3a;
-	color: #ffffff;
-}
-
-.card-banner :deep(.status-unknown) {
-	border-color: var(--color-border-strong);
-	background: var(--color-surface-raised);
-	color: var(--color-ink);
-}
-
-.card-banner :deep(.status-info) {
-	border-color: var(--color-info);
-	background: var(--color-info);
-	color: #ffffff;
-}
-
 .request-feedback {
 	display: inline-flex;
 	margin: var(--space-4) 0 0;
@@ -506,7 +489,7 @@ h1 {
 	background: var(--color-info-soft);
 	color: var(--color-info);
 	font-size: 0.85rem;
-	font-weight: 700;
+	font-weight: var(--font-weight-medium);
 }
 
 .loading-state {

@@ -1,10 +1,7 @@
 <script setup lang="ts">
 import { RouterLink } from "vue-router";
 
-const navigation = [
-	{ label: "Overview", to: "/", icon: "pi pi-th-large" },
-	{ label: "Manage cards", to: "/manage", icon: "pi pi-sliders-h" },
-];
+const navigation = [{ label: "Overview", to: "/", icon: "pi pi-th-large" }];
 </script>
 
 <template>
@@ -54,7 +51,7 @@ const navigation = [
 	color: var(--color-ink);
 	font-family: var(--font-display);
 	font-size: 1.25rem;
-	font-weight: 600;
+	font-weight: var(--font-weight-semibold);
 	text-decoration: none;
 }
 
@@ -68,7 +65,7 @@ const navigation = [
 	color: #ffffff;
 	font-family: var(--font-ui);
 	font-size: 0.9rem;
-	font-weight: 800;
+	font-weight: var(--font-weight-semibold);
 }
 
 .primary-nav {
@@ -85,7 +82,7 @@ const navigation = [
 	border-bottom: 3px solid transparent;
 	color: var(--color-muted);
 	font-size: 0.9rem;
-	font-weight: 700;
+	font-weight: var(--font-weight-medium);
 	text-decoration: none;
 }
 
