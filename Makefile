@@ -18,7 +18,7 @@ ui-dev:
 
 ## Run the Go backend using the currently embedded UI build
 backend-run:
-	go run ./cmd/marionette
+	MARIONETTE_CONFIG=./marionette.json go run ./cmd/marionette
 
 ## Run the Go backend with hot reload (air)
 backend-dev:

@@ -163,7 +163,7 @@ onMounted(loadDashboard);
 					:loading="loading"
 					@click="loadDashboard"
 				/>
-				<RouterLink class="new-card-link" to="/manage">
+				<RouterLink v-if="cards.length" class="new-card-link" to="/manage">
 					<i class="pi pi-plus" aria-hidden="true"></i>
 					<span>New card</span>
 				</RouterLink>

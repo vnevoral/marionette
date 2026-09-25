@@ -15,4 +15,3 @@ web/.vite/
 # Editor / OS
 .DS_Store
 *.log
-.vscode/marionette.dev.json

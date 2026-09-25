@@ -72,6 +72,7 @@ uloží do `docs/plans/blocks/NNNN-nazev.md`. Blok se implementuje promptem
   [UX specifikaci](../ux/ui-ux-specification.md).
   První schválený blok je [0015 — UX-01: Design tokeny a AppShell](blocks/0015-ux-foundation.md).
   Následuje [0016 — UX-02: Overview a action feedback](blocks/0016-ux-overview.md).
+  Následuje [0017 — UX-03: Management CRUD workflow](blocks/0017-ux-management-crud.md).
 
 - Bloky uvnitř fáze by měly být dost malé na jednu implementační relaci s AI
   agentem (řádově hodiny práce, ne dny) a musí mít jasné kritérium hotovosti

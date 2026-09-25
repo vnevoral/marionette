@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { onMounted, reactive, ref } from "vue";
-import { RouterLink, useRouter } from "vue-router";
+import { RouterLink } from "vue-router";
 import Button from "primevue/button";
 import Card from "primevue/card";
 import InputNumber from "primevue/inputnumber";
@@ -13,7 +13,6 @@ import ActionEditor from "@/components/ActionEditor.vue";
 
 type EnvironmentRow = { key: string; value: string };
 
-const router = useRouter();
 const cards = ref<ActionCard[]>([]);
 const selectedID = ref("");
 const statusEnabled = ref(false);
@@ -142,13 +141,15 @@ async function save() {
 	}
 }
 
-async function remove() {
-	if (!selectedID.value || !window.confirm(`Delete ${form.name}?`)) return;
+async function removeCard(cardID: string, cardName: string) {
+	if (!window.confirm(`Delete ${cardName}?`)) return;
 	deleting.value = true;
 	error.value = "";
 	try {
-		await deleteCard(selectedID.value);
-		await router.push("/");
+		await deleteCard(cardID);
+		cards.value = await listCards();
+		if (selectedID.value === cardID) newCard();
+		notice.value = "Card deleted";
 	} catch (deleteError) {
 		error.value = deleteError instanceof Error ? deleteError.message : "Unable to delete card";
 	} finally {
@@ -185,19 +186,48 @@ onMounted(async () => {
 			<Card class="card-list">
 				<template #title>Cards</template>
 				<template #content>
-					<Button label="New card" icon="pi pi-plus" class="new-button" @click="newCard" />
+					<Button
+						v-if="cards.length"
+						label="New card"
+						icon="pi pi-plus"
+						class="new-button"
+						@click="newCard"
+					/>
 					<div v-if="loading" class="muted">Loading...</div>
-					<div v-else-if="!cards.length" class="muted">No cards configured.</div>
-					<button
+					<div v-else-if="!cards.length" class="empty-list">
+						<p class="muted">No cards configured.</p>
+						<Button label="New card" icon="pi pi-plus" @click="newCard" />
+					</div>
+					<article
 						v-for="card in cards"
 						:key="card.id"
-						class="card-choice"
+						class="card-row"
 						:class="{ selected: selectedID === card.id }"
-						@click="selectCard(card.id)"
 					>
-						<strong>{{ card.name }}</strong
-						><small>{{ card.id }}</small>
-					</button>
+						<div class="card-row-info">
+							<strong>{{ card.name }}</strong>
+							<small>{{ card.id }}</small>
+							<span>{{ card.status ? "Status check enabled" : "No status check" }}</span>
+						</div>
+						<div class="card-row-actions">
+							<Button
+								label="Edit"
+								icon="pi pi-pencil"
+								size="small"
+								outlined
+								@click="selectCard(card.id)"
+							/>
+							<Button
+								label="Delete"
+								icon="pi pi-trash"
+								size="small"
+								severity="danger"
+								text
+								:loading="deleting"
+								@click="removeCard(card.id, card.name)"
+							/>
+						</div>
+					</article>
 				</template>
 			</Card>
 			<Card class="editor-card">
@@ -253,15 +283,7 @@ onMounted(async () => {
 				</template>
 				<template #footer>
 					<div class="editor-actions">
-						<Button label="Save" icon="pi pi-check" :loading="saving" @click="save" /><Button
-							v-if="selectedID"
-							label="Delete"
-							icon="pi pi-trash"
-							severity="danger"
-							outlined
-							:loading="deleting"
-							@click="remove"
-						/>
+						<Button label="Save card" icon="pi pi-check" :loading="saving" @click="save" />
 					</div>
 				</template>
 			</Card>
@@ -337,25 +359,52 @@ h1 {
 	color: var(--color-muted);
 	font-family: var(--font-ui);
 }
-.card-choice {
+.card-row {
 	display: flex;
-	width: 100%;
-	flex-direction: column;
-	align-items: flex-start;
-	gap: 0.25rem;
-	padding: 0.75rem;
-	border: 0;
+	align-items: center;
+	justify-content: space-between;
+	gap: 0.75rem;
+	padding: 0.85rem 0;
 	border-top: 1px solid var(--color-border);
 	background: transparent;
 	color: var(--color-ink);
-	cursor: pointer;
 	text-align: left;
 }
-.card-choice.selected {
+.card-row.selected {
+	margin: 0 -0.75rem;
+	padding-right: 0.75rem;
+	padding-left: 0.75rem;
 	background: var(--color-accent-soft);
 }
-.card-choice small {
+.card-row-info {
+	display: grid;
+	min-width: 0;
+	gap: 0.2rem;
+}
+.card-row-info strong {
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+.card-row-info small,
+.card-row-info span {
 	color: var(--color-muted);
+	font-size: 0.75rem;
+}
+.card-row-actions {
+	display: flex;
+	flex-shrink: 0;
+	align-items: center;
+	gap: 0.25rem;
+}
+.empty-list {
+	display: grid;
+	justify-items: start;
+	gap: 0.75rem;
+	padding: 1rem 0;
+}
+.empty-list p {
+	margin: 0;
 }
 .form-grid {
 	display: grid;
