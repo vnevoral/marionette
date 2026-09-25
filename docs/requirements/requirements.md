@@ -14,7 +14,7 @@
 ## 1. Účel a rozsah
 
 Marionette je samostatně nasaditelná aplikace, která běží jako služba na
-cílovém hostu (typicky Raspberry Pi s Ubuntu, linux/arm64, případně obecný
+cílovém hostu (typicky Raspberry Pi ARM64 s Ubuntu 24.x, případně obecný
 Linux) a poskytuje webové rozhraní pro definici, spouštění a sledování stavu
 uživatelsky nakonfigurovaných akcí nad tímto hostem (příp. nad jeho síťovým
 okolím).
@@ -38,8 +38,9 @@ spustitelný soubor.
 
 - **FR-01**: Aplikace se distribuuje jako jeden binární soubor obsahující
   zabudované webové UI (bez nutnosti instalace Node.js/npm na cíli).
-- **FR-02**: Aplikace běží jako systémová služba (systemd unit na Ubuntu /
-  Raspberry Pi OS), se startem při bootu a automatickým restartem při pádu.
+- **FR-02**: Aplikace běží jako systémová služba na podporovaném Linuxu
+  (systemd unit; referenčně ověřeno na Ubuntu 24.x), se startem při bootu a
+  automatickým restartem při pádu.
 - **FR-03**: Aplikace naslouchá na konfigurovatelném HTTP portu a slouží jak
   API, tak statický obsah UI ze stejného procesu.
 - **FR-04**: Podporované cílové platformy: linux/amd64 (vývoj/testy) a
@@ -217,7 +218,8 @@ args...)` se strukturovanými argumenty, nikdy skládáním shell příkazu ze
 
 ## 5. Omezení a předpoklady
 
-- Cílové OS: Ubuntu Server / Raspberry Pi OS (systemd). Windows není cílová
+- Cílové prostředí: Linux se systemd; Ubuntu 24.x je referenční prostředí pro
+  deployment validaci na Raspberry Pi ARM64 i linux/amd64. Windows není cílová
   produkční platforma.
 - Jednouživatelské / malotýmové nasazení v důvěryhodné síti (domácí/lab síť) —
   víceuživatelská RBAC není v MVP požadována, ale NFR-01 musí umožnit budoucí

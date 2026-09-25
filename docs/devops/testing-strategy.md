@@ -22,9 +22,10 @@
 
 ## Manuální ověření
 
-- Před release na Raspberry Pi: spustit `make build-arm64`, nasadit na
-  testovací Pi, ověřit `systemd` start/stop/restart a základní scénář (WOL +
-  ping) end-to-end.
+- Před release na ARM host: spustit `make build-arm64`, nasadit na testovací
+  Linux se systemd; referenční ověření provést na Raspberry Pi ARM64 s Ubuntu
+  24.x, včetně `systemd` start/stop/restart a základního scénáře (WOL + ping)
+  end-to-end.
 
 ## Co se netestuje (vědomě)
 

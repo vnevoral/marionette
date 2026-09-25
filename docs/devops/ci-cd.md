@@ -17,7 +17,8 @@ před mergem do hlavní větve.
 
 1. `make build-arm64` vyprodukuje `bin/marionette-linux-arm64`.
 2. Artefakt + `systemd` unit soubor (`deploy/marionette.service`, vznikne ve
-   fázi 7) se nahrají na cílový Raspberry Pi.
+   fázi 7) se nahrají na cílový Linux host; referenční ověření probíhá na
+   Raspberry Pi ARM64 s Ubuntu 24.x.
 3. Instalace = zkopírovat binárku (např. do `/opt/marionette/`), nainstalovat
    systemd unit, `systemctl enable --now marionette`.
 4. Žádný krok nevyžaduje instalaci Go, Node.js ani jiného runtime na cíli.
