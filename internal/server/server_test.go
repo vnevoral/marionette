@@ -3,12 +3,14 @@ package server
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"testing"
 	"time"
 
 	"marionette/internal/config"
+	execengine "marionette/internal/exec"
 )
 
 func validServerCard(id string) config.ActionCard {
@@ -194,5 +196,138 @@ func TestRouterWithoutStoreKeepsHealthAvailable(t *testing.T) {
 	handler.ServeHTTP(response, httptest.NewRequest(http.MethodGet, "/api/health", nil))
 	if response.Code != http.StatusOK {
 		t.Fatalf("health response = %d", response.Code)
+	}
+}
+
+type fakeActionQueue struct {
+	primaryCalls chan string
+	statusCalls  chan string
+}
+
+func (queue *fakeActionQueue) EnqueuePrimary(cardID string, _ config.Action) error {
+	queue.primaryCalls <- cardID
+	return nil
+}
+
+func (queue *fakeActionQueue) EnqueueStatus(cardID string) error {
+	queue.statusCalls <- cardID
+	return nil
+}
+
+func (queue *fakeActionQueue) Wait() {}
+
+type fakePrimaryNotifier struct {
+	calls chan string
+}
+
+func (notifier *fakePrimaryNotifier) NotifyPrimaryAction(cardID string) error {
+	notifier.calls <- cardID
+	return nil
+}
+
+func TestRouterEnqueuesActionsWithoutWaiting(t *testing.T) {
+	store := config.NewStore(config.Settings{HistorySize: 5, MaxConcurrentActions: 1})
+	createServerCard(t, store, "enqueue")
+	queue := &fakeActionQueue{primaryCalls: make(chan string, 1), statusCalls: make(chan string, 1)}
+	notifier := &fakePrimaryNotifier{calls: make(chan string, 1)}
+	handler := NewRouterWithDependencies(RouterDependencies{Store: store, Actions: queue, Notifier: notifier})
+
+	primary := httptest.NewRecorder()
+	handler.ServeHTTP(primary, httptest.NewRequest(http.MethodPost, "/api/cards/enqueue/actions/primary", nil))
+	if primary.Code != http.StatusAccepted {
+		t.Fatalf("primary enqueue response = %d, body = %s", primary.Code, primary.Body.String())
+	}
+	if cardID := <-queue.primaryCalls; cardID != "enqueue" {
+		t.Fatalf("primary enqueue card ID = %q", cardID)
+	}
+	if cardID := <-notifier.calls; cardID != "enqueue" {
+		t.Fatalf("primary notification card ID = %q", cardID)
+	}
+
+	status := httptest.NewRecorder()
+	handler.ServeHTTP(status, httptest.NewRequest(http.MethodPost, "/api/cards/enqueue/actions/status/check", nil))
+	if status.Code != http.StatusAccepted {
+		t.Fatalf("status enqueue response = %d, body = %s", status.Code, status.Body.String())
+	}
+	if cardID := <-queue.statusCalls; cardID != "enqueue" {
+		t.Fatalf("status enqueue card ID = %q", cardID)
+	}
+}
+
+func TestRouterRejectsStatusEnqueueWithoutStatusAction(t *testing.T) {
+	store := config.NewStore(config.Settings{HistorySize: 5, MaxConcurrentActions: 1})
+	card := validServerCard("without-status")
+	card.Status = nil
+	if _, err := store.CreateCard(card); err != nil {
+		t.Fatalf("CreateCard() error = %v", err)
+	}
+	queue := &fakeActionQueue{primaryCalls: make(chan string, 1), statusCalls: make(chan string, 1)}
+	handler := NewRouterWithDependencies(RouterDependencies{Store: store, Actions: queue})
+	response := httptest.NewRecorder()
+	handler.ServeHTTP(response, httptest.NewRequest(http.MethodPost, "/api/cards/without-status/actions/status/check", nil))
+	if response.Code != http.StatusUnprocessableEntity {
+		t.Fatalf("status enqueue response = %d", response.Code)
+	}
+}
+
+type fakeBackgroundRunner struct {
+	called chan config.Action
+	result execengine.Result
+}
+
+func (runner *fakeBackgroundRunner) Run(action config.Action) (execengine.Result, error) {
+	runner.called <- action
+	return runner.result, nil
+}
+
+type fakeStatusChecker struct {
+	called chan string
+}
+
+func (checker *fakeStatusChecker) CheckNow(cardID string) (config.StatusSnapshot, error) {
+	checker.called <- cardID
+	return config.StatusSnapshot{State: config.StatusStateOK}, nil
+}
+
+func TestBackgroundActionsRunAndDrainAcceptedWork(t *testing.T) {
+	store := config.NewStore(config.Settings{HistorySize: 5, MaxConcurrentActions: 1})
+	card := createServerCard(t, store, "background")
+	runner := &fakeBackgroundRunner{
+		called: make(chan config.Action, 1),
+		result: execengine.Result{Outcome: config.RunOutcomeOK},
+	}
+	checker := &fakeStatusChecker{called: make(chan string, 1)}
+	actions, err := NewBackgroundActions(store, runner, checker)
+	if err != nil {
+		t.Fatalf("NewBackgroundActions() error = %v", err)
+	}
+	if err := actions.EnqueuePrimary(card.ID, card.Primary); err != nil {
+		t.Fatalf("EnqueuePrimary() error = %v", err)
+	}
+	if err := actions.EnqueueStatus(card.ID); err != nil {
+		t.Fatalf("EnqueueStatus() error = %v", err)
+	}
+	actions.Wait()
+
+	select {
+	case <-runner.called:
+	default:
+		t.Fatal("primary action was not executed")
+	}
+	select {
+	case cardID := <-checker.called:
+		if cardID != card.ID {
+			t.Fatalf("status card ID = %q", cardID)
+		}
+	default:
+		t.Fatal("status action was not executed")
+	}
+	runs, err := store.GetRuns(card.ID, "primary")
+	if err != nil || len(runs) != 1 || runs[0].Outcome != config.RunOutcomeOK {
+		t.Fatalf("primary runs = %#v, error = %v", runs, err)
+	}
+	actions.Close()
+	if err := actions.EnqueuePrimary(card.ID, card.Primary); !errors.Is(err, ErrActionQueueClosed) {
+		t.Fatalf("enqueue after close error = %v", err)
 	}
 }

@@ -16,15 +16,34 @@ import (
 
 const maxJSONBodyBytes = 1 << 20
 
+// RouterDependencies contains application services used by API routes.
+type RouterDependencies struct {
+	Store    *config.Store
+	Actions  ActionQueue
+	Notifier PrimaryActionNotifier
+}
+
 // NewRouter builds the top-level HTTP handler for the application. A store
 // enables the card API; omitting it keeps the health endpoint and SPA fallback
 // available during application composition.
 func NewRouter(stores ...*config.Store) http.Handler {
+	if len(stores) > 0 {
+		return NewRouterWithDependencies(RouterDependencies{Store: stores[0]})
+	}
+	return NewRouterWithDependencies(RouterDependencies{})
+}
+
+// NewRouterWithDependencies builds the HTTP handler with application services.
+func NewRouterWithDependencies(dependencies RouterDependencies) http.Handler {
 	mux := http.NewServeMux()
 
 	mux.HandleFunc("GET /api/health", handleHealth)
-	if len(stores) > 0 && stores[0] != nil {
-		handler := cardAPI{store: stores[0]}
+	if dependencies.Store != nil {
+		handler := cardAPI{
+			store:    dependencies.Store,
+			actions:  dependencies.Actions,
+			notifier: dependencies.Notifier,
+		}
 		mux.HandleFunc("GET /api/cards", handler.listCards)
 		mux.HandleFunc("POST /api/cards", handler.createCard)
 		mux.HandleFunc("GET /api/cards/{id}", handler.getCard)
@@ -33,6 +52,10 @@ func NewRouter(stores ...*config.Store) http.Handler {
 		mux.HandleFunc("GET /api/cards/{id}/runs", handler.getRuns)
 		mux.HandleFunc("GET /api/cards/{id}/status", handler.getStatus)
 		mux.HandleFunc("GET /api/cards/{id}/status/history", handler.getStatusHistory)
+		if dependencies.Actions != nil {
+			mux.HandleFunc("POST /api/cards/{id}/actions/primary", handler.enqueuePrimary)
+			mux.HandleFunc("POST /api/cards/{id}/actions/status/check", handler.enqueueStatus)
+		}
 	}
 
 	mux.Handle("/", spaHandler(webui.Dist()))
@@ -41,7 +64,9 @@ func NewRouter(stores ...*config.Store) http.Handler {
 }
 
 type cardAPI struct {
-	store *config.Store
+	store    *config.Store
+	actions  ActionQueue
+	notifier PrimaryActionNotifier
 }
 
 func (api cardAPI) listCards(w http.ResponseWriter, _ *http.Request) {
@@ -132,6 +157,44 @@ func (api cardAPI) getStatusHistory(w http.ResponseWriter, request *http.Request
 		return
 	}
 	writeJSON(w, http.StatusOK, changes)
+}
+
+func (api cardAPI) enqueuePrimary(w http.ResponseWriter, request *http.Request) {
+	cardID := request.PathValue("id")
+	card, exists := api.store.GetCard(cardID)
+	if !exists {
+		writeError(w, http.StatusNotFound, config.ErrNotFound)
+		return
+	}
+	if err := api.actions.EnqueuePrimary(cardID, card.Primary); err != nil {
+		writeError(w, http.StatusInternalServerError, err)
+		return
+	}
+	if api.notifier != nil {
+		if err := api.notifier.NotifyPrimaryAction(cardID); err != nil {
+			writeError(w, http.StatusInternalServerError, err)
+			return
+		}
+	}
+	writeJSON(w, http.StatusAccepted, acceptedAction{CardID: cardID, ActionKind: "primary", Status: "accepted"})
+}
+
+func (api cardAPI) enqueueStatus(w http.ResponseWriter, request *http.Request) {
+	cardID := request.PathValue("id")
+	card, exists := api.store.GetCard(cardID)
+	if !exists {
+		writeError(w, http.StatusNotFound, config.ErrNotFound)
+		return
+	}
+	if card.Status == nil {
+		writeError(w, http.StatusUnprocessableEntity, errors.New("status action is not configured"))
+		return
+	}
+	if err := api.actions.EnqueueStatus(cardID); err != nil {
+		writeError(w, http.StatusInternalServerError, err)
+		return
+	}
+	writeJSON(w, http.StatusAccepted, acceptedAction{CardID: cardID, ActionKind: "status", Status: "accepted"})
 }
 
 func decodeJSON(w http.ResponseWriter, request *http.Request, target any) error {

@@ -3,7 +3,7 @@
 - **Fáze**: 5 — REST API
 - **Vazba na požadavky**: FR-11, FR-12, FR-13, FR-14, FR-15a, FR-17, FR-18, FR-40
 - **Vazba na ADR**: ADR-0004, ADR-0005, ADR-0006
-- **Stav**: Návrh
+- **Stav**: Hotovo
 - **Závislosti**: Blok 0010; `config.Store`, `execengine.Runner`, `StatusCheckService`, `Scheduler`
 
 ## Cíl bloku
@@ -41,11 +41,11 @@ projekci. Čtení statusu zůstává oddělenou read-only operací.
 ## Návrh řešení
 
 Handler obdrží rozhraní pro background execution manager, status checker a
-scheduler notifier. Primární endpoint ověří kartu a požadavek, okamžitě zavolá
-`NotifyPrimaryAction` a předá `card.Primary` background workeru. Worker následně
-zavolá `Runner.Run`, převede výsledek přes `Result.ToRun("primary")` a uloží jej
-přes `AppendRun`. Background manager musí být součástí lifecycle aplikace, aby
-shutdown počkal na přijaté primární běhy před `SaveFileWithHistory`.
+scheduler notifier. Primární endpoint ověří kartu a požadavek, předá
+`card.Primary` background workeru a zavolá `NotifyPrimaryAction`. Worker
+následně zavolá `Runner.Run`, převede výsledek přes `Result.ToRun("primary")` a
+uloží jej přes `AppendRun`. Background manager nabízí `Wait`/`Close`; jeho
+zapojení do lifecycle aplikace dokončí blok 0012.
 
 Status se v tomto handleru nespouští; read-only status handler pouze vrací
 poslední uloženou projekci. Doporučené tělo odpovědi primárního endpointu je
@@ -71,6 +71,6 @@ drainovatelný a žádné spouštění neobchází sdílený concurrency-limited
 
 ## Uzavření
 
-- **Stav po implementaci**: čeká
-- **Ověření**: čeká
-- **Dokumentace aktualizována**: čeká
+- **Stav po implementaci**: Hotovo
+- **Ověření**: `go test ./internal/server -count=1`, `go test -race ./...`
+- **Dokumentace aktualizována**: ano; lifecycle zapojení zůstává v bloku 0012
