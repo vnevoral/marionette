@@ -6,7 +6,7 @@ DEV_FIXTURE := deploy/dev-fixture.json
 VERSION ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo dev)
 LDFLAGS := -X main.version=$(VERSION)
 
-.PHONY: ui-install ui-build ui-dev ui-lint dev-config backend-run backend-dev build build-arm64 release-arm64 test lint verify clean
+.PHONY: ui-install ui-build ui-dev ui-lint ui-test dev-config backend-run backend-dev build build-arm64 release-arm64 test lint verify clean
 
 ## Install UI dependencies
 ui-install:
@@ -23,6 +23,10 @@ ui-dev:
 ## Lint, type-check and format-check the UI
 ui-lint:
 	cd web && npm run lint && npm run lint:types && npm run format:check
+
+## Run the UI unit tests (Vitest)
+ui-test:
+	cd web && npm test
 
 ## Create the local dev configuration from the fixture if it does not exist yet
 dev-config:
@@ -52,8 +56,8 @@ release-arm64: build-arm64
 		-C bin $(APP_NAME)-linux-arm64 \
 		-C ../deploy marionette.service marionette.default marionette.example.json install.sh
 
-## Run all automated tests (Go with the race detector; UI tests are added by block 0030)
-test:
+## Run all automated tests (Go with the race detector, then the UI unit tests)
+test: ui-test
 	go test -race -count=1 ./...
 
 ## Run all linters and format checks (Go + UI)

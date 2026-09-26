@@ -17,9 +17,17 @@
 
 - `npm run lint` (`--max-warnings 0`), `vue-tsc` (type-check) a
   `prettier --check` jsou povinnou součástí CI a `make verify`.
-- Komponentové/unit testy (Vitest + Vue Test Utils) se zavedou při
-  implementaci fáze 6 (Dashboard UI) pro klíčovou logiku (zobrazení stavu
-  karty, volání API) — netestuje se vzhled PrimeVue komponent samotných.
+- Jednotkové a komponentové testy běží ve **Vitest** (`npm test`, součást
+  `make test` a CI jobu `web`) v prostředí `happy-dom`; komponenty se
+  montují přes Vue Test Utils s PrimeVue pluginem. Soubory `src/**/*.spec.ts`
+  leží vedle testovaného kódu, sdílejí Vite konfiguraci (`vitest.config.ts`,
+  alias `@`) a nedostávají se do bundlu. Testuje se čistá logika (API vrstva
+  `api.ts` přes mock `fetch`, model formuláře `cardEditModel.ts`) a chování
+  vlastních komponent (`StatusBadge`) — netestuje se vzhled PrimeVue
+  komponent samotných. Pokrytí: `npm run test:coverage` (v8); cíl pro
+  `api.ts` a čisté moduly ~80 %+, view komponenty se pokrývají postupně
+  (bloky 0029, 0032, 0033). E2E/browser testy nejsou zavedené (samostatný
+  blok po fázi 8).
 
 ## Manuální ověření
 

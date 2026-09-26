@@ -53,7 +53,7 @@ make ui-dev          # Vite dev server :5173 (proxy /api -> :8080)
 make backend-dev     # Go backend s hot-reload (air) na :8080
 make build           # build UI + embed + Go binárka pro aktuální platformu
 make build-arm64     # cross-compile pro Raspberry Pi (linux/arm64)
-make test            # go test -race ./... (UI testy přibudou blokem 0030)
+make test            # go test -race ./... + npm test (Vitest)
 make lint            # golangci-lint + eslint + vue-tsc + prettier --check
 make verify          # jediný validační příkaz: build UI + lint + test + go build/vet
 ```

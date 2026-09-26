@@ -9,17 +9,18 @@ import Message from "primevue/message";
 import Select from "primevue/select";
 import Textarea from "primevue/textarea";
 import ToggleSwitch from "primevue/toggleswitch";
-import {
-	CARD_ICON_OPTIONS,
-	createCard,
-	getCard,
-	updateCard,
-	type Action,
-	type ActionCard,
-} from "@/api";
+import { CARD_ICON_OPTIONS, createCard, getCard, updateCard, type ActionCard } from "@/api";
 import ActionEditor from "@/components/ActionEditor.vue";
-
-type EnvironmentRow = { key: string; value: string };
+import {
+	actionFrom,
+	copyAction,
+	emptyAction,
+	emptyCard,
+	environmentRows,
+	fingerprint,
+	validate as validateCard,
+	type EnvironmentRow,
+} from "@/views/cardEditModel";
 
 const route = useRoute();
 const router = useRouter();
@@ -34,20 +35,6 @@ const statusEnabled = ref(false);
 const initialFingerprint = ref("");
 const fieldErrors = reactive<Record<string, string>>({});
 
-function emptyAction(): Action {
-	return { command: "", args: [], dir: "", env: {}, timeoutSec: 30, rule: { type: "exit_code" } };
-}
-
-function emptyCard(): ActionCard {
-	return {
-		id: "",
-		name: "",
-		description: "",
-		icon: CARD_ICON_OPTIONS[0].value,
-		primary: emptyAction(),
-	};
-}
-
 const form = reactive<ActionCard>(emptyCard());
 const primaryArgs = ref<string[]>([]);
 const statusArgs = ref<string[]>([]);
@@ -55,18 +42,13 @@ const primaryEnv = ref<EnvironmentRow[]>([]);
 const statusEnv = ref<EnvironmentRow[]>([]);
 
 function formFingerprint() {
-	return JSON.stringify({
-		name: form.name,
-		description: form.description,
-		icon: form.icon,
-		primary: actionFrom(form.primary, primaryArgs.value, primaryEnv.value),
-		status:
-			statusEnabled.value && form.status
-				? actionFrom(form.status, statusArgs.value, statusEnv.value)
-				: undefined,
-		pollingIntervalSeconds: form.pollingIntervalSeconds,
-		fastPollingIntervalSeconds: form.fastPollingIntervalSeconds,
-		fastPollingWindowSeconds: form.fastPollingWindowSeconds,
+	return fingerprint({
+		form,
+		statusEnabled: statusEnabled.value,
+		primaryArgs: primaryArgs.value,
+		statusArgs: statusArgs.value,
+		primaryEnv: primaryEnv.value,
+		statusEnv: statusEnv.value,
 	});
 }
 
@@ -78,15 +60,6 @@ function markClean() {
 	initialFingerprint.value = formFingerprint();
 }
 
-function copyAction(action: Action): Action {
-	return {
-		...action,
-		args: [...(action.args ?? [])],
-		env: { ...(action.env ?? {}) },
-		rule: { ...action.rule },
-	};
-}
-
 function applyCard(card: ActionCard) {
 	Object.assign(form, {
 		...card,
@@ -96,43 +69,16 @@ function applyCard(card: ActionCard) {
 	statusEnabled.value = Boolean(card.status);
 	primaryArgs.value = [...(card.primary.args ?? [])];
 	statusArgs.value = [...(card.status?.args ?? [])];
-	primaryEnv.value = Object.entries(card.primary.env ?? {}).map(([key, value]) => ({ key, value }));
-	statusEnv.value = Object.entries(card.status?.env ?? {}).map(([key, value]) => ({ key, value }));
+	primaryEnv.value = environmentRows(card.primary.env);
+	statusEnv.value = environmentRows(card.status?.env);
 	markClean();
-}
-
-function actionFrom(action: Action, args: string[], environment: EnvironmentRow[]): Action {
-	const env = Object.fromEntries(
-		environment.filter((row) => row.key.trim()).map((row) => [row.key.trim(), row.value]),
-	);
-	return {
-		...action,
-		args: args.map((arg) => arg.trim()).filter(Boolean),
-		env,
-		dir: action.dir?.trim(),
-		rule: {
-			...action.rule,
-			pattern: action.rule.type === "exit_code" ? undefined : action.rule.pattern?.trim(),
-		},
-	};
 }
 
 function validate() {
 	for (const key of Object.keys(fieldErrors)) delete fieldErrors[key];
-	let firstError = "";
-	const addError = (key: string, message: string) => {
-		fieldErrors[key] = message;
-		if (!firstError) firstError = message;
-	};
-	if (!form.name.trim()) addError("name", "Card name is required");
-	if (!form.primary.command.trim()) addError("primaryCommand", "Primary command is required");
-	if (form.primary.timeoutSec <= 0) addError("primaryTimeout", "Primary timeout must be positive");
-	if (statusEnabled.value) {
-		if (!form.status?.command.trim()) addError("statusCommand", "Status command is required");
-		if (!form.status || form.status.timeoutSec <= 0)
-			addError("statusTimeout", "Status timeout must be positive");
-	}
-	return firstError;
+	const result = validateCard(form, statusEnabled.value);
+	Object.assign(fieldErrors, result.fieldErrors);
+	return result.firstError;
 }
 
 async function save() {

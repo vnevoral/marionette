@@ -3,7 +3,7 @@
 - **Fáze**: 8 — Zpevnění
 - **Vazba na požadavky**: NFR-05, NFR-06, FR-27
 - **Vazba na ADR**: ADR-0003
-- **Stav**: Schváleno
+- **Stav**: Hotovo
 - **Závislosti**: `docs/devops/testing-strategy.md` (slib Vitest ve fázi 6), blok 0013
 
 ## Cíl bloku
@@ -69,6 +69,34 @@ Viz [Definition of Done](../../devops/definition-of-done.md) +:
 
 ## Uzavření
 
-- **Stav po implementaci**: čeká
-- **Ověření**: čeká
-- **Dokumentace aktualizována**: čeká
+- **Stav po implementaci**: Hotovo (2026-09-26)
+- **Ověření**: `make verify` prošel (`make test` nyní volá `ui-test` =
+  `npm test` a poté `go test -race`). Vitest 5 + Vue Test Utils 2.5 +
+  happy-dom 20 + coverage-v8; 24 testů ve třech souborech: `src/api.spec.ts`
+  (2xx JSON, 204, 4xx obálka, 5xx bez JSON, chybějící `error`, síťová chyba,
+  zachování `Accept` při vlastních hlavičkách, `Content-Type` u mutujících
+  volání bez těla, odstranění `currentStatus` z payloadu, URL s enkódovaným
+  ID, `connectStatusEvents` s falešným `EventSource` vč. neplatných
+  událostí), `src/components/StatusBadge.spec.ts` (label, ikona, tón,
+  výchozí tón), `src/views/cardEditModel.spec.ts` (`actionFrom`,
+  `validate`, `fingerprint`, `copyAction`, `environmentRows`). Pokrytí
+  `api.ts` ≥ 80 % (viz `npm run test:coverage`), `cardEditModel.ts` 100 %.
+  `npm run build` spec soubory do bundlu nezahrnuje (Vite vychází z
+  `main.ts`), `vue-tsc -b` je typově kontroluje; `npm run lint` a
+  `format:check` procházejí. **Nález:** test odhalil skutečnou chybu v
+  `request` — `...options` za sloučenými hlavičkami zahazoval `Accept` u
+  každého volání s vlastním `Content-Type`; opraveno.
+- **Odchylky od návrhu**: (1) testy importují `describe/it/expect/vi`
+  explicitně z `vitest` místo `globals: true` + `vitest/globals` typů —
+  žádné globální symboly v ESLint ani tsconfig; (2) `EnvironmentRow`,
+  `emptyAction`, `emptyCard`, `copyAction` a nový `environmentRows` jsou
+  vyexportované společně s `validate`/`actionFrom`/`fingerprint`;
+  `validate` vrací `{ fieldErrors, firstError }` místo mutace reaktivního
+  objektu; (3) instalace vyžadovala `npx npm@11` kvůli chybě `edgesOut`
+  v npm 10.8 při řešení peer závislostí (lockfile v3 zůstává kompatibilní
+  s `npm ci`); (4) přibyl `web/.prettierignore` a `web/coverage/` v
+  `.gitignore`, aby výstup pokrytí nerozbil `format:check`.
+- **Dokumentace aktualizována**: ano — `docs/devops/testing-strategy.md`
+  (sekce Frontend odpovídá skutečnosti), AGENTS.md (`make test`), CI
+  (`npm test` mezi `format:check` a `build`), Makefile (`ui-test`),
+  roadmapa.

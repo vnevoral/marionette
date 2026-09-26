@@ -57,9 +57,11 @@ export interface StatusEvent {
 }
 
 async function request<T>(path: string, options?: RequestInit): Promise<T> {
+	// Spread options first: a later spread would replace the merged headers and
+	// drop Accept on every call that sets its own Content-Type.
 	const response = await fetch(path, {
-		headers: { Accept: "application/json", ...options?.headers },
 		...options,
+		headers: { Accept: "application/json", ...options?.headers },
 	});
 	if (!response.ok) {
 		let detail = `Request failed (${response.status})`;

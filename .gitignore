@@ -13,6 +13,7 @@
 # Node / UI
 web/node_modules/
 web/dist/
+web/coverage/
 web/.vite/
 web/*.tsbuildinfo
 web/vite.config.js

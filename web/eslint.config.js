@@ -30,6 +30,6 @@ export default tseslint.config(
 	// Must stay last: disables every formatting rule that conflicts with Prettier.
 	prettier,
 	{
-		ignores: ["dist/**", "node_modules/**", "vite.config.js", "vite.config.d.ts"],
+		ignores: ["dist/**", "node_modules/**", "coverage/**", "vite.config.js", "vite.config.d.ts"],
 	},
 );

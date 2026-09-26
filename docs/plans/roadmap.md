@@ -21,7 +21,7 @@ uloží do `docs/plans/blocks/NNNN-nazev.md`. Blok se implementuje promptem
 | 5    | REST API (CRUD karet/akcí, spuštění, čtení stavu)                                            | **Hotovo**                                       | FR-40, FR-41                   |
 | 6    | Dashboard UI (karty, stavové indikátory, formuláře správy)                                   | **Hotovo**                                       | FR-20..23                      |
 | 7    | Balíčkování a nasazení (systemd unit, install skript, arm64 release)                         | **Probíhá** (0023)                               | FR-01..04, NFR-02              |
-| 8    | Zpevnění (auth/access control, logování, chybové stavy, testy, dokumentace)                  | **Probíhá** (proud A 0024–0028 a 0034 hotovo, 0031 hotovo; 0029, 0030, 0032, 0033 schváleny) | NFR-01, NFR-04..06, NFR-12     |
+| 8    | Zpevnění (auth/access control, logování, chybové stavy, testy, dokumentace)                  | **Probíhá** (proudy A a B hotové: 0024–0028, 0030, 0031, 0034; proud C 0029, 0032, 0033 schválen) | NFR-01, NFR-04..06, NFR-12     |
 | 9    | UX redesign a sdílený design systém                                                          | **Hotovo**                                       | FR-24..29, NFR-08..10          |
 | 10   | Realtime doručování statusů přes SSE                                                         | **Hotovo**                                       | FR-42, NFR-11                  |
 
@@ -122,7 +122,9 @@ uloží do `docs/plans/blocks/NNNN-nazev.md`. Blok se implementuje promptem
   **Proud B — tooling a testy (odblokuje frontend):**
   1. [0031 — Hygiena repozitáře, lint a CI](blocks/0031-repo-tooling-and-ci-hygiene.md)
      — **Hotovo** (2026-09-26); zavádí `make verify` jako jedinou validační sadu.
-  2. [0030 — Frontend testovací infrastruktura (Vitest)](blocks/0030-frontend-test-infrastructure.md).
+  2. [0030 — Frontend testovací infrastruktura (Vitest)](blocks/0030-frontend-test-infrastructure.md)
+     — **Hotovo** (2026-09-26); `npm test` v `make test` a CI, první testy
+     `api.ts`, `StatusBadge`, `cardEditModel`.
 
   **Proud C — frontend (po 0030):**
   1. [0029 — Stav akcí na dashboardu a sdílené sledování statusu](blocks/0029-dashboard-action-state-and-shared-status.md)
