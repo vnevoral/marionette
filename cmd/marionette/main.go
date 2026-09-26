@@ -21,6 +21,10 @@ import (
 	"marionette/internal/status"
 )
 
+// version is the release identifier reported by GET /api/health. It is set at
+// build time by the Makefile (-ldflags "-X main.version=...").
+var version = "dev"
+
 const (
 	defaultConfigPath      = "./marionette.json"
 	defaultAddr            = ":8080"
@@ -146,6 +150,8 @@ func (app application) run(ctx context.Context) error {
 		Reconciler:   scheduler,
 		StatusEvents: statusEvents,
 		AllowedHosts: app.env.AllowedHosts,
+		Version:      version,
+		StartedAt:    time.Now(),
 	})
 	srv := &http.Server{
 		Handler:           handler,

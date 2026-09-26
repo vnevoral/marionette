@@ -1,6 +1,8 @@
 package config
 
 import (
+	"errors"
+	"strconv"
 	"strings"
 	"testing"
 )
@@ -175,6 +177,118 @@ func TestActionCardValidatePolling(t *testing.T) {
 			err := test.card.Validate()
 			if (err != nil) != test.wantErr {
 				t.Fatalf("Validate() error = %v, wantErr %t", err, test.wantErr)
+			}
+		})
+	}
+}
+
+func TestValidateCollectsAllFieldsAndMatchesErrValidation(t *testing.T) {
+	card := validCard()
+	card.ID = "bad id"
+	card.Name = ""
+	card.Primary.TimeoutSec = 0
+	card.Status = &Action{Command: "x", TimeoutSec: 5, Rule: OutputRule{Type: OutputRuleMatch}}
+	err := card.Validate()
+	if !errors.Is(err, ErrValidation) {
+		t.Fatalf("Validate() error = %v, want errors.Is ErrValidation", err)
+	}
+	var validation *ValidationError
+	if !errors.As(err, &validation) {
+		t.Fatalf("Validate() error = %T, want *ValidationError", err)
+	}
+	for _, key := range []string{"id", "name", "primary.timeoutSec", "status.rule.pattern"} {
+		if validation.Fields[key] == "" {
+			t.Errorf("missing field %q in %v", key, validation.Fields)
+		}
+	}
+	if len(validation.Fields) != 4 {
+		t.Fatalf("fields = %v, want exactly 4", validation.Fields)
+	}
+	if message := err.Error(); !strings.HasPrefix(message, "validation failed: id: ") || strings.Contains(message, "Go struct") {
+		t.Fatalf("message = %q", message)
+	}
+}
+
+func TestValidateLimits(t *testing.T) {
+	long := func(n int) string { return strings.Repeat("a", n) }
+	args := func(n int) []string {
+		list := make([]string, n)
+		for i := range list {
+			list[i] = "x"
+		}
+		return list
+	}
+	env := func(n int) map[string]string {
+		m := make(map[string]string, n)
+		for i := range n {
+			m["K"+strconv.Itoa(i)] = "v"
+		}
+		return m
+	}
+	cases := []struct {
+		name   string
+		mutate func(*ActionCard)
+		field  string // empty = valid
+	}{
+		{"id at limit", func(c *ActionCard) { c.ID = long(MaxCardIDLength) }, ""},
+		{"id over limit", func(c *ActionCard) { c.ID = long(MaxCardIDLength + 1) }, "id"},
+		{"id with slash", func(c *ActionCard) { c.ID = "a/b" }, "id"},
+		{"id with space", func(c *ActionCard) { c.ID = "a b" }, "id"},
+		{"id with diacritics", func(c *ActionCard) { c.ID = "kartá" }, "id"},
+		{"id empty", func(c *ActionCard) { c.ID = "  " }, "id"},
+		{"id generated shape", func(c *ActionCard) { c.ID = "card-0123456789abcdef0123456789abcdef" }, ""},
+		{"name at limit", func(c *ActionCard) { c.Name = long(MaxNameLength) }, ""},
+		{"name over limit", func(c *ActionCard) { c.Name = long(MaxNameLength + 1) }, "name"},
+		{"description at limit", func(c *ActionCard) { c.Description = long(MaxDescriptionLength) }, ""},
+		{"description over limit", func(c *ActionCard) { c.Description = long(MaxDescriptionLength + 1) }, "description"},
+		{"icon known", func(c *ActionCard) { c.Icon = "pi pi-exclamation-triangle" }, ""},
+		{"icon wrong prefix", func(c *ActionCard) { c.Icon = "fa fa-home" }, "icon"},
+		{"icon empty name", func(c *ActionCard) { c.Icon = "pi pi-" }, "icon"},
+		{"icon with markup", func(c *ActionCard) { c.Icon = "pi pi-home\"><script>" }, "icon"},
+		{"icon over limit", func(c *ActionCard) { c.Icon = IconPrefix + long(MaxIconLength) }, "icon"},
+		{"command at limit", func(c *ActionCard) { c.Primary.Command = long(MaxCommandLength) }, ""},
+		{"command over limit", func(c *ActionCard) { c.Primary.Command = long(MaxCommandLength + 1) }, "primary.command"},
+		{"args at limit", func(c *ActionCard) { c.Primary.Args = args(MaxArgs) }, ""},
+		{"args over limit", func(c *ActionCard) { c.Primary.Args = args(MaxArgs + 1) }, "primary.args"},
+		{"arg at limit", func(c *ActionCard) { c.Primary.Args = []string{long(MaxArgLength)} }, ""},
+		{"arg over limit", func(c *ActionCard) { c.Primary.Args = []string{"ok", long(MaxArgLength + 1)} }, "primary.args[1]"},
+		{"dir at limit", func(c *ActionCard) { c.Primary.Dir = long(MaxDirLength) }, ""},
+		{"dir over limit", func(c *ActionCard) { c.Primary.Dir = long(MaxDirLength + 1) }, "primary.dir"},
+		{"env at limit", func(c *ActionCard) { c.Primary.Env = env(MaxEnvEntries) }, ""},
+		{"env over limit", func(c *ActionCard) { c.Primary.Env = env(MaxEnvEntries + 1) }, "primary.env"},
+		{"env key with equals", func(c *ActionCard) { c.Primary.Env = map[string]string{"A=B": "x"} }, "primary.env.A=B"},
+		{"env key starting with digit", func(c *ActionCard) { c.Primary.Env = map[string]string{"1A": "x"} }, "primary.env.1A"},
+		{"env key at limit", func(c *ActionCard) { c.Primary.Env = map[string]string{"K" + long(MaxEnvKeyLength-1): "x"} }, ""},
+		{"env key over limit", func(c *ActionCard) { c.Primary.Env = map[string]string{"K" + long(MaxEnvKeyLength): "x"} }, "primary.env.K" + long(MaxEnvKeyLength)},
+		{"env value at limit", func(c *ActionCard) { c.Primary.Env = map[string]string{"K": long(MaxEnvValueLength)} }, ""},
+		{"env value over limit", func(c *ActionCard) { c.Primary.Env = map[string]string{"K": long(MaxEnvValueLength + 1)} }, "primary.env.K"},
+		{"timeout zero", func(c *ActionCard) { c.Primary.TimeoutSec = 0 }, "primary.timeoutSec"},
+		{"timeout at limit", func(c *ActionCard) { c.Primary.TimeoutSec = MaxTimeoutSec }, ""},
+		{"timeout over limit", func(c *ActionCard) { c.Primary.TimeoutSec = MaxTimeoutSec + 1 }, "primary.timeoutSec"},
+		{"status timeout over limit", func(c *ActionCard) {
+			status := validAction()
+			status.TimeoutSec = MaxTimeoutSec + 1
+			c.Status = &status
+		}, "status.timeoutSec"},
+		{"rule type unknown", func(c *ActionCard) { c.Primary.Rule.Type = "weird" }, "primary.rule.type"},
+	}
+	for _, testCase := range cases {
+		t.Run(testCase.name, func(t *testing.T) {
+			card := validCard()
+			testCase.mutate(&card)
+			err := card.Validate()
+			if testCase.field == "" {
+				if err != nil {
+					t.Fatalf("Validate() error = %v, want valid", err)
+				}
+				return
+			}
+			var validation *ValidationError
+			if !errors.As(err, &validation) {
+				t.Fatalf("Validate() error = %v, want ValidationError", err)
+			}
+			if _, ok := validation.Fields[testCase.field]; !ok || len(validation.Fields) != 1 {
+				t.Fatalf("fields = %v, want only %q", validation.Fields, testCase.field)
 			}
 		})
 	}

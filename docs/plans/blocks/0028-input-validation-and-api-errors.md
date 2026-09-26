@@ -3,7 +3,7 @@
 - **Fáze**: 8 — Zpevnění
 - **Vazba na požadavky**: FR-10, FR-11, FR-40, NFR-01, NFR-03, NFR-04
 - **Vazba na ADR**: ADR-0004
-- **Stav**: Schváleno
+- **Stav**: Hotovo
 - **Závislosti**: Blok 0001 (typy a validace), 0010 (REST API), 0025 (sentinel chyby)
 
 ## Cíl bloku
@@ -81,6 +81,39 @@ Viz [Definition of Done](../../devops/definition-of-done.md) +:
 
 ## Uzavření
 
-- **Stav po implementaci**: čeká
-- **Ověření**: čeká
-- **Dokumentace aktualizována**: čeká
+- **Stav po implementaci**: Hotovo (2026-09-26)
+- **Ověření**: `make verify` prošel (golangci-lint, eslint, vue-tsc, prettier,
+  `go test -race -count=1 ./...`, build, vet). Nové testy:
+  `TestValidateCollectsAllFieldsAndMatchesErrValidation`,
+  `TestValidateLimits` (36 případů: každý limit „na hranici“ a „přes“, ID
+  s `/`, mezerou, diakritikou, prázdné, tvar generovaného ID, env klíč
+  s `=` a číslicí na začátku, timeout 0/3600/3601, ikony),
+  `TestRouterAnswersMethodNotAllowedWithAllowAndJSON` (7 cest, `HEAD`
+  na `GET` routě projde), `TestRouterRejectsOversizedBodyWithJSON413`,
+  `TestRouterDecodeErrorsHideGoTypes` (7 tvarů chybného těla, zpráva bez
+  „Go struct“ a názvů balíčků), `TestRouterReturnsValidationFields`,
+  `TestHealthReportsVersionAndUptime`, `TestSPACacheHeadersAndDirectories`
+  (`/assets/<hash>` immutable, `/assets` a `/assets/` vrací `index.html`
+  bez listingu). Stávající testy validace (substring) a serveru prošly
+  beze změny. `deploy/marionette.example.json` i `dev-fixture.json` limity
+  splňují (ověřeno skriptem: ID, délky, ikony `pi pi-*`, timeouty 5 s).
+- **Odchylky od návrhu**: (1) ikona se nekontroluje proti slovníku
+  `CARD_ICON_OPTIONS` (duplikace frontendového seznamu v Go), ale jen
+  na tvar `pi pi-<malá písmena, číslice, ->` ≤ 64 — fixture používá
+  `pi pi-exclamation-triangle`, které ve slovníku není; (2) 405 fallback
+  vzniká automaticky z tabulky rout (`routeTable`), ne ručně per cesta,
+  `Allow` u `GET` rout obsahuje i `HEAD`; (3) `ValidationError` má metodu
+  `Is(ErrValidation)`, store proto validační chybu nebalí do
+  `fmt.Errorf("%w: %w")` (zpráva by byla zdvojená); (4) `Settings.Validate`
+  a `OutputRule.Validate` také vrací `ValidationError` kvůli jednotnému
+  slučování polí; (5) `http.FileServer` přesměrovává `/index.html` na `/`
+  (301) — ponecháno, `Cache-Control: no-cache` se nastavuje na `/`;
+  (6) chyba SSE „streaming is not supported“ převedena z `http.Error`
+  (text/plain) na JSON obálku kvůli kritériu „žádná odpověď na `/api/*`
+  není `text/plain`“; (7) `backend-run` i `build*` používají stejné
+  `LDFLAGS`, verze přepsatelná `make build VERSION=…`.
+- **Dokumentace aktualizována**: ano — `docs/architecture/overview.md`
+  (sekce „API kontrakt — chybové odpovědi a limity hodnot“), ADR-0004
+  („Doplnění — Limity hodnot“), README (verze v health), godoc
+  (`ValidationError`, `Validate`, `routeTable`, `decodeJSON`, `spaHandler`),
+  roadmapa. Zobrazení `fields` ve formuláři řeší blok 0032.

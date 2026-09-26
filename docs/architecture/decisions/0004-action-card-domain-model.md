@@ -122,3 +122,16 @@ explicitní vynucenou terminaci akce po timeoutu (FR-19).
 - `Settings` (velikost historie, limit souběžnosti) jsou součástí
   persistované konfigurace a měnitelné přes stejné API/UI jako karty.
 - Toto ADR je vstupem pro implementační blok(y) fáze 2 v roadmapě.
+
+## Doplnění 2026-09-26 — Limity hodnot (blok 0028)
+
+Validace domény (`ActionCard.Validate`, `Action.Validate`) vynucuje limity
+velikosti, aby jedna karta zůstala malá pro JSON soubor i UI a aby jediná
+akce nemohla trvale obsadit slot: ID `^[A-Za-z0-9_-]{1,64}$`, název ≤ 120,
+popis ≤ 2000, ikona `pi pi-<název>` ≤ 64, příkaz ≤ 512, argumenty ≤ 64 ×
+1024, pracovní adresář ≤ 1024, prostředí ≤ 64 položek (klíč
+`^[A-Za-z_][A-Za-z0-9_]*$` ≤ 128, hodnota ≤ 4096), timeout 1–3600 s.
+Validace vrací všechny chyby najednou jako `ValidationError` s mapou
+`Fields` (JSON cesta → důvod); API ji zveřejňuje jako 422 s polem `fields`.
+Přesné hodnoty jsou konstanty `config.Max*` a tabulka v
+`docs/architecture/overview.md`.

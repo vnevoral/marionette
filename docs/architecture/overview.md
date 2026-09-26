@@ -131,3 +131,45 @@ akce, které už ve frontě čekají, se nezařadí znovu a API vrátí `202`
 idempotentně; deduplikace platí jen pro čekající joby, běžící job nový
 požadavek neblokuje. Po zahájení shutdownu fronta vrací `503` s
 `Retry-After: 1`.
+
+## API kontrakt — chybové odpovědi a limity hodnot
+
+Každá chybová odpověď na `/api/*` má JSON obálku `{"error": "…"}`
+(blok 0028); žádná odpověď API není `text/plain`. Stavové kódy:
+
+| Kód | Kdy                                                                                                     |
+| --- | ------------------------------------------------------------------------------------------------------- |
+| 400 | tělo není přesně jedna JSON hodnota očekávaného tvaru; zpráva uvádí pole nebo offset, ne interní typy   |
+| 403 | cross-site požadavek nebo nepovolený `Host` (NFR-12)                                                    |
+| 404 | neznámá karta nebo neznámá cesta pod `/api/`                                                            |
+| 405 | známá cesta, nepodporovaná metoda; hlavička `Allow` vyjmenovává povolené metody                         |
+| 409 | karta se stejným ID už existuje                                                                         |
+| 413 | tělo přesahuje 1 MiB                                                                                    |
+| 415 | mutující požadavek bez `Content-Type: application/json` (NFR-12)                                        |
+| 422 | validace selhala; obálka má navíc `"fields": {"<json cesta>": "<důvod>"}` se všemi chybami najednou     |
+| 503 | fronta akcí je plná nebo probíhá shutdown; hlavička `Retry-After` (FR-18)                                |
+| 500 | persistence selhala (změna vrácena zpět) nebo jiná vnitřní chyba                                        |
+
+`GET /api/health` vrací `{"status":"ok","version":"<git describe>","uptimeSec":n}`;
+verze se vkládá při buildu (`-ldflags -X main.version`, `make build`).
+
+Limity hodnot karty (konstanty `config.Max*`, ADR-0004 „Limity hodnot“):
+
+| Pole                                  | Limit                                                              |
+| ------------------------------------- | ------------------------------------------------------------------ |
+| `id`                                  | `^[A-Za-z0-9_-]{1,64}$`; serverem generovaná ID (`card-<32 hex>`) vyhovují |
+| `name`                                | 1–120 znaků                                                        |
+| `description`                         | ≤ 2000 znaků                                                       |
+| `icon`                                | prázdné nebo `pi pi-<název>` (malá písmena, číslice, `-`), ≤ 64 znaků |
+| `*.command`                           | 1–512 znaků                                                        |
+| `*.args`                              | ≤ 64 položek, každá ≤ 1024 znaků                                   |
+| `*.dir`                               | ≤ 1024 znaků                                                       |
+| `*.env`                               | ≤ 64 položek; klíč `^[A-Za-z_][A-Za-z0-9_]*$` ≤ 128, hodnota ≤ 4096 |
+| `*.timeoutSec`                        | 1–3600 (`MaxTimeoutSec`)                                           |
+| `*.rule`                              | typ `exit_code`, `match`, `not_match`; `pattern` platný regex      |
+| `pollingIntervalSeconds` a rychlé     | ≥ 0; rychlý interval < standardní interval                         |
+
+Statické soubory SPA: `index.html` a klientské cesty se vydávají s
+`Cache-Control: no-cache`, hashované soubory pod `/assets/` s
+`public, max-age=31536000, immutable`; adresáře se nevypisují (vrací se
+`index.html`).

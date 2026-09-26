@@ -2,8 +2,10 @@
 package config
 
 import (
+	"errors"
 	"fmt"
 	"regexp"
+	"sort"
 	"strings"
 	"time"
 )
@@ -16,6 +18,97 @@ const (
 	DefaultFastPollingIntervalSeconds = 10
 	DefaultFastPollingWindowSeconds   = 120
 )
+
+// Limits applied by Validate to user-supplied values (block 0028). They keep
+// a single card small enough for the JSON configuration file and the UI, and
+// keep one action from occupying an execution slot indefinitely.
+const (
+	MaxCardIDLength      = 64
+	MaxNameLength        = 120
+	MaxDescriptionLength = 2000
+	MaxIconLength        = 64
+	MaxCommandLength     = 512
+	MaxArgs              = 64
+	MaxArgLength         = 1024
+	MaxDirLength         = 1024
+	MaxEnvEntries        = 64
+	MaxEnvKeyLength      = 128
+	MaxEnvValueLength    = 4096
+	MaxTimeoutSec        = 3600
+	// IconPrefix is the PrimeIcons class prefix accepted for card icons.
+	IconPrefix = "pi pi-"
+)
+
+var (
+	cardIDPattern = regexp.MustCompile(`^[A-Za-z0-9_-]+$`)
+	envKeyPattern = regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_]*$`)
+)
+
+// ValidationError reports every invalid field of a value at once. Keys are
+// JSON paths relative to the validated value (for example
+// "primary.timeoutSec") and values are human-readable reasons. It matches
+// ErrValidation in errors.Is.
+type ValidationError struct {
+	Fields map[string]string
+}
+
+func (err *ValidationError) Error() string {
+	keys := make([]string, 0, len(err.Fields))
+	for key := range err.Fields {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+	parts := make([]string, 0, len(keys))
+	for _, key := range keys {
+		parts = append(parts, key+": "+err.Fields[key])
+	}
+	return "validation failed: " + strings.Join(parts, "; ")
+}
+
+// Is makes errors.Is(err, ErrValidation) true for every ValidationError.
+func (err *ValidationError) Is(target error) bool {
+	return target == ErrValidation
+}
+
+// fieldErrors accumulates validation failures keyed by field path.
+type fieldErrors map[string]string
+
+func (fields fieldErrors) add(key, reason string) {
+	if _, exists := fields[key]; !exists {
+		fields[key] = reason
+	}
+}
+
+// merge copies nested failures under a prefix ("primary" + "command" →
+// "primary.command").
+func (fields fieldErrors) merge(prefix string, err error) {
+	if err == nil {
+		return
+	}
+	var validation *ValidationError
+	if !errorsAs(err, &validation) {
+		fields.add(prefix, err.Error())
+		return
+	}
+	for key, reason := range validation.Fields {
+		fields.add(prefix+"."+key, reason)
+	}
+}
+
+func (fields fieldErrors) err() error {
+	if len(fields) == 0 {
+		return nil
+	}
+	return &ValidationError{Fields: map[string]string(fields)}
+}
+
+func errorsAs(err error, target **ValidationError) bool {
+	return errors.As(err, target)
+}
+
+func lengthReason(limit int) string {
+	return fmt.Sprintf("must be at most %d characters", limit)
+}
 
 // OutputRuleType describes how an action result is evaluated.
 type OutputRuleType string
@@ -36,7 +129,9 @@ type OutputRule struct {
 }
 
 // Validate checks that the output rule has a supported type and valid pattern.
+// Failures are reported as a ValidationError with the keys "type" and "pattern".
 func (rule OutputRule) Validate() error {
+	fields := fieldErrors{}
 	ruleType := rule.Type
 	if ruleType == "" {
 		ruleType = OutputRuleExitCode
@@ -44,18 +139,16 @@ func (rule OutputRule) Validate() error {
 
 	switch ruleType {
 	case OutputRuleExitCode:
-		return nil
 	case OutputRuleMatch, OutputRuleNotMatch:
 		if rule.Pattern == "" {
-			return fmt.Errorf("output rule pattern is required for type %q", ruleType)
+			fields.add("pattern", fmt.Sprintf("output rule pattern is required for type %q", ruleType))
+		} else if _, err := regexp.Compile(rule.Pattern); err != nil {
+			fields.add("pattern", fmt.Sprintf("output rule pattern is invalid: %v", err))
 		}
-		if _, err := regexp.Compile(rule.Pattern); err != nil {
-			return fmt.Errorf("output rule pattern is invalid: %w", err)
-		}
-		return nil
 	default:
-		return fmt.Errorf("unsupported output rule type %q", rule.Type)
+		fields.add("type", fmt.Sprintf("unsupported output rule type %q", rule.Type))
 	}
+	return fields.err()
 }
 
 // Action defines one command that can be executed by the execution engine.
@@ -68,18 +161,47 @@ type Action struct {
 	Rule       OutputRule        `json:"rule"`
 }
 
-// Validate checks that an action can be executed safely by the execution engine.
+// Validate checks that an action can be executed safely by the execution
+// engine and that its values respect the documented limits. All failures are
+// collected into one ValidationError keyed by field ("command", "args[2]",
+// "env.KEY", "timeoutSec", "rule.pattern", ...).
 func (action Action) Validate() error {
-	if strings.TrimSpace(action.Command) == "" {
-		return fmt.Errorf("action command is required")
+	fields := fieldErrors{}
+	switch {
+	case strings.TrimSpace(action.Command) == "":
+		fields.add("command", "action command is required")
+	case len(action.Command) > MaxCommandLength:
+		fields.add("command", lengthReason(MaxCommandLength))
 	}
-	if action.TimeoutSec <= 0 {
-		return fmt.Errorf("action timeout must be positive")
+	if len(action.Args) > MaxArgs {
+		fields.add("args", fmt.Sprintf("must have at most %d items", MaxArgs))
 	}
-	if err := action.Rule.Validate(); err != nil {
-		return fmt.Errorf("invalid action rule: %w", err)
+	for index, arg := range action.Args {
+		if len(arg) > MaxArgLength {
+			fields.add(fmt.Sprintf("args[%d]", index), lengthReason(MaxArgLength))
+		}
 	}
-	return nil
+	if len(action.Dir) > MaxDirLength {
+		fields.add("dir", lengthReason(MaxDirLength))
+	}
+	if len(action.Env) > MaxEnvEntries {
+		fields.add("env", fmt.Sprintf("must have at most %d entries", MaxEnvEntries))
+	}
+	for key, value := range action.Env {
+		switch {
+		case !envKeyPattern.MatchString(key):
+			fields.add("env."+key, "environment variable name must match ^[A-Za-z_][A-Za-z0-9_]*$")
+		case len(key) > MaxEnvKeyLength:
+			fields.add("env."+key, "environment variable name "+lengthReason(MaxEnvKeyLength))
+		case len(value) > MaxEnvValueLength:
+			fields.add("env."+key, lengthReason(MaxEnvValueLength))
+		}
+	}
+	if action.TimeoutSec < 1 || action.TimeoutSec > MaxTimeoutSec {
+		fields.add("timeoutSec", fmt.Sprintf("must be between 1 and %d", MaxTimeoutSec))
+	}
+	fields.merge("rule", action.Rule.Validate())
+	return fields.err()
 }
 
 // ActionCard groups a primary action with an optional status action and polling settings.
@@ -95,35 +217,69 @@ type ActionCard struct {
 	FastPollingWindowSeconds   int     `json:"fastPollingWindowSeconds,omitempty"`
 }
 
-// Validate checks the card identity, actions, and polling configuration.
+// Validate checks the card identity, actions, and polling configuration and
+// reports every failure at once as a ValidationError keyed by JSON path.
 func (card ActionCard) Validate() error {
-	if strings.TrimSpace(card.ID) == "" {
-		return fmt.Errorf("action card id is required")
+	fields := fieldErrors{}
+	switch {
+	case strings.TrimSpace(card.ID) == "":
+		fields.add("id", "action card id is required")
+	case len(card.ID) > MaxCardIDLength:
+		fields.add("id", lengthReason(MaxCardIDLength))
+	case !cardIDPattern.MatchString(card.ID):
+		fields.add("id", "must contain only letters, digits, '-' and '_'")
 	}
-	if strings.TrimSpace(card.Name) == "" {
-		return fmt.Errorf("action card name is required")
+	switch {
+	case strings.TrimSpace(card.Name) == "":
+		fields.add("name", "action card name is required")
+	case len(card.Name) > MaxNameLength:
+		fields.add("name", lengthReason(MaxNameLength))
 	}
-	if err := card.Primary.Validate(); err != nil {
-		return fmt.Errorf("invalid primary action: %w", err)
+	if len(card.Description) > MaxDescriptionLength {
+		fields.add("description", lengthReason(MaxDescriptionLength))
 	}
+	if !ValidIcon(card.Icon) {
+		fields.add("icon", fmt.Sprintf("must be empty or a %q class of at most %d characters", IconPrefix, MaxIconLength))
+	}
+	fields.merge("primary", card.Primary.Validate())
 	if card.Status != nil {
-		if err := card.Status.Validate(); err != nil {
-			return fmt.Errorf("invalid status action: %w", err)
-		}
+		fields.merge("status", card.Status.Validate())
 	}
 	if card.PollingIntervalSeconds < 0 {
-		return fmt.Errorf("polling interval cannot be negative")
+		fields.add("pollingIntervalSeconds", "polling interval cannot be negative")
 	}
 	if card.FastPollingIntervalSeconds < 0 {
-		return fmt.Errorf("fast polling interval cannot be negative")
+		fields.add("fastPollingIntervalSeconds", "fast polling interval cannot be negative")
 	}
 	if card.FastPollingWindowSeconds < 0 {
-		return fmt.Errorf("fast polling window cannot be negative")
+		fields.add("fastPollingWindowSeconds", "fast polling window cannot be negative")
 	}
 	if card.PollingIntervalSeconds > 0 && card.FastPollingIntervalSeconds >= card.PollingIntervalSeconds {
-		return fmt.Errorf("fast polling interval must be less than polling interval")
+		fields.add("fastPollingIntervalSeconds", "fast polling interval must be less than polling interval")
 	}
-	return nil
+	return fields.err()
+}
+
+// ValidIcon reports whether an icon value is empty or a PrimeIcons class
+// ("pi pi-<name>") within the length limit. The name part may contain only
+// lowercase letters, digits and dashes.
+func ValidIcon(icon string) bool {
+	if icon == "" {
+		return true
+	}
+	if len(icon) > MaxIconLength || !strings.HasPrefix(icon, IconPrefix) {
+		return false
+	}
+	name := strings.TrimPrefix(icon, IconPrefix)
+	if name == "" {
+		return false
+	}
+	for _, r := range name {
+		if (r < 'a' || r > 'z') && (r < '0' || r > '9') && r != '-' {
+			return false
+		}
+	}
+	return true
 }
 
 // RunOutcome describes the result of one action execution.
@@ -187,11 +343,12 @@ type Settings struct {
 
 // Validate checks that global settings use positive limits.
 func (settings Settings) Validate() error {
+	fields := fieldErrors{}
 	if settings.HistorySize <= 0 {
-		return fmt.Errorf("history size must be positive")
+		fields.add("historySize", "history size must be positive")
 	}
 	if settings.MaxConcurrentActions <= 0 {
-		return fmt.Errorf("max concurrent actions must be positive")
+		fields.add("maxConcurrentActions", "max concurrent actions must be positive")
 	}
-	return nil
+	return fields.err()
 }

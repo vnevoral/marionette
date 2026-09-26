@@ -3,6 +3,8 @@ APP_NAME := marionette
 DIST_DIR := internal/webui/dist
 DEV_CONFIG := ./marionette.json
 DEV_FIXTURE := deploy/dev-fixture.json
+VERSION ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo dev)
+LDFLAGS := -X main.version=$(VERSION)
 
 .PHONY: ui-install ui-build ui-dev ui-lint dev-config backend-run backend-dev build build-arm64 release-arm64 test lint verify clean
 
@@ -28,7 +30,7 @@ dev-config:
 
 ## Run the Go backend using the currently embedded UI build
 backend-run: dev-config
-	MARIONETTE_CONFIG=$(DEV_CONFIG) go run ./cmd/marionette
+	MARIONETTE_CONFIG=$(DEV_CONFIG) go run -ldflags "$(LDFLAGS)" ./cmd/marionette
 
 ## Run the Go backend with hot reload (air)
 backend-dev: dev-config
@@ -37,12 +39,12 @@ backend-dev: dev-config
 ## Build the UI, then produce a single Go binary for the current host platform
 build: ui-build
 	mkdir -p bin
-	go build -o bin/$(APP_NAME) ./cmd/marionette
+	go build -ldflags "$(LDFLAGS)" -o bin/$(APP_NAME) ./cmd/marionette
 
 ## Build the UI, then cross-compile for linux/arm64
 build-arm64: ui-build
 	mkdir -p bin
-	CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build -o bin/$(APP_NAME)-linux-arm64 ./cmd/marionette
+	CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build -ldflags "$(LDFLAGS)" -o bin/$(APP_NAME)-linux-arm64 ./cmd/marionette
 
 ## Build and package the linux/arm64 release with systemd installation files
 release-arm64: build-arm64

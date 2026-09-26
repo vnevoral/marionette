@@ -125,7 +125,7 @@ func (store *Store) CreateCard(card ActionCard) (ActionCard, error) {
 	}
 	if err := card.Validate(); err != nil {
 		store.mu.Unlock()
-		return ActionCard{}, fmt.Errorf("%w: %w", ErrValidation, err)
+		return ActionCard{}, err
 	}
 	if _, exists := store.cards[card.ID]; exists {
 		store.mu.Unlock()
@@ -162,7 +162,7 @@ func (store *Store) UpdateCard(id string, card ActionCard) (ActionCard, error) {
 	card.ID = id
 	if err := card.Validate(); err != nil {
 		store.mu.Unlock()
-		return ActionCard{}, fmt.Errorf("%w: %w", ErrValidation, err)
+		return ActionCard{}, err
 	}
 
 	card = cloneCard(card)
@@ -240,7 +240,7 @@ func (store *Store) GetSettings() Settings {
 // trimmed to the newest records when the history limit is reduced.
 func (store *Store) UpdateSettings(settings Settings) error {
 	if err := settings.Validate(); err != nil {
-		return fmt.Errorf("%w: %w", ErrValidation, err)
+		return err
 	}
 
 	store.persistMu.Lock()

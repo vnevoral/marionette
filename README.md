@@ -34,7 +34,10 @@ make build-arm64   # cross-compiles for Raspberry Pi (Ubuntu, linux/arm64)
 ```
 
 The resulting binary in `bin/` serves the UI and API from a single process —
-no separate web server or Node runtime is needed on the Raspberry Pi.
+no separate web server or Node runtime is needed on the Raspberry Pi. The
+build stamps the version from `git describe` into the binary (override with
+`make build VERSION=…`); `GET /api/health` reports it together with the
+uptime in seconds.
 
 ## Installation on Linux with systemd
 

@@ -6,12 +6,13 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"io/fs"
 	"log"
 	"math"
 	"net/http"
+	"sort"
 	"strconv"
 	"strings"
+	"time"
 
 	"marionette/internal/config"
 	"marionette/internal/webui"
@@ -29,6 +30,10 @@ type RouterDependencies struct {
 	// AllowedHosts optionally restricts the Host header accepted by mutating
 	// API requests (NFR-12, MARIONETTE_ALLOWED_HOSTS). Empty disables the check.
 	AllowedHosts []string
+	// Version is reported by GET /api/health; empty means "dev".
+	Version string
+	// StartedAt is the process start used for the health uptime; zero means now.
+	StartedAt time.Time
 }
 
 // NewRouter builds the top-level HTTP handler for the application. A store
@@ -43,10 +48,11 @@ func NewRouter(stores ...*config.Store) http.Handler {
 
 // NewRouterWithDependencies builds the HTTP handler with application services.
 // Mutating API routes are wrapped by the cross-site protection (NFR-12).
+// Every API path also gets a fallback for unsupported methods that answers
+// 405 with an Allow header and the JSON error envelope.
 func NewRouterWithDependencies(dependencies RouterDependencies) http.Handler {
-	mux := http.NewServeMux()
-
-	mux.HandleFunc("GET /api/health", handleHealth)
+	routes := routeTable{}
+	routes.add(http.MethodGet, "/api/health", newHealthHandler(dependencies.Version, dependencies.StartedAt))
 	if dependencies.Store != nil {
 		statusEvents := dependencies.StatusEvents
 		if statusEvents == nil {
@@ -66,24 +72,59 @@ func NewRouterWithDependencies(dependencies RouterDependencies) http.Handler {
 			reconciler:   dependencies.Reconciler,
 			statusEvents: statusEvents,
 		}
-		mux.HandleFunc("GET /api/cards", handler.listCards)
-		mux.HandleFunc("POST /api/cards", handler.createCard)
-		mux.HandleFunc("GET /api/cards/{id}", handler.getCard)
-		mux.HandleFunc("PUT /api/cards/{id}", handler.updateCard)
-		mux.HandleFunc("DELETE /api/cards/{id}", handler.deleteCard)
-		mux.HandleFunc("GET /api/cards/{id}/runs", handler.getRuns)
-		mux.HandleFunc("GET /api/cards/{id}/status", handler.getStatus)
-		mux.HandleFunc("GET /api/cards/{id}/status/history", handler.getStatusHistory)
-		mux.HandleFunc("GET /api/events", handler.events)
+		routes.add(http.MethodGet, "/api/cards", handler.listCards)
+		routes.add(http.MethodPost, "/api/cards", handler.createCard)
+		routes.add(http.MethodGet, "/api/cards/{id}", handler.getCard)
+		routes.add(http.MethodPut, "/api/cards/{id}", handler.updateCard)
+		routes.add(http.MethodDelete, "/api/cards/{id}", handler.deleteCard)
+		routes.add(http.MethodGet, "/api/cards/{id}/runs", handler.getRuns)
+		routes.add(http.MethodGet, "/api/cards/{id}/status", handler.getStatus)
+		routes.add(http.MethodGet, "/api/cards/{id}/status/history", handler.getStatusHistory)
+		routes.add(http.MethodGet, "/api/events", handler.events)
 		if dependencies.Actions != nil {
-			mux.HandleFunc("POST /api/cards/{id}/actions/primary", handler.enqueuePrimary)
-			mux.HandleFunc("POST /api/cards/{id}/actions/status/check", handler.enqueueStatus)
+			routes.add(http.MethodPost, "/api/cards/{id}/actions/primary", handler.enqueuePrimary)
+			routes.add(http.MethodPost, "/api/cards/{id}/actions/status/check", handler.enqueueStatus)
 		}
 	}
 
+	mux := http.NewServeMux()
+	routes.register(mux)
 	mux.Handle("/", spaHandler(webui.Dist()))
 
 	return requireSameOrigin(dependencies.AllowedHosts, mux)
+}
+
+// routeTable collects API routes so that each path can be registered with a
+// method-less fallback answering 405 for the methods it does not support.
+type routeTable map[string]map[string]http.HandlerFunc
+
+func (routes routeTable) add(method, path string, handler http.HandlerFunc) {
+	if routes[path] == nil {
+		routes[path] = map[string]http.HandlerFunc{}
+	}
+	routes[path][method] = handler
+}
+
+func (routes routeTable) register(mux *http.ServeMux) {
+	for path, handlers := range routes {
+		methods := make([]string, 0, len(handlers)+1)
+		for method, handler := range handlers {
+			mux.HandleFunc(method+" "+path, handler)
+			methods = append(methods, method)
+			if method == http.MethodGet {
+				methods = append(methods, http.MethodHead)
+			}
+		}
+		sort.Strings(methods)
+		mux.HandleFunc(path, methodNotAllowed(strings.Join(methods, ", ")))
+	}
+}
+
+func methodNotAllowed(allow string) http.HandlerFunc {
+	return func(w http.ResponseWriter, request *http.Request) {
+		w.Header().Set("Allow", allow)
+		writeError(w, http.StatusMethodNotAllowed, fmt.Errorf("method %s is not allowed", request.Method))
+	}
 }
 
 type cardAPI struct {
@@ -247,22 +288,57 @@ func (api cardAPI) enqueueStatus(w http.ResponseWriter, request *http.Request) {
 	writeJSON(w, http.StatusAccepted, acceptedAction{CardID: cardID, ActionKind: "status", Status: "accepted"})
 }
 
+// decodeJSON reads one JSON value into target. Failures are answered with the
+// JSON error envelope: a body over maxJSONBodyBytes → 413, anything that is
+// not exactly one JSON value of the expected shape → 400 with a message that
+// names the offending field or offset without exposing Go type names.
 func decodeJSON(w http.ResponseWriter, request *http.Request, target any) error {
 	request.Body = http.MaxBytesReader(w, request.Body, maxJSONBodyBytes)
 	decoder := json.NewDecoder(request.Body)
 	decoder.DisallowUnknownFields()
 	if err := decoder.Decode(target); err != nil {
-		writeError(w, http.StatusBadRequest, fmt.Errorf("decode JSON: %w", err))
+		writeDecodeError(w, err)
 		return err
 	}
 	if err := decoder.Decode(&struct{}{}); !errors.Is(err, io.EOF) {
 		if err == nil {
 			err = errors.New("request contains multiple JSON values")
 		}
-		writeError(w, http.StatusBadRequest, fmt.Errorf("decode JSON: %w", err))
+		writeDecodeError(w, err)
 		return err
 	}
 	return nil
+}
+
+func writeDecodeError(w http.ResponseWriter, err error) {
+	var (
+		maxBytes    *http.MaxBytesError
+		syntax      *json.SyntaxError
+		wrongType   *json.UnmarshalTypeError
+		description string
+	)
+	switch {
+	case errors.As(err, &maxBytes):
+		writeError(w, http.StatusRequestEntityTooLarge, fmt.Errorf("request body must be at most %d bytes", maxBytes.Limit))
+		return
+	case errors.As(err, &syntax):
+		description = fmt.Sprintf("malformed JSON at offset %d", syntax.Offset)
+	case errors.As(err, &wrongType):
+		field := wrongType.Field
+		if field == "" {
+			field = "body"
+		}
+		description = fmt.Sprintf("unexpected %s value for field %q", wrongType.Value, field)
+	case errors.Is(err, io.EOF):
+		description = "request body is empty"
+	case errors.Is(err, io.ErrUnexpectedEOF):
+		description = "unexpected end of JSON body"
+	case strings.HasPrefix(err.Error(), "json: unknown field "):
+		description = "unknown field " + strings.TrimPrefix(err.Error(), "json: unknown field ")
+	default:
+		description = err.Error()
+	}
+	writeError(w, http.StatusBadRequest, errors.New("invalid JSON body: "+description))
 }
 
 func writeJSON(w http.ResponseWriter, status int, value any) {
@@ -306,41 +382,45 @@ func writeStoreError(w http.ResponseWriter, err error) {
 	case errors.Is(err, config.ErrAlreadyExists):
 		writeError(w, http.StatusConflict, err)
 	case errors.Is(err, config.ErrValidation):
-		writeError(w, http.StatusUnprocessableEntity, err)
+		writeValidationError(w, err)
 	default:
 		writeError(w, http.StatusBadRequest, err)
 	}
 }
 
-func handleHealth(w http.ResponseWriter, _ *http.Request) {
-	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(map[string]string{"status": "ok"})
+// writeValidationError answers 422 with the error envelope extended by a
+// "fields" object (JSON path → reason) when the error carries per-field
+// details.
+func writeValidationError(w http.ResponseWriter, err error) {
+	var validation *config.ValidationError
+	if !errors.As(err, &validation) {
+		writeError(w, http.StatusUnprocessableEntity, err)
+		return
+	}
+	writeJSON(w, http.StatusUnprocessableEntity, struct {
+		Error  string            `json:"error"`
+		Fields map[string]string `json:"fields"`
+	}{Error: err.Error(), Fields: validation.Fields})
 }
 
-// spaHandler serves static assets from the embedded filesystem and falls back
-// to index.html for unknown paths so client-side (Vue Router) routes resolve.
-func spaHandler(root fs.FS) http.Handler {
-	fileServer := http.FileServer(http.FS(root))
+type healthResponse struct {
+	Status    string `json:"status"`
+	Version   string `json:"version"`
+	UptimeSec int64  `json:"uptimeSec"`
+}
 
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		path := r.URL.Path
-		if path != "/" {
-			if strings.HasPrefix(path, "/api/") || path == "/api" {
-				writeError(w, http.StatusNotFound, config.ErrNotFound)
-				return
-			}
-			if _, err := fs.Stat(root, path[1:]); err == nil {
-				fileServer.ServeHTTP(w, r)
-				return
-			}
-		}
-
-		data, err := fs.ReadFile(root, "index.html")
-		if err != nil {
-			http.Error(w, "index.html not found", http.StatusNotFound)
-			return
-		}
-		w.Header().Set("Content-Type", "text/html; charset=utf-8")
-		_, _ = w.Write(data)
-	})
+func newHealthHandler(version string, startedAt time.Time) http.HandlerFunc {
+	if version == "" {
+		version = "dev"
+	}
+	if startedAt.IsZero() {
+		startedAt = time.Now()
+	}
+	return func(w http.ResponseWriter, _ *http.Request) {
+		writeJSON(w, http.StatusOK, healthResponse{
+			Status:    "ok",
+			Version:   version,
+			UptimeSec: int64(time.Since(startedAt).Seconds()),
+		})
+	}
 }

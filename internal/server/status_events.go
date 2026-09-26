@@ -2,6 +2,7 @@ package server
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"strconv"
@@ -108,7 +109,7 @@ func (broker *StatusEventBroker) subscribe() (<-chan StatusEvent, func()) {
 func (api cardAPI) events(w http.ResponseWriter, request *http.Request) {
 	flusher, ok := w.(http.Flusher)
 	if !ok {
-		http.Error(w, "streaming is not supported", http.StatusInternalServerError)
+		writeError(w, http.StatusInternalServerError, errors.New("streaming is not supported"))
 		return
 	}
 
