@@ -7,7 +7,7 @@
 			"request": "launch",
 			"mode": "auto",
 			"program": "${workspaceFolder}/cmd/marionette",
-			"preLaunchTask": "Marionette: build UI",
+			"preLaunchTask": "Marionette: prepare backend",
 			"env": {
 				"MARIONETTE_ADDR": ":8080",
 				"MARIONETTE_CONFIG": "${workspaceFolder}/marionette.json"

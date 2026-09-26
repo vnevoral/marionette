@@ -10,6 +10,7 @@ import (
 	"marionette/internal/config"
 )
 
+// Errors returned by Scheduler lifecycle methods.
 var (
 	ErrSchedulerRunning = errors.New("status scheduler is already running")
 	ErrSchedulerStopped = errors.New("status scheduler is not running")

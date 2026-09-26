@@ -47,19 +47,28 @@ make ui-dev          # Vite dev server :5173 (proxy /api -> :8080)
 make backend-dev     # Go backend s hot-reload (air) na :8080
 make build           # build UI + embed + Go binárka pro aktuální platformu
 make build-arm64     # cross-compile pro Raspberry Pi (linux/arm64)
-make test            # go test ./...
-make lint            # golangci-lint run ./...
+make test            # go test -race ./... (UI testy přibudou blokem 0030)
+make lint            # golangci-lint + eslint + vue-tsc + prettier --check
+make verify          # jediný validační příkaz: build UI + lint + test + go build/vet
 ```
 
-Pro web samostatně (`cd web`): `npm run lint`, `npm run build`
-(`vue-tsc -b && vite build`), `npm run format`.
+Pro web samostatně (`cd web`): `npm run lint`, `npm run lint:types`,
+`npm run format` / `npm run format:check`, `npm run build`
+(`vue-tsc -b && vite build`).
 
-Po každé změně v `internal/**/*.go` spusť `go build ./...`, `go vet ./...` a
-`make test`. Po změně v `web/src/**` spusť `npm run lint` a `npm run build`.
+Lokální dev konfigurace `./marionette.json` je ignorovaná gitem a vzniká
+z `deploy/dev-fixture.json` příkazem `make dev-config` (volá se automaticky
+z `make backend-dev` / `backend-run`).
+
+**Před uzavřením jakékoli změny spusť `make verify`** — je to jediné místo,
+kde je definována sada validačních příkazů (CI a Definition of Done na něj
+odkazují). Při rychlé iteraci lze použít dílčí `make test`, `make lint`,
+nebo přímo `go test ./...` a `npm run lint`.
 
 ## Konvence
 
-- Go: standardní `gofmt`, balíčky bez zbytečných abstrakcí, chyby se vracejí,
+- Go: formát `gofumpt` (přísnější nadmnožina `gofmt`, vynucuje `make lint`),
+  balíčky bez zbytečných abstrakcí, chyby se vracejí,
   nepoužívá se `panic` mimo `internal/webui` inicializaci vestavěného FS.
 - Vue/TS: `<script setup lang="ts">`, PrimeVue komponenty místo vlastních UI
   prvků, odsazení tabulátorem (viz `.prettierrc.json`), ESLint flat config.

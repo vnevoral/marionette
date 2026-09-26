@@ -9,8 +9,11 @@ import (
 	execengine "marionette/internal/exec"
 )
 
-var ErrActionQueueClosed = errors.New("action queue is closed")
-var ErrActionQueueFull = errors.New("action queue is full")
+// Errors returned by BackgroundActions when a job cannot be accepted.
+var (
+	ErrActionQueueClosed = errors.New("action queue is closed")
+	ErrActionQueueFull   = errors.New("action queue is full")
+)
 
 // ActionRunner executes one configured action through the shared concurrency limit.
 type ActionRunner interface {
@@ -138,11 +141,6 @@ func (actions *BackgroundActions) runWorker() {
 		job()
 		actions.pending.Done()
 	}
-}
-
-type actionQueueDependencies struct {
-	queue    ActionQueue
-	notifier PrimaryActionNotifier
 }
 
 type acceptedAction struct {

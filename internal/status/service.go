@@ -9,6 +9,7 @@ import (
 	execengine "marionette/internal/exec"
 )
 
+// ErrStatusActionMissing is returned when a card has no status action configured.
 var ErrStatusActionMissing = errors.New("status action is not configured")
 
 type runner interface {

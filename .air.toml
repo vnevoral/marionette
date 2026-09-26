@@ -2,6 +2,7 @@ root = "."
 tmp_dir = "tmp"
 
 [build]
+pre_cmd = ["make dev-config"]
 cmd = "go build -o ./tmp/marionette ./cmd/marionette"
 bin = "tmp/marionette"
 full_bin = "MARIONETTE_ADDR=:8080 MARIONETTE_CONFIG=./marionette.json ./tmp/marionette"

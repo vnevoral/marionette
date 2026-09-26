@@ -10,10 +10,10 @@ Blok je hotový, když jsou splněny všechny následující body:
       stavu `Probíhá`.
 - [ ] Kód odpovídá schválenému návrhu v bloku (`docs/plans/blocks/...`); pokud
       se návrh za implementace změnil, blok je aktualizován.
-- [ ] `go build ./...`, `go vet ./...` a `make test` (resp. `go test ./...`)
-      procházejí bez chyb.
-- [ ] Pokud blok mění `web/`: `npm run lint` a `npm run build` procházejí bez
-      chyb.
+- [ ] `make verify` prochází bez chyb (build UI, `golangci-lint`, `eslint`
+      s `--max-warnings 0`, `vue-tsc`, `prettier --check`, `go test -race`,
+      `go build`, `go vet`). Je to jediná definice validační sady; dílčí
+      příkazy (`make test`, `make lint`) slouží jen pro rychlou iteraci.
 - [ ] Nová/změněná doménová logika má jednotkové testy pokrývající hlavní i
       chybové scénáře (viz [testing-strategy.md](testing-strategy.md)).
 - [ ] Veřejné API/chování je zdokumentováno (komentář na exportovaném

@@ -152,7 +152,7 @@ func waitForInitialCheck(t *testing.T, checker *fakeChecker, cardID string) {
 func TestSchedulerRunsStandardPolling(t *testing.T) {
 	scheduler, clock, checker, cancel := newTestScheduler(t, "standard", 10, 2, 5)
 	defer cancel()
-	defer scheduler.Stop()
+	defer stopScheduler(t, scheduler)
 	waitForTimer(t, clock)
 	<-clock.durations
 	waitForInitialCheck(t, checker, "standard")
@@ -176,7 +176,7 @@ func TestSchedulerRunsStandardPolling(t *testing.T) {
 func TestSchedulerUsesFastPollingAndReturnsToStandard(t *testing.T) {
 	scheduler, clock, checker, cancel := newTestScheduler(t, "fast", 10, 2, 3)
 	defer cancel()
-	defer scheduler.Stop()
+	defer stopScheduler(t, scheduler)
 	waitForTimer(t, clock)
 	<-clock.durations
 	waitForInitialCheck(t, checker, "fast")
@@ -324,5 +324,12 @@ func TestSchedulerRestartClearsFastPollingWindow(t *testing.T) {
 	waitForInitialCheck(t, checker, "restart")
 	if err := scheduler.Stop(); err != nil {
 		t.Fatalf("final Stop() error = %v", err)
+	}
+}
+
+func stopScheduler(t *testing.T, scheduler *Scheduler) {
+	t.Helper()
+	if err := scheduler.Stop(); err != nil {
+		t.Fatalf("stop scheduler: %v", err)
 	}
 }

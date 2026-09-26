@@ -3,7 +3,7 @@
 - **Fáze**: 8 — Zpevnění
 - **Vazba na požadavky**: NFR-05, NFR-06
 - **Vazba na ADR**: ADR-0002, ADR-0003
-- **Stav**: Schváleno
+- **Stav**: Hotovo
 - **Závislosti**: žádné (lze implementovat jako první)
 
 ## Cíl bloku
@@ -88,6 +88,28 @@ Viz [Definition of Done](../../devops/definition-of-done.md) +:
 
 ## Uzavření
 
-- **Stav po implementaci**: čeká
-- **Ověření**: čeká
-- **Dokumentace aktualizována**: čeká
+- **Stav po implementaci**: Hotovo (2026-09-26)
+- **Ověření**: `make verify` (build UI, `golangci-lint run ./...`,
+  `npm run lint --max-warnings 0`, `npm run lint:types`, `npm run
+  format:check`, `go test -race -count=1 ./...`, `go build ./...`,
+  `go vet ./...`) prošel za 12 s bez nálezů; `go list ./...` vrací pouze
+  balíčky pod `cmd/` a `internal/` (žádný z `web/node_modules`); po
+  `npm run build` nevznikají `vite.config.js`, `vite.config.d.ts` ani
+  `tsconfig.node.tsbuildinfo`; `git check-ignore marionette.json` potvrzuje
+  ignorování lokální dev konfigurace; negativní test — uměle přidaný soubor s
+  nepoužitou proměnnou shodí `npm run lint` (exit 1), po odstranění exit 0;
+  `npm audit --omit=dev --audit-level=high` bez zranitelností; `git diff
+  --check` čistý. Počet ESLint warningů klesl ze 176 na 0 bez přeformátování
+  `.vue` souborů (řešeno `eslint-config-prettier`).
+- **Neověřeno lokálně**: zelený běh CI na PR a první Dependabot PR (vyžadují
+  push do GitHubu); devcontainer s Node 22 vyžaduje rebuild kontejneru
+  (lokálně stále běží Node 20, `engines` pouze varuje).
+- **Odchylky od návrhu**: `make test` zatím spouští jen Go testy — `npm test`
+  se doplní blokem 0030; revive pravidlo `exported` běží s vypnutou kontrolou
+  stutteringu (`StatusCheckService`), přejmenování řeší blok 0034; doplněny
+  chybějící godoc komentáře u exportovaných chyb a typů (původně L-12 pro
+  0034), protože je lint vyžaduje.
+- **Dokumentace aktualizována**: ano — `AGENTS.md`, `CLAUDE.md`,
+  `.github/instructions/*`, `.github/prompts/implement-block.prompt.md`,
+  `docs/devops/definition-of-done.md`, `development-workflow.md`, `ci-cd.md`,
+  `testing-strategy.md`, `README.md`, roadmapa.

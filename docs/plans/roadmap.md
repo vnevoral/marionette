@@ -21,7 +21,7 @@ uloží do `docs/plans/blocks/NNNN-nazev.md`. Blok se implementuje promptem
 | 5    | REST API (CRUD karet/akcí, spuštění, čtení stavu)                                            | **Hotovo**                                       | FR-40, FR-41                   |
 | 6    | Dashboard UI (karty, stavové indikátory, formuláře správy)                                   | **Hotovo**                                       | FR-20..23                      |
 | 7    | Balíčkování a nasazení (systemd unit, install skript, arm64 release)                         | **Probíhá** (0023)                               | FR-01..04, NFR-02              |
-| 8    | Zpevnění (auth/access control, logování, chybové stavy, testy, dokumentace)                  | **Schváleno** (bloky 0024–0034, 2026-09-26)      | NFR-01, NFR-04..06, NFR-12     |
+| 8    | Zpevnění (auth/access control, logování, chybové stavy, testy, dokumentace)                  | **Probíhá** (0031 hotovo; 0024–0030, 0032–0034 schváleny) | NFR-01, NFR-04..06, NFR-12     |
 | 9    | UX redesign a sdílený design systém                                                          | **Hotovo**                                       | FR-24..29, NFR-08..10          |
 | 10   | Realtime doručování statusů přes SSE                                                         | **Hotovo**                                       | FR-42, NFR-11                  |
 
@@ -114,7 +114,7 @@ uloží do `docs/plans/blocks/NNNN-nazev.md`. Blok se implementuje promptem
 
   **Proud B — tooling a testy (odblokuje frontend):**
   1. [0031 — Hygiena repozitáře, lint a CI](blocks/0031-repo-tooling-and-ci-hygiene.md)
-     — bez závislostí, doporučeno implementovat jako úplně první.
+     — **Hotovo** (2026-09-26); zavádí `make verify` jako jedinou validační sadu.
   2. [0030 — Frontend testovací infrastruktura (Vitest)](blocks/0030-frontend-test-infrastructure.md).
 
   **Proud C — frontend (po 0030):**

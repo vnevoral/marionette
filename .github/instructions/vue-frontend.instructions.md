@@ -15,4 +15,6 @@ applyTo: "web/src/**"
   zhodnotí breaking changes.
 - API volání směřují na `/api/...` (v dev proxováno Vite na backend `:8080`,
   v produkci stejný proces/port).
-- Po každé změně: `npm run lint` a `npm run build` ve `web/`.
+- Po každé změně: `npm run lint` a `npm run build` ve `web/` (lint běží s
+  `--max-warnings 0`, formátování hlídá Prettier přes `eslint-config-prettier`);
+  před uzavřením `make verify` z kořene repozitáře.

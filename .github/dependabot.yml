@@ -1,0 +1,26 @@
+version: 2
+updates:
+  - package-ecosystem: gomod
+    directory: /
+    schedule:
+      interval: weekly
+  - package-ecosystem: npm
+    directory: /web
+    schedule:
+      interval: weekly
+    ignore:
+      # Pinned as a frozen layout layer for the MVP, see ADR-0009.
+      - dependency-name: primeflex
+      # Major upgrades of core UI dependencies require an ADR (ADR-0003).
+      - dependency-name: primevue
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "@primevue/themes"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: vue
+        update-types: ["version-update:semver-major"]
+      - dependency-name: vite
+        update-types: ["version-update:semver-major"]
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly

@@ -19,7 +19,12 @@ Open the folder in the dev container (VS Code: "Reopen in Container"), then:
 make ui-install   # once, installs npm dependencies
 make ui-dev       # Vite dev server on :5173, proxies /api to :8080
 make backend-dev  # Go backend with hot reload (air) on :8080
+make verify       # build UI + lint + tests; run before every commit
 ```
+
+The backend reads `./marionette.json`, which is git-ignored and created from
+`deploy/dev-fixture.json` on the first `make backend-dev` (or `make
+dev-config`). Node 22 is required for the UI (`web/.nvmrc`).
 
 ## Production build
 
@@ -54,6 +59,10 @@ service. Runtime settings are read from `/etc/default/marionette`.
 For an update, run the installer again with the new binary. It keeps the
 existing configuration and restarts the service. To roll back, run the
 installer with the previous binary; configuration data is not removed.
+
+## License
+
+MIT, see [LICENSE](LICENSE).
 
 ## Project process & documentation
 

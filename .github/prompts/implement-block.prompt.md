@@ -20,9 +20,9 @@ Postup:
    jako nový requirement, ADR nebo implementační blok.
 5. Napiš jednotkové testy podle sekce „Testovací plán“ bloku a
    [testing-strategy.md](../../docs/devops/testing-strategy.md).
-6. Spusť požadované validační příkazy: pro Go `go build ./...`,
-   `go vet ./...`, `go test ./...` a `go test -race ./...`; pro web
-   `npm run lint` + `npm run build`), oprav chyby.
+6. Spusť `make verify` (jediná definice validační sady: build UI, lint Go i
+   web, `go test -race`, `go build`, `go vet`) a oprav chyby. Při iteraci
+   lze použít dílčí `make test` / `make lint`.
 7. Projdi [Definition of Done](../../docs/devops/definition-of-done.md),
    aktualizuj podle skutečnosti blok, requirements/ADR, veřejnou dokumentaci
    a `docs/plans/roadmap.md`.

@@ -2,7 +2,7 @@
 
 ## Backend (Go)
 
-- Jednotkové testy (`go test ./...`) pro veškerou doménovou logiku
+- Jednotkové testy (`go test -race ./...`, spouští `make test`) pro veškerou doménovou logiku
   (vyhodnocení akcí, config store, status engine) — bez závislosti na
   skutečném spouštění procesů nebo souborovém systému, kde to jde (rozhraní +
   fake implementace).
@@ -15,7 +15,8 @@
 
 ## Frontend (Vue)
 
-- `npm run lint` a `vue-tsc` (type-check) jsou povinnou součástí CI.
+- `npm run lint` (`--max-warnings 0`), `vue-tsc` (type-check) a
+  `prettier --check` jsou povinnou součástí CI a `make verify`.
 - Komponentové/unit testy (Vitest + Vue Test Utils) se zavedou při
   implementaci fáze 6 (Dashboard UI) pro klíčovou logiku (zobrazení stavu
   karty, volání API) — netestuje se vzhled PrimeVue komponent samotných.

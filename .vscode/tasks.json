@@ -13,6 +13,24 @@
 				"isDefault": false
 			},
 			"problemMatcher": []
+		},
+		{
+			"label": "Marionette: dev config",
+			"type": "shell",
+			"command": "make dev-config",
+			"options": {
+				"cwd": "${workspaceFolder}"
+			},
+			"problemMatcher": []
+		},
+		{
+			"label": "Marionette: prepare backend",
+			"dependsOn": [
+				"Marionette: build UI",
+				"Marionette: dev config"
+			],
+			"dependsOrder": "sequence",
+			"problemMatcher": []
 		}
 	]
 }

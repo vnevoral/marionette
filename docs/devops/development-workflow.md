@@ -57,9 +57,8 @@ Před uzavřením ověř:
 
 - implementace odpovídá schválenému rozsahu;
 - testy pokrývají hlavní i chybové scénáře;
-- pro změny Go prošly `go build ./...`, `go vet ./...` a `make test` nebo
-  `go test ./...`;
-- pro změny webu prošly `npm run lint` a `npm run build`;
+- `make verify` prošel (jediná definice validační sady pro Go i web, viz
+  `Makefile`);
 - veřejné chování a dokumentace odpovídají skutečnosti;
 - roadmapa a stav bloku jsou aktualizované.
 

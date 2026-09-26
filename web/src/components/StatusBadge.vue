@@ -5,7 +5,7 @@ withDefaults(
 	defineProps<{
 		label: string;
 		icon: string;
-		tone: "healthy" | "problem" | "unknown" | "info" | "warning";
+		tone?: "healthy" | "problem" | "unknown" | "info" | "warning";
 	}>(),
 	{ tone: "unknown" },
 );

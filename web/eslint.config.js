@@ -2,6 +2,7 @@ import js from "@eslint/js";
 import vue from "eslint-plugin-vue";
 import tseslint from "typescript-eslint";
 import globals from "globals";
+import prettier from "eslint-config-prettier";
 
 export default tseslint.config(
 	js.configs.recommended,
@@ -19,11 +20,16 @@ export default tseslint.config(
 				parser: tseslint.parser,
 			},
 		},
-		rules: {
-			"vue/html-indent": ["warn", "tab"],
-		},
 	},
 	{
-		ignores: ["dist/**", "node_modules/**"],
+		files: ["src/**/*.spec.ts"],
+		languageOptions: {
+			globals: { ...globals.browser, ...globals.node },
+		},
+	},
+	// Must stay last: disables every formatting rule that conflicts with Prettier.
+	prettier,
+	{
+		ignores: ["dist/**", "node_modules/**", "vite.config.js", "vite.config.d.ts"],
 	},
 );

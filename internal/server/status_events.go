@@ -13,6 +13,7 @@ import (
 
 const statusEventHeartbeat = 15 * time.Second
 
+// StatusEvent is the payload published to SSE subscribers when a card status changes.
 type StatusEvent struct {
 	ID       uint64
 	CardID   string
@@ -26,6 +27,7 @@ type StatusEventBroker struct {
 	subscribers map[chan StatusEvent]struct{}
 }
 
+// NewStatusEventBroker creates an empty broker with no subscribers.
 func NewStatusEventBroker() *StatusEventBroker {
 	return &StatusEventBroker{subscribers: make(map[chan StatusEvent]struct{})}
 }

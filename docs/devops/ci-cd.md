@@ -4,14 +4,19 @@
 
 Na každý push a pull request:
 
-1. **backend** — `go build ./...`, `go vet ./...`, `go test ./...` na
-   linux/amd64.
-2. **web** — `npm ci`, `npm run lint`, `npm run build` (zahrnuje type-check
-   přes `vue-tsc`) ve `web/`.
-3. (volitelně, jakmile bude `golangci-lint` v devcontaineru/CI) `make lint`.
+1. **backend** — `golangci-lint` (verze připnutá shodně s devcontainerem,
+   konfigurace `.golangci.yml`), `go build ./...`, `go vet ./...`,
+   `go test -race -count=1 ./...` na linux/amd64.
+2. **web** — `npm ci`, `npm audit --omit=dev --audit-level=high`,
+   `npm run lint` (`--max-warnings 0`), `npm run format:check`,
+   `npm run build` (zahrnuje type-check přes `vue-tsc`) ve `web/`. Verze Node
+   je určena souborem `web/.nvmrc` (shodná s devcontainerem a `engines`).
 
-CI běh musí projít čistě (bez chyb; varování z lintů se řeší, ne potlačují)
-před mergem do hlavní větve.
+Stejnou sadu spouští lokálně `make verify`; CI ji pouze zrcadlí. CI běh
+musí projít čistě (lint warningy selhávají build, nepotlačují se) před
+mergem do hlavní větve. Dependabot (`.github/dependabot.yml`) otevírá týdenní
+PR pro Go moduly, npm a GitHub Actions; major verze klíčových UI závislostí a
+PrimeFlex jsou vyloučené (ADR-0003, ADR-0009).
 
 ## Release proces (cílový stav, viz roadmapa fáze 7)
 
