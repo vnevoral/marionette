@@ -64,6 +64,7 @@ export const FEEDBACK = {
 	resultUnavailable: "Result not available yet",
 	statusUnavailable: "Status could not be refreshed",
 	cardSaved: "Card saved",
+	cardDeleted: "Card deleted",
 	deleting: "Deleting card...",
 	unableToQueue: "Unable to queue action",
 	unableToSave: "Unable to save card",

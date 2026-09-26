@@ -20,7 +20,7 @@ test("creates, runs, checks and deletes a card through the UI", async ({ page })
 	await page.getByLabel("Configure status action").check();
 	await actionEditor(page, "Status action").getByLabel("Command").fill("true");
 	await page.getByRole("button", { name: "Save card" }).click();
-	await expect(page.getByText("Card saved")).toBeVisible();
+	await expect(page.getByRole("alert").filter({ hasText: "Card saved" })).toBeVisible();
 	await expect(page.getByRole("heading", { name: "Edit card", level: 1 })).toBeVisible();
 
 	await page.getByRole("link", { name: "Back to card detail" }).click();
@@ -45,6 +45,9 @@ test("creates, runs, checks and deletes a card through the UI", async ({ page })
 	await expect(dialog).toContainText('Delete "Printer"?');
 	await dialog.getByRole("button", { name: "Delete card" }).click();
 	await expect(page).toHaveURL("/");
+	await expect(page.getByRole("alert").filter({ hasText: "Card deleted" })).toContainText(
+		'"Printer"',
+	);
 	await expect(page.getByRole("heading", { name: "No action cards yet" })).toBeVisible();
 });
 

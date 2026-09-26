@@ -16,6 +16,7 @@ import {
 } from "@/api";
 import CardDetailView from "@/views/CardDetailView.vue";
 import { fakeConfirm } from "@/test/fakeConfirm";
+import { fakeToast } from "@/test/fakeToast";
 import { FakeEventSource } from "@/test/fakeEventSource";
 
 vi.mock("@/api", async (importOriginal) => {
@@ -93,11 +94,12 @@ async function mountDetail(id: string) {
 	await router.push(`/cards/${id}`);
 	await router.isReady();
 	const confirm = fakeConfirm();
+	const toast = fakeToast();
 	const wrapper = mount(CardDetailView, {
-		global: { plugins: [router, PrimeVue], provide: confirm.provide },
+		global: { plugins: [router, PrimeVue], provide: { ...confirm.provide, ...toast.provide } },
 	});
 	await flushPromises();
-	return { wrapper, router, confirm };
+	return { wrapper, router, confirm, toast };
 }
 
 describe("CardDetailView", () => {
@@ -274,7 +276,7 @@ describe("CardDetailView", () => {
 	});
 
 	it("deletes the card only after the dialog names it and is accepted", async () => {
-		const { wrapper, router, confirm } = await mountDetail("printer");
+		const { wrapper, router, confirm, toast } = await mountDetail("printer");
 		await buttonByLabel(wrapper, "Delete card").trigger("click");
 		expect(deleteCard).not.toHaveBeenCalled();
 		expect(confirm.last().header).toBe("Delete card");
@@ -285,6 +287,20 @@ describe("CardDetailView", () => {
 		await flushPromises();
 		expect(deleteCard).toHaveBeenCalledWith("printer");
 		expect(router.currentRoute.value.path).toBe("/");
+		expect(toast.summaries()).toEqual(["Card deleted"]);
+		expect(toast.add.mock.calls[0][0].detail).toContain('"Printer"');
+		wrapper.unmount();
+	});
+
+	it("keeps the detail and shows the error inline when deletion fails, without a toast", async () => {
+		vi.mocked(deleteCard).mockRejectedValue(new Error("Server unreachable"));
+		const { wrapper, router, confirm, toast } = await mountDetail("printer");
+		await buttonByLabel(wrapper, "Delete card").trigger("click");
+		confirm.last().accept?.();
+		await flushPromises();
+		expect(router.currentRoute.value.path).toBe("/cards/printer");
+		expect(wrapper.find(".request-feedback").text()).toBe("Server unreachable");
+		expect(toast.add).not.toHaveBeenCalled();
 		wrapper.unmount();
 	});
 

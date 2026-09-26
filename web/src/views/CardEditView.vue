@@ -10,6 +10,7 @@ import PageHeader from "@/components/PageHeader.vue";
 import PollingFields from "@/components/PollingFields.vue";
 import RequestState from "@/components/RequestState.vue";
 import SaveBar from "@/components/SaveBar.vue";
+import { useNotify } from "@/composables/useNotify";
 import { useUnsavedChangesGuard } from "@/composables/useUnsavedChangesGuard";
 import { ACTIONS, FEEDBACK, LOADING } from "@/ui/vocabulary";
 import {
@@ -30,6 +31,7 @@ import {
 import { singleParam } from "@/router/params";
 
 const route = useRoute();
+const notify = useNotify();
 const router = useRouter();
 const isNew = () => route.name === "card-new";
 const cardID = () => singleParam(route.params.id);
@@ -38,7 +40,6 @@ const backTo = () => (isNew() ? "/" : `/cards/${encodeURIComponent(cardID())}`);
 const loading = ref(!isNew());
 const saving = ref(false);
 const error = ref("");
-const notice = ref("");
 const statusEnabled = ref(false);
 const initialFingerprint = ref("");
 const fieldErrors = reactive<Record<string, string>>({});
@@ -114,7 +115,6 @@ async function save() {
 	error.value = validate();
 	if (error.value) return;
 	saving.value = true;
-	notice.value = "";
 	const payload: ActionCard = {
 		...form,
 		id: isNew() ? "" : cardID(),
@@ -128,7 +128,7 @@ async function save() {
 	try {
 		const saved = isNew() ? await createCard(payload) : await updateCard(payload);
 		applyCard(saved);
-		notice.value = FEEDBACK.cardSaved;
+		notify.success(FEEDBACK.cardSaved, saved.name);
 		// Stay in the edit context (UX spec §7.3); a new card moves to its own
 		// edit route so a reload or a second save addresses the stored card.
 		if (isNew()) {
@@ -146,7 +146,6 @@ async function save() {
 async function loadCard() {
 	const generation = ++loadGeneration;
 	error.value = "";
-	notice.value = "";
 	if (isNew()) {
 		applyCard(emptyCard());
 		loading.value = false;
@@ -155,7 +154,6 @@ async function loadCard() {
 	const saved = takeSavedCard(cardID());
 	if (saved) {
 		applyCard(saved);
-		notice.value = FEEDBACK.cardSaved;
 		loading.value = false;
 		return;
 	}
@@ -198,7 +196,6 @@ useUnsavedChangesGuard(isDirty, () => saving.value);
 
 		<div class="edit-feedback">
 			<RequestState :message="error" tone="error" />
-			<RequestState :message="notice" tone="success" />
 		</div>
 
 		<div v-if="loading" class="loading-state" role="status" aria-live="polite">

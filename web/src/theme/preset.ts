@@ -116,6 +116,26 @@ const MarionettePreset = definePreset(Aura, {
 		button: {
 			label: { fontWeight: "500" },
 		},
+		// Aura draws a success toast in {green.600} on {green.50} (3.2:1, below
+		// WCAG AA for 16 px text and off-palette); use the accent tokens
+		// instead: accent-strong on accent-soft is 4.9:1, the detail ink 11:1.
+		toast: {
+			colorScheme: {
+				light: {
+					success: {
+						background: "#e6f1e8",
+						borderColor: "{primary.300}",
+						color: "{primary.600}",
+						detailColor: "#26332f",
+						shadow: "0 4px 8px 0 rgb(38 51 47 / 8%)",
+						closeButton: {
+							hoverBackground: "{primary.100}",
+							focusRing: { color: "{primary.600}", shadow: "none" },
+						},
+					},
+				},
+			},
+		},
 		toggleswitch: {
 			root: {
 				width: "2.75rem",

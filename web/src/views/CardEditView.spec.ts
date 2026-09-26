@@ -6,6 +6,7 @@ import PrimeVue from "primevue/config";
 import { ApiError, createCard, getCard, updateCard, type ActionCard } from "@/api";
 import CardEditView from "@/views/CardEditView.vue";
 import { fakeConfirm } from "@/test/fakeConfirm";
+import { fakeToast } from "@/test/fakeToast";
 
 vi.mock("@/api", async (importOriginal) => {
 	const actual = await importOriginal<typeof import("@/api")>();
@@ -47,13 +48,14 @@ async function mountEdit(path: string) {
 	await router.push(path);
 	await router.isReady();
 	const confirm = fakeConfirm();
+	const toast = fakeToast();
 	// Rendered through RouterView so onBeforeRouteLeave is attached to the route.
 	const wrapper = mount(
 		{ render: () => h(RouterView) },
-		{ global: { plugins: [router, PrimeVue], provide: confirm.provide } },
+		{ global: { plugins: [router, PrimeVue], provide: { ...confirm.provide, ...toast.provide } } },
 	);
 	await flushPromises();
-	return { wrapper, router, confirm };
+	return { wrapper, router, confirm, toast };
 }
 
 describe("CardEditView", () => {
@@ -127,7 +129,7 @@ describe("CardEditView", () => {
 
 	it("keeps a new card in the edit context after saving", async () => {
 		vi.mocked(createCard).mockImplementation(async (card) => ({ ...card, id: "card-1" }));
-		const { wrapper, router, confirm } = await mountEdit("/cards/new/edit");
+		const { wrapper, router, confirm, toast } = await mountEdit("/cards/new/edit");
 		expect(wrapper.find("h1").text()).toBe("New card");
 		await inputInLabel(wrapper, "Name").setValue("Lamp");
 		await inputInLabel(wrapper, "Command").setValue("switch");
@@ -142,7 +144,13 @@ describe("CardEditView", () => {
 		expect(router.currentRoute.value.path).toBe("/cards/card-1/edit");
 		expect(getCard).not.toHaveBeenCalled();
 		expect((inputInLabel(wrapper, "Name").element as HTMLInputElement).value).toBe("Lamp");
-		expect(wrapper.text()).toContain("Card saved");
+		// The notice is a toast so it survives the move to the edit route.
+		expect(toast.summaries()).toEqual(["Card saved"]);
+		expect(toast.add.mock.calls[0][0]).toMatchObject({
+			severity: "success",
+			detail: "Lamp",
+			life: 4000,
+		});
 		expect(wrapper.find("h1").text()).toBe("Edit card");
 		expect(confirm.require).not.toHaveBeenCalled();
 		wrapper.unmount();

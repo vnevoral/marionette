@@ -113,6 +113,18 @@ Rules:
 - Every operation defines loading, empty, success, error, and destructive
   states.
 
+Feedback channels:
+
+- **Inline** (next to its subject) for everything that belongs to one card,
+  one form field or the current page: action outcomes on a card or in the
+  detail, validation and server errors, load errors, a failed delete. Several
+  cards can report at once without covering each other.
+- **Toast** (top right; full width minus the 16 px gutter on phones; about
+  4 s) only for the outcome of an operation that ends by leaving or
+  replacing the page, so the notice survives the navigation: **Card saved**
+  and **Card deleted**. Toasts are success notices only; an error never
+  appears only in a toast.
+
 Status always includes text, an icon, and a semantic color:
 
 - **Unknown**: question mark, neutral gray;
@@ -196,8 +208,11 @@ environment variables are repeatable rows, not an opaque JSON editor.
 - Leaving a dirty form asks **Discard unsaved changes?**.
 - Delete requires a dialog naming the card and an explicit **Delete card**
   destructive action.
-- After save, show **Card saved** and remain in the edit context; navigation
-  away is explicit.
+- After save, show **Card saved** as a toast and remain in the edit context;
+  navigation away is explicit.
+- After a confirmed delete, return to the overview and show **Card deleted**
+  as a toast naming the card; a failed delete keeps the detail open with the
+  error inline.
 
 ## 8. Design system
 
@@ -274,7 +289,9 @@ Shared patterns live in `web/src/components` and are used by every view
 (block 0033):
 
 - `AppShell`, `PageHeader`, `ConnectionStatus`;
-- `StatusBadge`, `RequestState`, `InlineError`, `EmptyState`;
+- `StatusBadge`, `RequestState`, `InlineError`, `EmptyState`; page-level
+  notices go through the shared PrimeVue `Toast` in `App.vue` and the
+  `useNotify` composable (§4 feedback channels);
 - `ActionCard`, `ActionControls`;
 - `ActionEditor`, `FormSection`, `CardIdentityFields`, `PollingFields`,
   `SaveBar`; the unsaved-changes dialog is the shared `ConfirmDialog` driven

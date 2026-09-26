@@ -17,6 +17,7 @@ import StatusTimeline from "@/components/StatusTimeline.vue";
 import { useCardActivity } from "@/composables/useCardActivity";
 import { outcomeResult, requestAction } from "@/composables/useActionRequest";
 import { useCardStatus } from "@/composables/useCardStatus";
+import { useNotify } from "@/composables/useNotify";
 import { useTransientMessage } from "@/composables/useTransientMessage";
 import { singleParam } from "@/router/params";
 import type { ActionKind, PendingRequest } from "@/types";
@@ -35,6 +36,7 @@ import {
 const route = useRoute();
 const router = useRouter();
 const confirm = useConfirm();
+const notify = useNotify();
 const card = ref<ActionCard>();
 const loading = ref(true);
 const notFound = ref(false);
@@ -131,16 +133,19 @@ function removeCard() {
 		acceptProps: { severity: "danger" },
 		rejectProps: { severity: "secondary", outlined: true },
 		defaultFocus: "reject",
-		accept: () => void performDelete(current.id),
+		accept: () => void performDelete(current),
 	});
 }
 
-async function performDelete(id: string) {
+async function performDelete(target: ActionCard) {
 	deleting.value = true;
 	showMessage(FEEDBACK.deleting, "info", false);
 	try {
-		await deleteCard(id);
+		await deleteCard(target.id);
+		// The detail page is gone after this, so the confirmation travels
+		// with the navigation as a toast (UX spec §4).
 		await router.push("/");
+		notify.success(FEEDBACK.cardDeleted, `"${target.name}" and its history were removed.`);
 	} catch (deleteError) {
 		showMessage(
 			deleteError instanceof Error ? deleteError.message : FEEDBACK.unableToDelete,
