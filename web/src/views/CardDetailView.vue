@@ -28,6 +28,7 @@ import {
 	LOADING,
 	NO_STATUS_CHECK,
 	REQUEST,
+	STATUS,
 	statusPresentation,
 } from "@/ui/vocabulary";
 
@@ -54,6 +55,7 @@ let pendingWait: AbortController | undefined;
 const badge = computed(() => {
 	if (!card.value?.status) return NO_STATUS_CHECK;
 	if (pending.value) return REQUEST[pending.value.phase];
+	if (cardStatus.failed.value) return STATUS.unknown;
 	return statusPresentation(status.value?.state);
 });
 const currentTransition = computed(() => history.value.find((change) => !change.endedAt));
@@ -217,6 +219,7 @@ onBeforeUnmount(() => {
 							:has-status="Boolean(card.status)"
 							:status="status"
 							:current-transition="currentTransition"
+							:unavailable="cardStatus.failed.value"
 						/>
 					</DetailPanel>
 				</div>

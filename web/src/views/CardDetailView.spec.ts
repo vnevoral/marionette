@@ -169,6 +169,28 @@ describe("CardDetailView", () => {
 		wrapper.unmount();
 	});
 
+	it("marks the status as Unknown while it cannot be refreshed", async () => {
+		vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout", "setInterval", "clearInterval"] });
+		try {
+			vi.mocked(getStatus).mockReset().mockRejectedValueOnce(new Error("Server unreachable"));
+			const { wrapper } = await mountDetail("printer");
+			expect(wrapper.find(".status-badge").text()).toBe("Healthy");
+			vi.advanceTimersByTime(5000);
+			await flushPromises();
+			expect(wrapper.find(".status-badge").text()).toBe("Unknown");
+			expect(wrapper.find(".summary-unavailable").text()).toBe("Status could not be refreshed");
+
+			vi.mocked(getStatus).mockResolvedValue(snapshot(before));
+			vi.advanceTimersByTime(5000);
+			await flushPromises();
+			expect(wrapper.find(".status-badge").text()).toBe("Healthy");
+			expect(wrapper.find(".summary-unavailable").exists()).toBe(false);
+			wrapper.unmount();
+		} finally {
+			vi.useRealTimers();
+		}
+	});
+
 	it("shows the enqueue error and re-enables the buttons", async () => {
 		vi.mocked(enqueuePrimary).mockRejectedValue(new Error("queue is full"));
 		const { wrapper } = await mountDetail("printer");

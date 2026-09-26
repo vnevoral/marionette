@@ -16,12 +16,11 @@ if [[ ! -f "$binary_path" || ! -x "$binary_path" ]]; then
 	exit 1
 fi
 
-if command -v file >/dev/null 2>&1; then
-	binary_description=$(file -b "$binary_path")
-	if [[ "$binary_description" != *ELF* ]]; then
-		echo "binary is not an ELF executable: $binary_description" >&2
-		exit 1
-	fi
+# Check the ELF magic directly so the check does not depend on file(1),
+# which minimal images do not ship.
+if [[ $(head -c 4 "$binary_path" | od -An -tx1 | tr -d ' \n') != "7f454c46" ]]; then
+	echo "binary is not an ELF executable: $binary_path" >&2
+	exit 1
 fi
 
 if [[ -z "$destdir" && "$EUID" -ne 0 ]]; then

@@ -2,7 +2,7 @@
 import { computed } from "vue";
 import type { StatusChange, StatusSnapshot } from "@/api";
 import { formatDate, transitionDuration } from "@/ui/format";
-import { EMPTY, outcomePresentation } from "@/ui/vocabulary";
+import { EMPTY, FEEDBACK, outcomePresentation } from "@/ui/vocabulary";
 
 // Summary of the current device state (UX spec §6): last check, last outcome
 // and how long the card has been in this state (FR-17).
@@ -11,6 +11,8 @@ const props = defineProps<{
 	status?: StatusSnapshot | null;
 	currentTransition?: StatusChange;
 	now?: number;
+	/** The last status read failed; the values below may be stale (spec §4). */
+	unavailable?: boolean;
 }>();
 
 const lastOutcome = computed(() =>
@@ -21,6 +23,10 @@ const lastOutcome = computed(() =>
 </script>
 
 <template>
+	<p v-if="hasStatus && unavailable" class="summary-unavailable">
+		<i class="pi pi-exclamation-circle" aria-hidden="true" />
+		<span>{{ FEEDBACK.statusUnavailable }}</span>
+	</p>
 	<dl v-if="hasStatus" class="summary-list">
 		<div>
 			<dt>Last checked</dt>
@@ -39,6 +45,13 @@ const lastOutcome = computed(() =>
 </template>
 
 <style scoped>
+.summary-unavailable {
+	display: flex;
+	align-items: center;
+	gap: var(--space-2);
+	margin: 0 0 var(--space-3);
+	color: var(--color-warning-strong);
+}
 .summary-list {
 	display: grid;
 	gap: var(--space-3);

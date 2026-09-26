@@ -14,6 +14,7 @@ Blok je hotový, když jsou splněny všechny následující body:
       s `--max-warnings 0`, `vue-tsc`, `prettier --check`, `go test -race`,
       `go build`, `go vet`). Je to jediná definice validační sady; dílčí
       příkazy (`make test`, `make lint`) slouží jen pro rychlou iteraci.
+      Blok, který mění UI tok nebo HTTP kontrakt, navíc spustí `make e2e`.
 - [ ] Nová/změněná doménová logika má jednotkové testy pokrývající hlavní i
       chybové scénáře (viz [testing-strategy.md](testing-strategy.md)).
 - [ ] Veřejné API/chování je zdokumentováno (komentář na exportovaném

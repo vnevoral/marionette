@@ -22,6 +22,7 @@ function mountCard(props: {
 	status?: StatusSnapshot | null;
 	pending?: PendingRequest | null;
 	result?: RequestResult | null;
+	statusUnavailable?: boolean;
 }) {
 	return mount(ActionCard, {
 		props: { card, ...props },
@@ -49,6 +50,23 @@ describe("ActionCard", () => {
 		expect(plain.find(".status-badge").text()).toBe("No status check");
 		expect(plain.text()).not.toContain("Not checked yet");
 		expect(plain.findAll("button")).toHaveLength(1);
+	});
+
+	it("marks the state as Unknown when the status could not be refreshed", () => {
+		const stale = mountCard({ status: snapshot("ok"), statusUnavailable: true });
+		expect(stale.find(".status-badge").text()).toBe("Unknown");
+		expect(stale.find(".card-unavailable").text()).toBe("Status could not be refreshed");
+		expect(stale.text()).toContain("Last checked");
+
+		const running = mountCard({
+			status: snapshot("ok"),
+			statusUnavailable: true,
+			pending: { action: "primary", phase: "running" },
+		});
+		expect(running.find(".status-badge").text()).toBe("Running");
+
+		const plain = mountCard({ card: { ...card, status: undefined }, statusUnavailable: true });
+		expect(plain.find(".card-unavailable").exists()).toBe(false);
 	});
 
 	it("shows queued in amber and running in blue while a request is pending", () => {

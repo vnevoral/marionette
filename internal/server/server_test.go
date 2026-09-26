@@ -6,6 +6,7 @@ import (
 	"errors"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
@@ -291,6 +292,19 @@ func TestRouterEnqueuesActionsWithoutWaiting(t *testing.T) {
 	}
 	if !acceptedStatus.CheckedAt.Equal(checkedAt) {
 		t.Fatalf("202 checkedAt = %v, want %v (body %s)", acceptedStatus.CheckedAt, checkedAt, status.Body.String())
+	}
+}
+
+func TestRouterServesEmptyHistoriesAsArrays(t *testing.T) {
+	store := config.NewStore(config.Settings{HistorySize: 5, MaxConcurrentActions: 1})
+	createServerCard(t, store, "fresh")
+	handler := NewRouter(Dependencies{Store: store, Actions: &fakeActionQueue{}})
+	for _, path := range []string{"/api/cards/fresh/runs", "/api/cards/fresh/status/history"} {
+		response := httptest.NewRecorder()
+		handler.ServeHTTP(response, httptest.NewRequest(http.MethodGet, path, nil))
+		if body := strings.TrimSpace(response.Body.String()); response.Code != http.StatusOK || body != "[]" {
+			t.Fatalf("GET %s = %d %q, want 200 []", path, response.Code, body)
+		}
 	}
 }
 

@@ -21,7 +21,7 @@ uloží do `docs/plans/blocks/NNNN-nazev.md`. Blok se implementuje promptem
 | 5    | REST API (CRUD karet/akcí, spuštění, čtení stavu)                                            | **Hotovo**                                       | FR-40, FR-41                   |
 | 6    | Dashboard UI (karty, stavové indikátory, formuláře správy)                                   | **Hotovo**                                       | FR-20..23                      |
 | 7    | Balíčkování a nasazení (systemd unit, install skript, arm64 release)                         | **Probíhá** (0023)                               | FR-01..04, NFR-02              |
-| 8    | Zpevnění (auth/access control, logování, chybové stavy, testy, dokumentace)                  | **Hotovo** (2026-09-26; bloky 0024–0039)         | NFR-01, NFR-04..06, NFR-12     |
+| 8    | Zpevnění (auth/access control, logování, chybové stavy, testy, dokumentace)                  | **Hotovo** (2026-09-26; bloky 0024–0041)         | NFR-01, NFR-04..06, NFR-12     |
 | 9    | UX redesign a sdílený design systém                                                          | **Hotovo**                                       | FR-24..29, NFR-08..10          |
 | 10   | Realtime doručování statusů přes SSE                                                         | **Hotovo**                                       | FR-42, NFR-11                  |
 
@@ -93,7 +93,8 @@ uloží do `docs/plans/blocks/NNNN-nazev.md`. Blok se implementuje promptem
   cestu binárky v `install.sh`), health, cross-site ochrana, graceful stop
   s uložením historie, restart se zachovanými daty a opakovaná instalace.
   Na referenčním ARM64 hostu chybí jen reálné `systemctl` start/stop/restart,
-  `Restart=on-failure`, náběh po rebootu a běh ARM64 artefaktu.
+  `Restart=on-failure`, náběh po rebootu a běh ARM64 artefaktu. Instalátor
+  má od 2026-09-26 automatický staged test v `make test` a CI.
 
 - Fáze 8 byla 2026-09-26 rozpracována na základě revize projektu a kódu do
   bloků 0024–0034 a téhož dne **schválena** vlastníkem. Jde převážně o opravy
@@ -162,6 +163,13 @@ uloží do `docs/plans/blocks/NNNN-nazev.md`. Blok se implementuje promptem
      — **Hotovo** (2026-09-26); 202 nese `checkedAt` jako baseline,
      `useActionRequest` sdílí průběh akce, `useCardStatus` s `supersedes`,
      rozpočet ruční kontroly z timeoutu, odkazy jako `<Button asChild>`.
+  6. [0040 — Viditelné selhání čtení statusu](blocks/0040-status-read-failure-visibility.md)
+     — **Hotovo** (2026-09-26); dashboard i detail ukážou Unknown
+     a „Status could not be refreshed“ (UX spec §4).
+  7. [0041 — End-to-end testy (Playwright)](blocks/0041-e2e-playwright.md)
+     — **Hotovo** (2026-09-26); `make e2e` a CI job proti skutečné binárce,
+     7 scénářů včetně NFR-12 z prohlížeče a 320 px; odhalil `null` místo
+     `[]` u prázdné historie běhů.
 
   Otevřené otázky revize jsou rozhodnuté v
   [requirements.md, sekce 13](../requirements/requirements.md#13-rozhodnutí-revize-projektu-2026-09-26)

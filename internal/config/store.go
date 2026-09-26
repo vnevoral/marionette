@@ -266,7 +266,8 @@ func (store *Store) GetRuns(cardID string, actionKind string) ([]Run, error) {
 		return nil, ErrNotFound
 	}
 	runs := store.history[cardID][actionKind]
-	return append([]Run(nil), runs...), nil
+	// Never nil: an empty history is served as [] in the API, not null.
+	return append(make([]Run, 0, len(runs)), runs...), nil
 }
 
 // GetStatus returns the latest status snapshot for a card.

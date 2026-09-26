@@ -15,6 +15,8 @@ web/node_modules/
 web/dist/
 web/coverage/
 web/.vite/
+web/test-results/
+web/playwright-report/
 web/*.tsbuildinfo
 web/vite.config.js
 web/vite.config.d.ts

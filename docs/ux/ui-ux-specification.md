@@ -106,8 +106,10 @@ Rules:
   transition that arrived through the stream in the meantime.
 - An enqueue failure is an operation error, not automatically a device
   failure.
-- A status read failure keeps the card visible and marks its data as unknown;
-  it must not hide the entire dashboard.
+- A status read failure keeps the card visible and marks its data as unknown:
+  the badge reads **Unknown**, the note **Status could not be refreshed**
+  appears next to the last check time, and both clear with the next status
+  that arrives. It must not hide the entire dashboard.
 - Every operation defines loading, empty, success, error, and destructive
   states.
 

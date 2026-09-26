@@ -25,6 +25,7 @@ make ui-install   # once, installs npm dependencies
 make ui-dev       # Vite dev server on :5173, proxies /api to :8080
 make backend-dev  # Go backend with hot reload (air) on :8080
 make verify       # build UI + lint + tests; run before every commit
+make e2e          # browser tests against the built binary (Playwright, Chromium)
 ```
 
 The backend reads `./marionette.json`, which is git-ignored and created from

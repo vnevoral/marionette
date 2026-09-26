@@ -252,6 +252,24 @@ describe("HomeView", () => {
 		wrapper.unmount();
 	});
 
+	it("marks monitored cards when the status cannot be refreshed and clears it on success", async () => {
+		const wrapper = mountHome();
+		await flushPromises();
+		vi.mocked(listCards).mockRejectedValueOnce(new Error("Server unreachable"));
+		vi.advanceTimersByTime(5000);
+		await flushPromises();
+		const printer = cardByName(wrapper, "Printer");
+		expect(printer.find(".status-badge").text()).toBe("Unknown");
+		expect(printer.find(".card-unavailable").text()).toBe("Status could not be refreshed");
+		expect(cardByName(wrapper, "Lamp").find(".card-unavailable").exists()).toBe(false);
+
+		vi.advanceTimersByTime(5000);
+		await flushPromises();
+		expect(cardByName(wrapper, "Printer").find(".status-badge").text()).toBe("Healthy");
+		expect(cardByName(wrapper, "Printer").find(".card-unavailable").exists()).toBe(false);
+		wrapper.unmount();
+	});
+
 	it("does not let a slow refresh overwrite a newer snapshot from the stream", async () => {
 		const wrapper = mountHome();
 		await flushPromises();

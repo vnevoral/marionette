@@ -1,0 +1,68 @@
+import { expect, test } from "@playwright/test";
+import { createCard, deleteAllCards, expectNoHorizontalScroll } from "./helpers";
+
+test.beforeEach(async ({ request }) => {
+	await deleteAllCards(request);
+});
+
+test("rejects mutating requests from another site (NFR-12)", async ({ request, baseURL }) => {
+	await createCard(request, { id: "target", name: "Target" });
+	const run = "/api/cards/target/actions/primary";
+	const json = { "Content-Type": "application/json" };
+
+	const foreign = await request.post(run, { headers: { ...json, Origin: "https://evil.example" } });
+	expect(foreign.status()).toBe(403);
+	const crossSite = await request.post(run, {
+		headers: { ...json, "Sec-Fetch-Site": "cross-site" },
+	});
+	expect(crossSite.status()).toBe(403);
+	const form = await request.post("/api/cards", {
+		headers: { "Content-Type": "text/plain" },
+		data: "name=x",
+	});
+	expect(form.status()).toBe(415);
+	const sameOrigin = await request.post(run, { headers: { ...json, Origin: baseURL! } });
+	expect(sameOrigin.status()).toBe(202);
+});
+
+test("a page on another origin cannot trigger an action in the operator's browser", async ({
+	page,
+	baseURL,
+}) => {
+	await createCard(page.request, { id: "target", name: "Target" });
+	// 127.0.0.1 and localhost are different origins for the browser.
+	const foreignOrigin = baseURL!.replace("127.0.0.1", "localhost");
+	await page.goto(`${foreignOrigin}/`);
+	const status = await page.evaluate(async (target) => {
+		try {
+			const response = await fetch(`${target}/api/cards/target/actions/primary`, {
+				method: "POST",
+				mode: "no-cors",
+			});
+			return response.type;
+		} catch {
+			return "network-error";
+		}
+	}, baseURL!);
+	expect(["opaque", "network-error"]).toContain(status);
+	const runs = (await (await page.request.get("/api/cards/target/runs")).json()) as unknown[];
+	expect(runs).toHaveLength(0);
+});
+
+test.describe("at 320 px", () => {
+	test.use({ viewport: { width: 320, height: 640 } });
+
+	test("overview, detail and edit do not scroll horizontally", async ({ page, request }) => {
+		await createCard(request, {
+			id: "narrow",
+			name: "A card with a fairly long name",
+			withStatus: true,
+		});
+		for (const path of ["/", "/cards/narrow", "/cards/narrow/edit", "/cards/new/edit"]) {
+			await page.goto(path);
+			await expect(page.locator("main.page")).toBeVisible();
+			await expect(page.locator(".loading-state")).toHaveCount(0);
+			await expectNoHorizontalScroll(page);
+		}
+	});
+});

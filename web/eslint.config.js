@@ -22,6 +22,12 @@ export default tseslint.config(
 		},
 	},
 	{
+		files: ["e2e/**/*.ts", "playwright.config.ts"],
+		languageOptions: {
+			globals: { ...globals.browser, ...globals.node },
+		},
+	},
+	{
 		files: ["src/**/*.spec.ts"],
 		languageOptions: {
 			globals: { ...globals.browser, ...globals.node },
@@ -30,6 +36,14 @@ export default tseslint.config(
 	// Must stay last: disables every formatting rule that conflicts with Prettier.
 	prettier,
 	{
-		ignores: ["dist/**", "node_modules/**", "coverage/**", "vite.config.js", "vite.config.d.ts"],
+		ignores: [
+			"dist/**",
+			"node_modules/**",
+			"coverage/**",
+			"test-results/**",
+			"playwright-report/**",
+			"vite.config.js",
+			"vite.config.d.ts",
+		],
 	},
 );

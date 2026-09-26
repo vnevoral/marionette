@@ -6,13 +6,18 @@ Na každý push a pull request:
 
 1. **backend** — `golangci-lint` (verze připnutá shodně s devcontainerem,
    konfigurace `.golangci.yml`), `go build ./...`, `go vet ./...`,
-   `go test -race -count=1 ./...` na linux/amd64.
+   `go test -race -count=1 ./...` na linux/amd64, `bash -n` a staged test
+   instalačního skriptu (`deploy/install_test.sh`).
 2. **web** — `npm ci`, `npm audit --omit=dev --audit-level=high`,
    `npm run lint` (`--max-warnings 0`), `npm run format:check`,
    `npm run build` (zahrnuje type-check přes `vue-tsc`) ve `web/`. Verze Node
    je určena souborem `web/.nvmrc` (shodná s devcontainerem a `engines`).
+3. **e2e** — `npm ci`, `npx playwright install --with-deps chromium`,
+   `make e2e` (build binárky a Playwright testy proti ní, blok 0041); při
+   selhání se nahraje report a trace jako artefakt `playwright-report`.
 
-Stejnou sadu spouští lokálně `make verify`; CI ji pouze zrcadlí. CI běh
+Stejnou sadu (kromě jobu `e2e`, lokálně `make e2e`) spouští lokálně
+`make verify`; CI ji pouze zrcadlí. CI běh
 musí projít čistě (lint warningy selhávají build, nepotlačují se) před
 mergem do hlavní větve. Dependabot (`.github/dependabot.yml`) otevírá týdenní
 PR pro Go moduly, npm a GitHub Actions; major verze klíčových UI závislostí

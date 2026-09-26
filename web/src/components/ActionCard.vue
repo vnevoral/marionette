@@ -9,7 +9,15 @@ import StatusBadge from "@/components/StatusBadge.vue";
 import type { PendingRequest, RequestResult } from "@/types";
 import { DEFAULT_CARD_ICON } from "@/ui/icons";
 import { lastCheckedLabel } from "@/ui/format";
-import { ACTIONS, EMPTY, NO_STATUS_CHECK, REQUEST, statusPresentation } from "@/ui/vocabulary";
+import {
+	ACTIONS,
+	EMPTY,
+	FEEDBACK,
+	NO_STATUS_CHECK,
+	REQUEST,
+	STATUS,
+	statusPresentation,
+} from "@/ui/vocabulary";
 
 // Dashboard card (UX spec §5.2): icon and badge, name, description, last
 // check, feedback line and the two action buttons.
@@ -18,6 +26,8 @@ const props = defineProps<{
 	status?: StatusSnapshot | null;
 	pending?: PendingRequest | null;
 	result?: RequestResult | null;
+	/** The last status read failed; the shown state may be stale (spec §4). */
+	statusUnavailable?: boolean;
 }>();
 
 const emit = defineEmits<{ run: []; check: [] }>();
@@ -25,6 +35,7 @@ const emit = defineEmits<{ run: []; check: [] }>();
 const badge = computed(() => {
 	if (!props.card.status) return NO_STATUS_CHECK;
 	if (props.pending) return REQUEST[props.pending.phase];
+	if (props.statusUnavailable) return STATUS.unknown;
 	return statusPresentation(props.status?.state);
 });
 
@@ -53,6 +64,10 @@ const detailLink = computed(() => `/cards/${encodeURIComponent(props.card.id)}`)
 		<template #content>
 			<p class="card-description">{{ card.description || EMPTY.description }}</p>
 			<p v-if="card.status" class="card-checked">{{ lastCheckedLabel(status?.checkedAt) }}</p>
+			<p v-if="card.status && statusUnavailable" class="card-unavailable">
+				<i class="pi pi-exclamation-circle" aria-hidden="true" />
+				<span>{{ FEEDBACK.statusUnavailable }}</span>
+			</p>
 			<RequestState class="card-feedback" :message="feedback.message" :tone="feedback.tone" />
 		</template>
 		<template #footer>
@@ -110,6 +125,14 @@ const detailLink = computed(() => `/cards/${encodeURIComponent(props.card.id)}`)
 	background: var(--color-accent-soft);
 	color: var(--color-accent);
 	font-size: 1.35rem;
+}
+.card-unavailable {
+	display: flex;
+	align-items: center;
+	gap: var(--space-2);
+	margin: var(--space-1) 0 0;
+	color: var(--color-warning-strong);
+	font-size: 0.85rem;
 }
 .card-title {
 	display: block;

@@ -21,6 +21,9 @@ const statuses = ref<Record<string, StatusSnapshot>>({});
 // card's buttons are released, and its outcome is shown briefly via lastResult.
 const requests = ref<Record<string, PendingRequest>>({});
 const lastResult = ref<Record<string, RequestResult>>({});
+// Cards whose last status read failed; they show Unknown until a snapshot
+// arrives again (UX spec §4).
+const statusUnavailable = ref<Record<string, boolean>>({});
 const loading = ref(true);
 const error = ref("");
 
@@ -41,7 +44,14 @@ const lede = computed(() => {
 // only when it is not older than what the card already shows.
 function applySnapshot(cardID: string, snapshot: StatusSnapshot | undefined) {
 	if (!snapshot || !cards.value.some((card) => card.id === cardID)) return;
+	statusUnavailable.value[cardID] = false;
 	if (supersedes(snapshot, statuses.value[cardID])) statuses.value[cardID] = snapshot;
+}
+
+function markStatusUnavailable(cardsToMark: Card[]) {
+	for (const card of cardsToMark) {
+		if (card.status) statusUnavailable.value[card.id] = true;
+	}
 }
 
 async function loadDashboard() {
@@ -55,6 +65,7 @@ async function loadDashboard() {
 			if (card.currentStatus) nextStatuses[card.id] = card.currentStatus;
 		}
 		statuses.value = nextStatuses;
+		statusUnavailable.value = {};
 	} catch (loadError) {
 		error.value = loadError instanceof Error ? loadError.message : FEEDBACK.unableToLoadCards;
 	} finally {
@@ -68,7 +79,9 @@ async function refreshStatuses() {
 	try {
 		for (const card of await listCards()) applySnapshot(card.id, card.currentStatus);
 	} catch {
-		// The next tick retries; the cards keep showing their last known status.
+		// The next tick retries; until then the cards show that their status
+		// could not be refreshed.
+		markStatusUnavailable(cards.value);
 	}
 }
 
@@ -115,6 +128,7 @@ async function runAction(card: Card, action: ActionKind) {
 			signal: controller.signal,
 			onPhase: (phase) => setPending(card.id, { action, phase }),
 			onSnapshot: (snapshot) => applySnapshot(card.id, snapshot),
+			onError: () => markStatusUnavailable([card]),
 		});
 		const result = outcomeResult(outcome, {
 			accepted: FEEDBACK.accepted,
@@ -180,6 +194,7 @@ onBeforeUnmount(() => {
 					:status="statuses[card.id]"
 					:pending="requests[card.id]"
 					:result="lastResult[card.id]"
+					:status-unavailable="statusUnavailable[card.id]"
 					@run="runAction(card, 'primary')"
 					@check="runAction(card, 'status')"
 				/>

@@ -116,6 +116,17 @@ Viz [Definition of Done](../../devops/definition-of-done.md) +:
   i `/etc/default/marionette`. Instalátor v containeru hlásí „installed and
   started“, protože `systemctl` je zde shim vracející 0 — na hostu se
   systemd to neplatí.
+- **Automatický test instalátoru (2026-09-26)**: přidán
+  `deploy/install_test.sh` (`make deploy-test`, součást `make test`, CI job
+  `backend`): staged instalace do dočasného `DESTDIR`, kontrola cest proti
+  unitě (`ExecStart`, `EnvironmentFile`, `WorkingDirectory`/`ReadWritePaths`,
+  `MARIONETTE_CONFIG`), práv 755/750/640, zachování konfigurace a defaults
+  při opakovaném běhu a odmítnutí ne-ELF souboru. Ověřeno, že test s
+  původní chybou cesty binárky selže. Test odhalil druhou chybu: kontrola
+  formátu binárky závisela na `file(1)`, který minimální image (včetně
+  devcontaineru) nemá, a bez něj se tiše přeskočila; nahrazeno kontrolou
+  ELF hlavičky (`7f 45 4c 46`) bez závislostí. Kontrola architektury proti
+  hostu zůstává mimo (chybný artefakt se projeví při startu služby).
 - **Zbývá ověřit na referenčním Ubuntu 24.x ARM64 hostu**: skutečné
   `systemctl enable/start/stop/restart`, `Restart=on-failure` po zabití
   procesu, náběh po rebootu, běh ARM64 artefaktu a chování hardening
