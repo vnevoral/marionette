@@ -262,6 +262,19 @@ func TestRouterEnqueuesActionsWithoutWaiting(t *testing.T) {
 		t.Fatalf("primary notification card ID = %q", cardID)
 	}
 
+	// Never checked: the baseline is absent.
+	var accepted map[string]any
+	if err := json.Unmarshal(primary.Body.Bytes(), &accepted); err != nil {
+		t.Fatalf("decode 202 body: %v", err)
+	}
+	if _, present := accepted["checkedAt"]; present {
+		t.Fatalf("checkedAt present for an unchecked card: %s", primary.Body.String())
+	}
+
+	checkedAt := time.Date(2026, 9, 26, 10, 0, 0, 0, time.UTC)
+	if err := store.UpdateStatus("enqueue", config.StatusSnapshot{State: config.StatusStateOK, CheckedAt: checkedAt}); err != nil {
+		t.Fatalf("UpdateStatus() error = %v", err)
+	}
 	status := httptest.NewRecorder()
 	handler.ServeHTTP(status, httptest.NewRequest(http.MethodPost, "/api/cards/enqueue/actions/status/check", nil))
 	if status.Code != http.StatusAccepted {
@@ -269,6 +282,15 @@ func TestRouterEnqueuesActionsWithoutWaiting(t *testing.T) {
 	}
 	if cardID := <-queue.statusCalls; cardID != "enqueue" {
 		t.Fatalf("status enqueue card ID = %q", cardID)
+	}
+	var acceptedStatus struct {
+		CheckedAt time.Time `json:"checkedAt"`
+	}
+	if err := json.Unmarshal(status.Body.Bytes(), &acceptedStatus); err != nil {
+		t.Fatalf("decode 202 body: %v", err)
+	}
+	if !acceptedStatus.CheckedAt.Equal(checkedAt) {
+		t.Fatalf("202 checkedAt = %v, want %v (body %s)", acceptedStatus.CheckedAt, checkedAt, status.Body.String())
 	}
 }
 

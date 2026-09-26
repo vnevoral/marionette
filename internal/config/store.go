@@ -111,40 +111,57 @@ func (store *Store) GetCard(id string) (ActionCard, bool) {
 	return cloneCard(card), true
 }
 
-// CreateCard validates and stores a card. A missing ID is generated.
-func (store *Store) CreateCard(card ActionCard) (ActionCard, error) {
+// mutate runs one persisted configuration change under the store's
+// protocol: apply the change in memory (under mu), count it, run OnChange
+// outside mu, and on failure undo the change, uncount it and report a
+// PersistenceError for operation. apply returns the undo step; an error from
+// apply (validation, not found, …) is returned unchanged and nothing is
+// counted.
+func (store *Store) mutate(operation string, apply func() (undo func(), err error)) error {
 	store.persistMu.Lock()
 	defer store.persistMu.Unlock()
 	store.mu.Lock()
-
-	if card.ID == "" {
-		id, err := generateCardID()
-		if err != nil {
-			store.mu.Unlock()
-			return ActionCard{}, fmt.Errorf("generate card id: %w", err)
-		}
-		card.ID = id
-	}
-	if err := card.Validate(); err != nil {
+	undo, err := apply()
+	if err != nil {
 		store.mu.Unlock()
-		return ActionCard{}, err
+		return err
 	}
-	if _, exists := store.cards[card.ID]; exists {
-		store.mu.Unlock()
-		return ActionCard{}, fmt.Errorf("card %q: %w", card.ID, ErrAlreadyExists)
-	}
-
-	card = cloneCard(card)
-	store.cards[card.ID] = card
 	store.changes++
-	created := cloneCard(card)
 	store.mu.Unlock()
 	if err := store.notifyChange(); err != nil {
 		store.mu.Lock()
-		delete(store.cards, card.ID)
+		undo()
 		store.changes--
 		store.mu.Unlock()
-		return ActionCard{}, &PersistenceError{Operation: "card creation", Err: err}
+		return &PersistenceError{Operation: operation, Err: err}
+	}
+	return nil
+}
+
+// CreateCard validates and stores a card. A missing ID is generated.
+func (store *Store) CreateCard(card ActionCard) (ActionCard, error) {
+	var created ActionCard
+	err := store.mutate("card creation", func() (func(), error) {
+		if card.ID == "" {
+			id, err := generateCardID()
+			if err != nil {
+				return nil, fmt.Errorf("generate card id: %w", err)
+			}
+			card.ID = id
+		}
+		if err := card.Validate(); err != nil {
+			return nil, err
+		}
+		if _, exists := store.cards[card.ID]; exists {
+			return nil, fmt.Errorf("card %q: %w", card.ID, ErrAlreadyExists)
+		}
+		card = cloneCard(card)
+		store.cards[card.ID] = card
+		created = cloneCard(card)
+		return func() { delete(store.cards, card.ID) }, nil
+	})
+	if err != nil {
+		return ActionCard{}, err
 	}
 	return created, nil
 }
@@ -152,73 +169,54 @@ func (store *Store) CreateCard(card ActionCard) (ActionCard, error) {
 // UpdateCard validates and replaces an existing card while retaining the
 // identifier supplied by the caller.
 func (store *Store) UpdateCard(id string, card ActionCard) (ActionCard, error) {
-	store.persistMu.Lock()
-	defer store.persistMu.Unlock()
-	store.mu.Lock()
-
-	previous, exists := store.cards[id]
-	if !exists {
-		store.mu.Unlock()
-		return ActionCard{}, ErrNotFound
-	}
-	card.ID = id
-	if err := card.Validate(); err != nil {
-		store.mu.Unlock()
+	var updated ActionCard
+	err := store.mutate("card update", func() (func(), error) {
+		previous, exists := store.cards[id]
+		if !exists {
+			return nil, ErrNotFound
+		}
+		card.ID = id
+		if err := card.Validate(); err != nil {
+			return nil, err
+		}
+		card = cloneCard(card)
+		store.cards[id] = card
+		updated = cloneCard(card)
+		return func() { store.cards[id] = previous }, nil
+	})
+	if err != nil {
 		return ActionCard{}, err
-	}
-
-	card = cloneCard(card)
-	store.cards[id] = card
-	store.changes++
-	updated := cloneCard(card)
-	store.mu.Unlock()
-	if err := store.notifyChange(); err != nil {
-		store.mu.Lock()
-		store.cards[id] = previous
-		store.changes--
-		store.mu.Unlock()
-		return ActionCard{}, &PersistenceError{Operation: "card update", Err: err}
 	}
 	return updated, nil
 }
 
 // DeleteCard removes a card and all run history associated with it.
 func (store *Store) DeleteCard(id string) error {
-	store.persistMu.Lock()
-	defer store.persistMu.Unlock()
-	store.mu.Lock()
-
-	previousCard, exists := store.cards[id]
-	if !exists {
-		store.mu.Unlock()
-		return ErrNotFound
-	}
-	previousHistory, hadHistory := store.history[id]
-	previousStatus, hadStatus := store.statuses[id]
-	previousStatusHistory, hadStatusHistory := store.statusHistory[id]
-	delete(store.cards, id)
-	delete(store.history, id)
-	delete(store.statuses, id)
-	delete(store.statusHistory, id)
-	store.changes++
-	store.mu.Unlock()
-	if err := store.notifyChange(); err != nil {
-		store.mu.Lock()
-		store.cards[id] = previousCard
-		store.changes--
-		if hadHistory {
-			store.history[id] = previousHistory
+	return store.mutate("card deletion", func() (func(), error) {
+		previousCard, exists := store.cards[id]
+		if !exists {
+			return nil, ErrNotFound
 		}
-		if hadStatus {
-			store.statuses[id] = previousStatus
-		}
-		if hadStatusHistory {
-			store.statusHistory[id] = previousStatusHistory
-		}
-		store.mu.Unlock()
-		return &PersistenceError{Operation: "card deletion", Err: err}
-	}
-	return nil
+		previousHistory, hadHistory := store.history[id]
+		previousStatus, hadStatus := store.statuses[id]
+		previousStatusHistory, hadStatusHistory := store.statusHistory[id]
+		delete(store.cards, id)
+		delete(store.history, id)
+		delete(store.statuses, id)
+		delete(store.statusHistory, id)
+		return func() {
+			store.cards[id] = previousCard
+			if hadHistory {
+				store.history[id] = previousHistory
+			}
+			if hadStatus {
+				store.statuses[id] = previousStatus
+			}
+			if hadStatusHistory {
+				store.statusHistory[id] = previousStatusHistory
+			}
+		}, nil
+	})
 }
 
 // Dirty reports whether the in-memory state (configuration, run history or

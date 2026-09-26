@@ -72,7 +72,10 @@ func (executor *Executor) Execute(ctx context.Context, action config.Action) (Re
 	if ctx == nil {
 		return Result{}, errors.New("context is required")
 	}
-	if err := action.Validate(); err != nil {
+	// Only what the engine relies on is checked here; the input limits are
+	// enforced at the API boundary so a card loaded from an older
+	// configuration still runs (see config.Action.ValidateEssential).
+	if err := action.ValidateEssential(); err != nil {
 		return Result{}, fmt.Errorf("validate action: %w", err)
 	}
 
@@ -97,7 +100,11 @@ func (executor *Executor) Execute(ctx context.Context, action config.Action) (Re
 		Output:     output.String(),
 		Truncated:  output.Truncated(),
 	}
-	if processErr != nil {
+	// ErrWaitDelay means the process itself exited successfully and only an
+	// orphaned descendant kept the output pipe open past WaitDelay (a
+	// "start service in the background" action); the run is a success and
+	// the error is kept for diagnostics only.
+	if processErr != nil && !errors.Is(processErr, exec.ErrWaitDelay) {
 		result.ExitCode = exitCode(processErr)
 		result.Outcome = config.RunOutcomeFail
 		switch {

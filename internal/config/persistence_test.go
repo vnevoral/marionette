@@ -1,11 +1,15 @@
 package config
 
 import (
+	"bytes"
 	"encoding/json"
 	"errors"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"reflect"
+	"strings"
+	"sync"
 	"testing"
 	"time"
 )
@@ -341,5 +345,76 @@ func TestStoreOnChangeHookPersistsMutationsButNotRuns(t *testing.T) {
 	}
 	if len(loaded.ListCards()) != 0 {
 		t.Fatalf("persisted file still contains %d cards after delete", len(loaded.ListCards()))
+	}
+}
+
+func TestLoadFileKeepsCardOverCurrentLimits(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "config.json")
+	legacy := validCard()
+	legacy.ID = "legacy.card"
+	legacy.Icon = "pi pi-Home"
+	legacy.Primary.TimeoutSec = MaxTimeoutSec + 1
+	file := persistedFile{Settings: validSettings(), Cards: []ActionCard{legacy}}
+	data, err := json.Marshal(file)
+	if err != nil {
+		t.Fatalf("json.Marshal() error = %v", err)
+	}
+	if err := os.WriteFile(path, data, 0o600); err != nil {
+		t.Fatalf("WriteFile() error = %v", err)
+	}
+
+	var logs bytes.Buffer
+	store, err := LoadFile(path, slog.New(slog.NewTextHandler(&logs, nil)))
+	if err != nil {
+		t.Fatalf("LoadFile() error = %v, want the card loaded despite the limits", err)
+	}
+	loaded, exists := store.GetCard(legacy.ID)
+	if !exists || loaded.Primary.TimeoutSec != MaxTimeoutSec+1 {
+		t.Fatalf("card not loaded as stored: %#v, %v", loaded, exists)
+	}
+	if !strings.Contains(logs.String(), "violates current limits") || !strings.Contains(logs.String(), legacy.ID) {
+		t.Fatalf("no warning for the card over the limits: %s", logs.String())
+	}
+	// The API boundary still rejects it until it is corrected.
+	if _, err := store.UpdateCard(legacy.ID, loaded); !errors.Is(err, ErrValidation) {
+		t.Fatalf("UpdateCard() error = %v, want ErrValidation", err)
+	}
+}
+
+func TestWritePersistedFileConcurrentWritersKeepFileValid(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "config.json")
+	store := NewStore(validSettings())
+	if _, err := store.CreateCard(validCard()); err != nil {
+		t.Fatalf("CreateCard() error = %v", err)
+	}
+	const writers = 8
+	var wg sync.WaitGroup
+	failures := make(chan error, writers*2)
+	for index := 0; index < writers; index++ {
+		wg.Add(2)
+		go func() {
+			defer wg.Done()
+			if err := store.SaveFile(path); err != nil {
+				failures <- err
+			}
+		}()
+		go func() {
+			defer wg.Done()
+			if err := store.SaveFileWithHistory(path); err != nil {
+				failures <- err
+			}
+		}()
+	}
+	wg.Wait()
+	close(failures)
+	for err := range failures {
+		t.Errorf("concurrent save failed: %v", err)
+	}
+	if _, err := LoadFile(path, nil); err != nil {
+		t.Fatalf("file after concurrent saves is not loadable: %v", err)
+	}
+	leftovers, _ := filepath.Glob(path + ".*.tmp")
+	if len(leftovers) != 0 {
+		t.Fatalf("temporary files left behind: %v", leftovers)
 	}
 }

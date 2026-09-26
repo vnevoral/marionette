@@ -374,3 +374,52 @@ func TestExecutorRunsActionWithMinimalEnvironment(t *testing.T) {
 		}
 	}
 }
+
+func TestExecutorTreatsWaitDelayAsSuccess(t *testing.T) {
+	// The process exited 0; only an orphaned descendant kept the output pipe
+	// open past WaitDelay (a "start service in the background" action).
+	factory := &fakeFactory{process: &fakeProcess{err: exec.ErrWaitDelay, stdout: "started\n"}}
+	executor, err := NewExecutorWithFactory(factory)
+	if err != nil {
+		t.Fatalf("NewExecutorWithFactory() error = %v", err)
+	}
+	result, err := executor.Execute(context.Background(), validAction())
+	if err != nil {
+		t.Fatalf("Execute() error = %v", err)
+	}
+	if result.Outcome != config.RunOutcomeOK || result.ExitCode != 0 {
+		t.Fatalf("Execute() = outcome %q exit %d, want ok/0", result.Outcome, result.ExitCode)
+	}
+	if !errors.Is(result.ProcessErr, exec.ErrWaitDelay) {
+		t.Fatalf("ProcessErr = %v, want ErrWaitDelay kept for diagnostics", result.ProcessErr)
+	}
+
+	// The output rule still decides the outcome.
+	action := validAction()
+	action.Rule = config.OutputRule{Type: config.OutputRuleMatch, Pattern: "^ready"}
+	result, err = executor.Execute(context.Background(), action)
+	if err != nil {
+		t.Fatalf("Execute() error = %v", err)
+	}
+	if result.Outcome != config.RunOutcomeFail {
+		t.Fatalf("Execute() outcome = %q, want fail from the output rule", result.Outcome)
+	}
+}
+
+func TestExecutorRunsActionOverCurrentLimits(t *testing.T) {
+	// Limits are an API concern; a stored action beyond them still runs.
+	factory := &fakeFactory{process: &fakeProcess{}}
+	executor, err := NewExecutorWithFactory(factory)
+	if err != nil {
+		t.Fatalf("NewExecutorWithFactory() error = %v", err)
+	}
+	action := validAction()
+	action.TimeoutSec = config.MaxTimeoutSec + 1
+	if _, err := executor.Execute(context.Background(), action); err != nil {
+		t.Fatalf("Execute() error = %v, want the action to run", err)
+	}
+	action.TimeoutSec = 0
+	if _, err := executor.Execute(context.Background(), action); err == nil {
+		t.Fatal("Execute() accepted a zero timeout")
+	}
+}

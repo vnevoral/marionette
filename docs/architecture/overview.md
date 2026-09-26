@@ -86,12 +86,20 @@ Konfigurace (`MARIONETTE_CONFIG`, FR-30..FR-35) se při startu načítá takto
 
 - **soubor neexistuje** — aplikace startuje s prázdnou konfigurací a soubor
   vytvoří při první změně;
-- **soubor je poškozený** (neplatný JSON, neplatná nastavení nebo karta,
-  duplicitní ID) — soubor se před jakýmkoli zápisem přejmenuje na
-  `<cesta>.corrupt-<UTC čas>` (při kolizi s číselným sufixem), do logu se
-  zapíše varování s novou cestou a aplikace startuje s prázdnou konfigurací;
-  původní obsah tak nikdy nepřepíše; pokud přejmenování selže, aplikace
-  odmítne nastartovat;
+- **soubor je poškozený** (neplatný JSON, neplatná nastavení, karta bez
+  ID/názvu/příkazu, nulový timeout, neplatné pravidlo výstupu, záporný
+  polling, duplicitní ID — tj. selhání `ValidateEssential`) — soubor se před
+  jakýmkoli zápisem přejmenuje na `<cesta>.corrupt-<UTC čas>` (při kolizi
+  s číselným sufixem), do logu se zapíše varování s novou cestou a aplikace
+  startuje s prázdnou konfigurací; původní obsah tak nikdy nepřepíše; pokud
+  přejmenování selže, aplikace odmítne nastartovat;
+- **karta porušuje jen aktuální limity** (délky, znaky ID, třída ikony,
+  `MaxTimeoutSec`, vztah intervalů — plná `Validate`) — karta se načte tak,
+  jak je uložená, s varováním `card violates current limits`; zpřísnění
+  limitu v nové verzi tedy nikdy nezpůsobí zmizení konfigurace. Plná
+  validace platí na hranici API (vytvoření/úprava karty), takže se karta
+  opraví při první editaci; engine i scheduler pracují s `ValidateEssential`
+  (blok 0038);
 - **soubor nelze přečíst** (např. oprávnění) — aplikace startuje s prázdnou
   konfigurací v režimu jen pro čtení: každá změna přes API vrátí 500 a v paměti
   se vrátí zpět, dokud operátor soubor nezpřístupní a službu nerestartuje;
@@ -99,11 +107,18 @@ Konfigurace (`MARIONETTE_CONFIG`, FR-30..FR-35) se při startu načítá takto
   ignoruje s varováním (FR-35), soubor se nepovažuje za poškozený.
 
 Každá persistovaná mutace store (vytvoření, úprava, smazání karty, nastavení)
-je atomická vůči paměti: pokud zápis na disk selže, změna se v paměti vrátí
-zpět a API vrátí 500, takže stav v paměti vždy odpovídá poslednímu úspěšně
-uloženému souboru. Zápis probíhá do `<cesta>.tmp` s `fsync`, přejmenováním
-přes cílový soubor a `fsync` adresáře; existující soubor si zachová práva,
-nový vzniká s `0600`.
+je atomická vůči paměti (`Store.mutate`, blok 0038): pokud zápis na disk
+selže, změna se v paměti vrátí zpět a API vrátí 500, takže stav v paměti
+vždy odpovídá poslednímu úspěšně uloženému souboru. Zápis probíhá do
+unikátního dočasného souboru `<název>.<náhodné>.tmp` ve stejném adresáři
+(`os.CreateTemp`) s `fsync`, přejmenováním přes cílový soubor a `fsync`
+adresáře; existující soubor si zachová práva (explicitní `chmod`), nový
+vzniká s `0600`. Unikátní název chrání před dvěma zapisovateli (druhá
+instance nad stejným souborem, uložení historie při vypnutí souběžně
+s mutací) — poslední `rename` vyhraje úplným souborem; uložení historie je
+navíc serializované s mutacemi (`persistMu`). Selhání `fsync` adresáře až po
+úspěšném `rename` (`ErrDirectorySync`) se jen zaloguje jako varování: soubor
+už změnu obsahuje, a proto se v paměti nevrací zpět.
 
 ## Řízené ukončení (shutdown)
 
@@ -136,7 +151,12 @@ z délky fronty na jednoho workera, min. 1 s), požadavek na kartu a druh
 akce, které už ve frontě čekají, se nezařadí znovu a API vrátí `202`
 idempotentně; deduplikace platí jen pro čekající joby, běžící job nový
 požadavek neblokuje. Po zahájení shutdownu fronta vrací `503` s
-`Retry-After: 1`.
+`Retry-After: 1`. Tělo `202` (`{"cardId","actionKind","status":"accepted",
+"checkedAt"?}`) nese čas posledního známého status checku v okamžiku
+přijetí (čte se před zařazením do fronty): SPA jej používá jako baseline
+pro čekání na „check novější než ten před mou akcí“, takže plánovaná
+kontrola dokončená během požadavku není zaměněna za výsledek; u nikdy
+nekontrolované karty pole chybí (blok 0039).
 
 ## API kontrakt — chybové odpovědi a limity hodnot
 

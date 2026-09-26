@@ -84,11 +84,15 @@ Rules:
   success.
 - While work is pending, controls for that card are disabled and the card
   shows **Running**.
-- After acceptance, the card waits for a check newer than the last one: a
-  `status.changed` event from the shared stream or a REST read every 2 s,
-  until the configured fast-polling window expires. The wait happens only
-  when the server will actually run a check: always after **Check status**,
-  and after **Run action** only for a card with a status check and all three
+- After acceptance, the card waits for a check newer than the one the server
+  knew when it accepted the request (the 202 response carries that
+  `checkedAt`, so a scheduled check that completed during the request is not
+  mistaken for the result): a `status.changed` event from the shared stream
+  or a REST read every 2 s. After **Run action** the wait is bounded by the
+  configured fast-polling window; after **Check status** by the status
+  action's timeout plus a 30 s queue margin. The wait happens only when the
+  server will actually run a check: always after **Check status**, and after
+  **Run action** only for a card with a status check and all three
   automatic-check values set (standard interval, fast interval, fast window),
   because that is when the server activates fast polling. The stream is
   shared by all views; while it is down, the card list is re-read over REST

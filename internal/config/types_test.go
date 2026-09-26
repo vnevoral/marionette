@@ -330,3 +330,39 @@ func TestStatusSnapshotJSONOmitsCheckForUncheckedCard(t *testing.T) {
 		t.Fatalf("unchecked round trip = %+v", fresh)
 	}
 }
+
+func TestValidateEssentialIgnoresLimits(t *testing.T) {
+	long := func(n int) string { return strings.Repeat("a", n) }
+	card := validCard()
+	card.ID = "legacy.card"
+	card.Name = long(MaxNameLength + 1)
+	card.Icon = "pi pi-Home"
+	card.Primary.TimeoutSec = MaxTimeoutSec + 1
+	card.Primary.Args = []string{long(MaxArgLength + 1)}
+	card.PollingIntervalSeconds = 10
+	card.FastPollingIntervalSeconds = 20
+	if err := card.ValidateEssential(); err != nil {
+		t.Fatalf("ValidateEssential() error = %v, want limits ignored", err)
+	}
+	if err := card.Validate(); !errors.Is(err, ErrValidation) {
+		t.Fatalf("Validate() error = %v, want ErrValidation", err)
+	}
+
+	essential := map[string]func(*ActionCard){
+		"empty id":             func(c *ActionCard) { c.ID = "" },
+		"empty command":        func(c *ActionCard) { c.Primary.Command = "" },
+		"zero timeout":         func(c *ActionCard) { c.Primary.TimeoutSec = 0 },
+		"bad rule":             func(c *ActionCard) { c.Primary.Rule = OutputRule{Type: "bogus"} },
+		"bad env name":         func(c *ActionCard) { c.Primary.Env = map[string]string{"1x": "v"} },
+		"negative polling":     func(c *ActionCard) { c.PollingIntervalSeconds = -1 },
+		"status without cmd":   func(c *ActionCard) { c.Status = &Action{TimeoutSec: 1} },
+		"negative fast window": func(c *ActionCard) { c.FastPollingWindowSeconds = -1 },
+	}
+	for name, mutate := range essential {
+		broken := validCard()
+		mutate(&broken)
+		if err := broken.ValidateEssential(); !errors.Is(err, ErrValidation) {
+			t.Errorf("%s: ValidateEssential() error = %v, want ErrValidation", name, err)
+		}
+	}
+}

@@ -5,6 +5,7 @@ import {
 	defaultMaxWaitMs,
 	expectsFollowUpCheck,
 	isNewerCheck,
+	statusCheckQueueMarginMs,
 	supersedes,
 	useCardStatus,
 	waitBudgetMs,
@@ -43,6 +44,7 @@ describe("isNewerCheck", () => {
 		expect(isNewerCheck(snapshot(after), before)).toBe(true);
 		expect(isNewerCheck(snapshot(after), undefined)).toBe(true);
 		expect(isNewerCheck(snapshot(before), before)).toBe(false);
+		expect(isNewerCheck(snapshot(before), after)).toBe(false);
 		expect(isNewerCheck({ state: "unknown" }, before)).toBe(false);
 		expect(isNewerCheck({ state: "unknown" }, undefined)).toBe(false);
 	});
@@ -87,10 +89,18 @@ describe("expectsFollowUpCheck", () => {
 		expect(expectsFollowUpCheck({ ...polled, status: undefined }, "status")).toBe(false);
 	});
 
-	it("waits for the fast polling window, or the default budget without one", () => {
-		expect(waitBudgetMs(polled)).toBe(120_000);
-		expect(waitBudgetMs({ ...polled, fastPollingWindowSeconds: 30 })).toBe(30_000);
-		expect(waitBudgetMs({ ...polled, fastPollingWindowSeconds: undefined })).toBe(defaultMaxWaitMs);
+	it("waits for the fast polling window after a primary action, or the default budget", () => {
+		expect(waitBudgetMs(polled, "primary")).toBe(120_000);
+		expect(waitBudgetMs({ ...polled, fastPollingWindowSeconds: 30 }, "primary")).toBe(30_000);
+		expect(waitBudgetMs({ ...polled, fastPollingWindowSeconds: undefined }, "primary")).toBe(
+			defaultMaxWaitMs,
+		);
+	});
+
+	it("bounds a manual status check by the status action timeout plus the queue margin", () => {
+		const slow = { ...polled, fastPollingWindowSeconds: 10, status: { ...action, timeoutSec: 30 } };
+		expect(waitBudgetMs(slow, "status")).toBe(30_000 + statusCheckQueueMarginMs);
+		expect(waitBudgetMs({ ...slow, status: undefined }, "status")).toBe(10_000);
 	});
 });
 
@@ -234,14 +244,29 @@ describe("useCardStatus", () => {
 		scope.stop();
 	});
 
-	it("waitForNewer writes snapshots for the card into the composable", async () => {
+	it("never replaces a newer snapshot with an older one, from any source", () => {
 		const scope = effectScope();
 		const status = scope.run(() => useCardStatus("card-1"))!;
-		status.set(snapshot(before));
-		const wait = status.waitForNewer(before, { pollIntervalMs: 1000 });
 		FakeEventSource.last().status({ cardId: "card-1", snapshot: snapshot(after, "fail") });
-		await expect(wait).resolves.toBe("updated");
 		expect(status.snapshot.value?.state).toBe("fail");
+
+		// A card loaded while the event was in flight carries the older check.
+		status.set(snapshot(before));
+		expect(status.snapshot.value?.checkedAt).toBe(after);
+		// A slow REST poll answering late, and a poll for another card.
+		status.apply("card-1", snapshot(before));
+		status.apply("card-2", snapshot("2026-09-26T11:00:00Z"));
+		expect(status.snapshot.value?.checkedAt).toBe(after);
+
+		status.fail("card-2");
+		expect(status.failed.value).toBe(false);
+		status.fail("card-1");
+		expect(status.failed.value).toBe(true);
+		status.apply("card-1", snapshot(after));
+		expect(status.failed.value).toBe(false);
+
+		status.set(undefined);
+		expect(status.snapshot.value).toBeNull();
 		scope.stop();
 	});
 });

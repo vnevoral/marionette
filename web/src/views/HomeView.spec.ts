@@ -146,6 +146,32 @@ describe("HomeView", () => {
 		expect(FakeEventSource.last().closed).toBe(true);
 	});
 
+	it("ignores a check the server already knew when it accepted the action", async () => {
+		const during = "2026-09-26T10:00:02Z";
+		vi.mocked(enqueuePrimary).mockResolvedValue({
+			cardId: "printer",
+			actionKind: "primary",
+			status: "accepted",
+			checkedAt: during,
+		});
+		const wrapper = mountHome();
+		await flushPromises();
+		const card = cardByName(wrapper, "Printer");
+		await buttonByLabel(card, "Run action").trigger("click");
+		await flushPromises();
+
+		FakeEventSource.last().status({ cardId: "printer", snapshot: snapshot(during, "fail") });
+		await flushPromises();
+		expect(card.text()).toContain("Running");
+		expect(buttonByLabel(card, "Run action").attributes("disabled")).toBeDefined();
+
+		FakeEventSource.last().status({ cardId: "printer", snapshot: snapshot(after) });
+		await flushPromises();
+		expect(card.find(".request-feedback").text()).toBe("Updated");
+		expect(card.text()).toContain("Healthy");
+		wrapper.unmount();
+	});
+
 	it("keeps the buttons enabled and shows the message when enqueue fails", async () => {
 		vi.mocked(enqueuePrimary).mockRejectedValue(new Error("queue is full"));
 		const wrapper = mountHome();

@@ -20,6 +20,11 @@ var (
 	// ErrConfigUnreadable means the file exists but could not be read (for
 	// example because of permissions). Its content may be perfectly valid.
 	ErrConfigUnreadable = errors.New("config file is not readable")
+	// ErrDirectorySync is returned by the save functions when the file was
+	// already replaced but its directory entry could not be fsynced. The new
+	// content is on disk; only its durability across a crash is uncertain.
+	// Callers should log it and must not undo the change in memory.
+	ErrDirectorySync = errors.New("config directory could not be synced")
 )
 
 type persistedFile struct {
@@ -37,8 +42,11 @@ type persistedHistory struct {
 // LoadFile loads settings and cards from a JSON file. A missing file creates an
 // empty store with default settings and no error. A file that cannot be read
 // returns an empty store and an error wrapping ErrConfigUnreadable; a file
-// that cannot be decoded or validated returns an empty store and an error
-// wrapping ErrConfigCorrupt. Invalid runtime state (status, history) is
+// that cannot be decoded, or whose cards fail ActionCard.ValidateEssential,
+// returns an empty store and an error wrapping ErrConfigCorrupt. A card that
+// only violates the current input limits (Validate) is loaded as it is and
+// reported with a warning, so tightening a limit never makes a stored
+// configuration disappear. Invalid runtime state (status, history) is
 // ignored with a warning (written to logger; nil discards) and never makes
 // the file corrupt.
 func LoadFile(path string, logger *slog.Logger) (*Store, error) {
@@ -66,11 +74,14 @@ func LoadFile(path string, logger *slog.Logger) (*Store, error) {
 
 	store := NewStore(file.Settings)
 	for _, card := range file.Cards {
-		if err := card.Validate(); err != nil {
+		if err := card.ValidateEssential(); err != nil {
 			return NewStore(Settings{}), fmt.Errorf("invalid card %q in config file %q: %w: %w", card.ID, path, ErrConfigCorrupt, err)
 		}
 		if _, exists := store.cards[card.ID]; exists {
 			return NewStore(Settings{}), fmt.Errorf("duplicate card %q in config file %q: %w", card.ID, path, ErrConfigCorrupt)
+		}
+		if err := card.Validate(); err != nil {
+			logger.Warn("card violates current limits; it is loaded as stored and must be corrected when edited", "card", card.ID, "path", path, "error", err)
 		}
 		store.cards[card.ID] = cloneCard(card)
 	}
@@ -110,10 +121,15 @@ func (store *Store) SaveFile(path string) error {
 
 // SaveFileWithHistory atomically saves settings, cards, run history and the
 // status projection, and marks the store clean (see Dirty) as of the
-// snapshot that was written.
+// snapshot that was written. It is serialised with the persisted mutations
+// (persistMu), so it never runs concurrently with an OnChange save. An
+// ErrDirectorySync result still counts as written.
 func (store *Store) SaveFileWithHistory(path string) error {
+	store.persistMu.Lock()
+	defer store.persistMu.Unlock()
 	file, revision := store.snapshotWithRevision(true)
-	if err := writePersistedFile(path, file); err != nil {
+	err := writePersistedFile(path, file)
+	if err != nil && !errors.Is(err, ErrDirectorySync) {
 		return err
 	}
 	store.mu.Lock()
@@ -121,7 +137,7 @@ func (store *Store) SaveFileWithHistory(path string) error {
 		store.savedChanges = revision
 	}
 	store.mu.Unlock()
-	return nil
+	return err
 }
 
 func (store *Store) snapshot(includeHistory bool) persistedFile {
@@ -226,9 +242,13 @@ func loadHistory(store *Store, raw json.RawMessage, path string, logger *slog.Lo
 	}
 }
 
-// writePersistedFile replaces path atomically: the content is written to
-// "<path>.tmp", fsynced, renamed over the target and the directory entry is
-// fsynced. An existing file keeps its permission bits; a new file is 0600.
+// writePersistedFile replaces path atomically: the content is written to a
+// unique "<name>.<random>.tmp" file next to the target, fsynced, renamed over
+// the target and the directory entry is fsynced. The unique name keeps two
+// writers (a second instance on the same file, or a save racing a mutation)
+// from truncating each other's temporary file; the last rename wins with a
+// complete file. An existing file keeps its permission bits; a new file is
+// 0600. A failure after the rename is reported as ErrDirectorySync.
 func writePersistedFile(path string, file persistedFile) error {
 	data, err := json.MarshalIndent(file, "", "  ")
 	if err != nil {
@@ -239,11 +259,11 @@ func writePersistedFile(path string, file persistedFile) error {
 	if info, err := os.Stat(path); err == nil {
 		mode = info.Mode().Perm()
 	}
-	temporaryName := path + ".tmp"
-	temporary, err := os.OpenFile(temporaryName, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, mode)
+	temporary, err := os.CreateTemp(filepath.Dir(path), filepath.Base(path)+".*.tmp")
 	if err != nil {
-		return fmt.Errorf("create temporary config file %q: %w", temporaryName, err)
+		return fmt.Errorf("create temporary config file for %q: %w", path, err)
 	}
+	temporaryName := temporary.Name()
 	cleanup := func() {
 		_ = temporary.Close()
 		_ = os.Remove(temporaryName)
@@ -261,7 +281,7 @@ func writePersistedFile(path string, file persistedFile) error {
 		_ = os.Remove(temporaryName)
 		return fmt.Errorf("close temporary config file %q: %w", temporaryName, err)
 	}
-	// OpenFile applies the umask; make the permission bits explicit.
+	// CreateTemp always uses 0600; apply the target's permission bits.
 	if err := os.Chmod(temporaryName, mode); err != nil {
 		_ = os.Remove(temporaryName)
 		return fmt.Errorf("set permissions of temporary config file %q: %w", temporaryName, err)
@@ -271,7 +291,7 @@ func writePersistedFile(path string, file persistedFile) error {
 		return fmt.Errorf("replace config file %q: %w", path, err)
 	}
 	if err := syncDirectory(filepath.Dir(path)); err != nil {
-		return fmt.Errorf("sync config directory for %q: %w", path, err)
+		return fmt.Errorf("sync config directory for %q: %w: %w", path, ErrDirectorySync, err)
 	}
 	return nil
 }

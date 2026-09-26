@@ -51,6 +51,10 @@ export interface AcceptedAction {
 	cardId: string;
 	actionKind: "primary" | "status";
 	status: "accepted";
+	/** Last check known to the server when it accepted the request; the
+	 * baseline for "a check newer than the one before my action". Absent for
+	 * a card that was never checked. */
+	checkedAt?: string;
 }
 
 /** Request budget; a slow or hung server surfaces as a timeout, not a spinner. */

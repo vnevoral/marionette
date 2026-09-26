@@ -4,23 +4,12 @@ import { RouterLink } from "vue-router";
 import Button from "primevue/button";
 import Message from "primevue/message";
 import ProgressSpinner from "primevue/progressspinner";
-import {
-	enqueuePrimary,
-	enqueueStatus,
-	listCards,
-	type ActionCard as Card,
-	type StatusEvent,
-	type StatusSnapshot,
-} from "@/api";
+import { listCards, type ActionCard as Card, type StatusEvent, type StatusSnapshot } from "@/api";
 import ActionCard from "@/components/ActionCard.vue";
 import EmptyState from "@/components/EmptyState.vue";
 import PageHeader from "@/components/PageHeader.vue";
-import {
-	expectsFollowUpCheck,
-	supersedes,
-	waitBudgetMs,
-	waitForNewerStatus,
-} from "@/composables/useCardStatus";
+import { outcomeResult, requestAction } from "@/composables/useActionRequest";
+import { supersedes } from "@/composables/useCardStatus";
 import { useStatusEvents } from "@/composables/useStatusEvents";
 import { messageVisibleMs } from "@/composables/useTransientMessage";
 import type { ActionKind, PendingRequest, RequestResult } from "@/types";
@@ -119,35 +108,19 @@ function setPending(cardID: string, request: PendingRequest | undefined) {
 
 async function runAction(card: Card, action: ActionKind) {
 	if (requests.value[card.id]) return;
-	const previousCheckedAt = statuses.value[card.id]?.checkedAt;
-	setPending(card.id, { action, phase: "queued" });
 	const controller = new AbortController();
 	pendingWaits.set(card.id, controller);
 	try {
-		if (action === "primary") await enqueuePrimary(card.id);
-		else await enqueueStatus(card.id);
-		if (!expectsFollowUpCheck(card, action)) {
-			showResult(card.id, { tone: "success", message: FEEDBACK.accepted });
-			return;
-		}
-		setPending(card.id, { action, phase: "running" });
-		const result = await waitForNewerStatus(card.id, previousCheckedAt, {
+		const outcome = await requestAction(card, action, {
 			signal: controller.signal,
-			maxWaitMs: waitBudgetMs(card),
+			onPhase: (phase) => setPending(card.id, { action, phase }),
 			onSnapshot: (snapshot) => applySnapshot(card.id, snapshot),
 		});
-		if (result === "aborted") return;
-		showResult(
-			card.id,
-			result === "updated"
-				? { tone: "success", message: FEEDBACK.updated }
-				: { tone: "error", message: FEEDBACK.resultUnavailable },
-		);
-	} catch (actionError) {
-		showResult(card.id, {
-			tone: "error",
-			message: actionError instanceof Error ? actionError.message : FEEDBACK.unableToQueue,
+		const result = outcomeResult(outcome, {
+			accepted: FEEDBACK.accepted,
+			updated: FEEDBACK.updated,
 		});
+		if (result) showResult(card.id, result);
 	} finally {
 		pendingWaits.delete(card.id);
 		setPending(card.id, undefined);
@@ -178,10 +151,12 @@ onBeforeUnmount(() => {
 					:loading="loading"
 					@click="loadDashboard"
 				/>
-				<RouterLink v-if="cards.length" class="primary-action-link" to="/cards/new/edit">
-					<i class="pi pi-plus" aria-hidden="true" />
-					<span>{{ ACTIONS.newCard }}</span>
-				</RouterLink>
+				<Button v-if="cards.length" v-slot="slotProps" as-child>
+					<RouterLink :class="[slotProps.class, 'primary-action-button']" to="/cards/new/edit">
+						<i class="pi pi-plus p-button-icon p-button-icon-left" aria-hidden="true" />
+						<span class="p-button-label">{{ ACTIONS.newCard }}</span>
+					</RouterLink>
+				</Button>
 			</template>
 		</PageHeader>
 
@@ -213,10 +188,12 @@ onBeforeUnmount(() => {
 
 		<EmptyState v-else icon="pi pi-inbox" :title="EMPTY.cards.title" :body="EMPTY.cards.body">
 			<template #action>
-				<RouterLink class="primary-action-link" to="/cards/new/edit">
-					<i class="pi pi-plus" aria-hidden="true" />
-					<span>{{ EMPTY.cards.action }}</span>
-				</RouterLink>
+				<Button v-slot="slotProps" as-child>
+					<RouterLink :class="[slotProps.class, 'primary-action-button']" to="/cards/new/edit">
+						<i class="pi pi-plus p-button-icon p-button-icon-left" aria-hidden="true" />
+						<span class="p-button-label">{{ EMPTY.cards.action }}</span>
+					</RouterLink>
+				</Button>
 			</template>
 		</EmptyState>
 	</main>

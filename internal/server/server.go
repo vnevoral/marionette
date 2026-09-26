@@ -155,10 +155,26 @@ type cardAPI struct {
 	logger      *slog.Logger
 }
 
+// acceptedAction is the 202 body of the enqueue endpoints. CheckedAt is the
+// time of the last status check known when the request was accepted (read
+// before the action is queued), so a client waiting for "a check newer than
+// the one before my action" has a baseline that includes a scheduled check
+// which completed while the request was in flight. It is absent for a card
+// that was never checked.
 type acceptedAction struct {
-	CardID     string `json:"cardId"`
-	ActionKind string `json:"actionKind"`
-	Status     string `json:"status"`
+	CardID     string     `json:"cardId"`
+	ActionKind string     `json:"actionKind"`
+	Status     string     `json:"status"`
+	CheckedAt  *time.Time `json:"checkedAt,omitempty"`
+}
+
+func (api cardAPI) lastCheckedAt(cardID string) *time.Time {
+	snapshot, exists := api.store.GetStatus(cardID)
+	if !exists || snapshot.CheckedAt.IsZero() {
+		return nil
+	}
+	checkedAt := snapshot.CheckedAt
+	return &checkedAt
 }
 
 type cardView struct {
@@ -284,6 +300,7 @@ func (api cardAPI) enqueuePrimary(w http.ResponseWriter, request *http.Request) 
 		writeError(w, http.StatusNotFound, config.ErrNotFound)
 		return
 	}
+	checkedAt := api.lastCheckedAt(cardID)
 	if err := api.actions.EnqueuePrimary(cardID, card.Primary); err != nil && !errors.Is(err, actions.ErrAlreadyQueued) {
 		writeQueueError(w, err)
 		return
@@ -293,7 +310,7 @@ func (api cardAPI) enqueuePrimary(w http.ResponseWriter, request *http.Request) 
 			api.logger.Warn("fast polling notification failed", "card", cardID, "error", err)
 		}
 	}
-	writeJSON(w, http.StatusAccepted, acceptedAction{CardID: cardID, ActionKind: "primary", Status: "accepted"})
+	writeJSON(w, http.StatusAccepted, acceptedAction{CardID: cardID, ActionKind: "primary", Status: "accepted", CheckedAt: checkedAt})
 }
 
 func (api cardAPI) enqueueStatus(w http.ResponseWriter, request *http.Request) {
@@ -307,11 +324,12 @@ func (api cardAPI) enqueueStatus(w http.ResponseWriter, request *http.Request) {
 		writeError(w, http.StatusUnprocessableEntity, errors.New("status action is not configured"))
 		return
 	}
+	checkedAt := api.lastCheckedAt(cardID)
 	if err := api.actions.EnqueueStatus(cardID); err != nil && !errors.Is(err, actions.ErrAlreadyQueued) {
 		writeQueueError(w, err)
 		return
 	}
-	writeJSON(w, http.StatusAccepted, acceptedAction{CardID: cardID, ActionKind: "status", Status: "accepted"})
+	writeJSON(w, http.StatusAccepted, acceptedAction{CardID: cardID, ActionKind: "status", Status: "accepted", CheckedAt: checkedAt})
 }
 
 // decodeJSON reads one JSON value into target. Failures are answered with the

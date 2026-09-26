@@ -351,10 +351,22 @@ func openStore(configPath string, now func() time.Time, logger *slog.Logger) (st
 	default:
 		return nil, false, err
 	}
-	store.OnChange = func(changedStore *config.Store) error {
-		return changedStore.SaveFile(configPath)
-	}
+	store.OnChange = persistOnChange(configPath, logger)
 	return store, false, nil
+}
+
+// persistOnChange saves the configuration after every mutation. A failed
+// directory fsync after the file was already replaced is logged, not
+// returned: the change is on disk and must not be undone in memory.
+func persistOnChange(configPath string, logger *slog.Logger) func(*config.Store) error {
+	return func(changedStore *config.Store) error {
+		err := changedStore.SaveFile(configPath)
+		if errors.Is(err, config.ErrDirectorySync) {
+			logger.Warn("configuration saved but the directory could not be synced", "path", configPath, "error", err)
+			return nil
+		}
+		return err
+	}
 }
 
 func emptyStore() *config.Store {

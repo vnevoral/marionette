@@ -17,11 +17,13 @@ export interface WaitOptions {
 export const defaultMaxWaitMs = 120_000;
 export const defaultPollIntervalMs = 2000;
 
-/** A snapshot counts as a new check when it carries a checkedAt that differs
- * from the previous one; an unchecked card has none. */
+/** A snapshot counts as a new check when it carries a checkedAt later than
+ * the previous one; an unchecked card has none, so any check is new. A check
+ * older than the baseline (a late REST answer) is not. */
 export function isNewerCheck(snapshot: StatusSnapshot, previousCheckedAt: string | undefined) {
 	if (!snapshot.checkedAt) return false;
-	return snapshot.checkedAt !== previousCheckedAt;
+	if (!previousCheckedAt) return true;
+	return Date.parse(snapshot.checkedAt) > Date.parse(previousCheckedAt);
 }
 
 /**
@@ -54,9 +56,20 @@ export function expectsFollowUpCheck(card: ActionCard, action: ActionKind): bool
 	);
 }
 
-/** How long a view waits for the follow-up check: the card's fast polling
- * window, or `defaultMaxWaitMs` when the card has none. */
-export function waitBudgetMs(card: ActionCard): number {
+/** Allowance for the time a manual status check may spend queued behind
+ * other actions before it starts. */
+export const statusCheckQueueMarginMs = 30_000;
+
+/**
+ * How long a view waits for the follow-up check. A manual status check is
+ * bounded by the status action's own timeout plus the queue margin; after a
+ * primary action the check comes from fast polling, so the wait is the fast
+ * polling window, or `defaultMaxWaitMs` when the card has none.
+ */
+export function waitBudgetMs(card: ActionCard, action: ActionKind): number {
+	if (action === "status" && card.status) {
+		return card.status.timeoutSec * 1000 + statusCheckQueueMarginMs;
+	}
 	return card.fastPollingWindowSeconds ? card.fastPollingWindowSeconds * 1000 : defaultMaxWaitMs;
 }
 
@@ -133,11 +146,16 @@ export interface CardStatus {
 	snapshot: Ref<StatusSnapshot | null>;
 	/** True after the last REST read for the card failed. */
 	failed: Ref<boolean>;
-	/** Replaces the snapshot, e.g. from a freshly loaded card. */
+	/** Replaces the snapshot from a freshly loaded card; `undefined` clears
+	 * it. A snapshot older than the current one is ignored (see supersedes). */
 	set(snapshot: StatusSnapshot | undefined): void;
+	/** Applies a snapshot read for `id`; ignored when the composable meanwhile
+	 * follows another card or already shows a newer check. */
+	apply(id: string, snapshot: StatusSnapshot): void;
+	/** Marks the last REST read for `id` as failed. */
+	fail(id: string): void;
 	/** Reads the snapshot over REST. */
 	refresh(): Promise<void>;
-	waitForNewer(previousCheckedAt: string | undefined, options?: WaitOptions): Promise<WaitResult>;
 }
 
 /**
@@ -154,8 +172,12 @@ export function useCardStatus(
 
 	function apply(id: string, next: StatusSnapshot) {
 		if (toValue(cardId) !== id) return;
-		snapshot.value = next;
+		if (supersedes(next, snapshot.value ?? undefined)) snapshot.value = next;
 		failed.value = false;
+	}
+
+	function fail(id: string) {
+		if (toValue(cardId) === id) failed.value = true;
 	}
 
 	async function refresh() {
@@ -164,7 +186,7 @@ export function useCardStatus(
 		try {
 			apply(id, await getStatus(id));
 		} catch {
-			if (toValue(cardId) === id) failed.value = true;
+			fail(id);
 		}
 	}
 
@@ -181,19 +203,12 @@ export function useCardStatus(
 		snapshot,
 		failed,
 		set(next) {
-			snapshot.value = next ?? null;
+			if (!next) snapshot.value = null;
+			else if (supersedes(next, snapshot.value ?? undefined)) snapshot.value = next;
 			failed.value = false;
 		},
+		apply,
+		fail,
 		refresh,
-		waitForNewer(previousCheckedAt, options) {
-			const id = toValue(cardId);
-			return waitForNewerStatus(id, previousCheckedAt, {
-				...options,
-				onSnapshot: (next) => apply(id, next),
-				onError: () => {
-					if (toValue(cardId) === id) failed.value = true;
-				},
-			});
-		},
 	};
 }

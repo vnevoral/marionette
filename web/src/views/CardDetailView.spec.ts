@@ -153,6 +153,22 @@ describe("CardDetailView", () => {
 		expect(FakeEventSource.last().closed).toBe(true);
 	});
 
+	it("keeps a newer stream snapshot when the loaded card carries an older check", async () => {
+		vi.mocked(getCard).mockImplementationOnce(
+			() =>
+				new Promise<ActionCard>((resolve) => {
+					setTimeout(() => resolve(cards.printer), 0);
+				}),
+		);
+		const { wrapper } = await mountDetail("printer");
+		FakeEventSource.last().status({ cardId: "printer", snapshot: snapshot(after, "fail") });
+		await new Promise((resolve) => setTimeout(resolve, 0));
+		await flushPromises();
+		expect(wrapper.find("h1").text()).toBe("Printer");
+		expect(wrapper.text()).toContain("Problem");
+		wrapper.unmount();
+	});
+
 	it("shows the enqueue error and re-enables the buttons", async () => {
 		vi.mocked(enqueuePrimary).mockRejectedValue(new Error("queue is full"));
 		const { wrapper } = await mountDetail("printer");

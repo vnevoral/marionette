@@ -161,44 +161,63 @@ type Action struct {
 // Validate checks that an action can be executed safely by the execution
 // engine and that its values respect the documented limits. All failures are
 // collected into one ValidationError keyed by field ("command", "args[2]",
-// "env.KEY", "timeoutSec", "rule.pattern", ...).
+// "env.KEY", "timeoutSec", "rule.pattern", ...). It is the rule applied at
+// the API boundary (card creation and update).
 func (action Action) Validate() error {
+	return action.validate(true).err()
+}
+
+// ValidateEssential checks only what the execution engine relies on: a
+// command, a timeout of at least one second, well-formed environment
+// variable names and a valid output rule. The input limits (lengths, number
+// of arguments, MaxTimeoutSec) are left to Validate so that an action stored
+// before a limit was tightened still loads and runs.
+func (action Action) ValidateEssential() error {
+	return action.validate(false).err()
+}
+
+func (action Action) validate(limits bool) fieldErrors {
 	fields := fieldErrors{}
 	switch {
 	case strings.TrimSpace(action.Command) == "":
 		fields.add("command", "action command is required")
-	case len(action.Command) > MaxCommandLength:
+	case limits && len(action.Command) > MaxCommandLength:
 		fields.add("command", lengthReason(MaxCommandLength))
 	}
-	if len(action.Args) > MaxArgs {
+	if limits && len(action.Args) > MaxArgs {
 		fields.add("args", fmt.Sprintf("must have at most %d items", MaxArgs))
 	}
-	for index, arg := range action.Args {
-		if len(arg) > MaxArgLength {
-			fields.add(fmt.Sprintf("args[%d]", index), lengthReason(MaxArgLength))
+	if limits {
+		for index, arg := range action.Args {
+			if len(arg) > MaxArgLength {
+				fields.add(fmt.Sprintf("args[%d]", index), lengthReason(MaxArgLength))
+			}
 		}
 	}
-	if len(action.Dir) > MaxDirLength {
+	if limits && len(action.Dir) > MaxDirLength {
 		fields.add("dir", lengthReason(MaxDirLength))
 	}
-	if len(action.Env) > MaxEnvEntries {
+	if limits && len(action.Env) > MaxEnvEntries {
 		fields.add("env", fmt.Sprintf("must have at most %d entries", MaxEnvEntries))
 	}
 	for key, value := range action.Env {
 		switch {
 		case !envKeyPattern.MatchString(key):
 			fields.add("env."+key, "environment variable name must match ^[A-Za-z_][A-Za-z0-9_]*$")
-		case len(key) > MaxEnvKeyLength:
+		case limits && len(key) > MaxEnvKeyLength:
 			fields.add("env."+key, "environment variable name "+lengthReason(MaxEnvKeyLength))
-		case len(value) > MaxEnvValueLength:
+		case limits && len(value) > MaxEnvValueLength:
 			fields.add("env."+key, lengthReason(MaxEnvValueLength))
 		}
 	}
-	if action.TimeoutSec < 1 || action.TimeoutSec > MaxTimeoutSec {
+	switch {
+	case action.TimeoutSec < 1:
+		fields.add("timeoutSec", fmt.Sprintf("must be between 1 and %d", MaxTimeoutSec))
+	case limits && action.TimeoutSec > MaxTimeoutSec:
 		fields.add("timeoutSec", fmt.Sprintf("must be between 1 and %d", MaxTimeoutSec))
 	}
 	fields.merge("rule", action.Rule.Validate())
-	return fields.err()
+	return fields
 }
 
 // ActionCard groups a primary action with an optional status action and polling settings.
@@ -215,32 +234,47 @@ type ActionCard struct {
 }
 
 // Validate checks the card identity, actions, and polling configuration and
-// reports every failure at once as a ValidationError keyed by JSON path.
+// reports every failure at once as a ValidationError keyed by JSON path. It
+// is the rule applied at the API boundary (card creation and update).
 func (card ActionCard) Validate() error {
+	return card.validate(true).err()
+}
+
+// ValidateEssential checks only what the scheduler and the execution engine
+// rely on: an ID and a name, executable actions (see Action.ValidateEssential)
+// and non-negative polling values. Limits on lengths, ID characters, the icon
+// class and the fast/standard interval relation are left to Validate, so a
+// configuration written before a limit was tightened still loads; the card
+// is brought up to date the next time it is saved through the API.
+func (card ActionCard) ValidateEssential() error {
+	return card.validate(false).err()
+}
+
+func (card ActionCard) validate(limits bool) fieldErrors {
 	fields := fieldErrors{}
 	switch {
 	case strings.TrimSpace(card.ID) == "":
 		fields.add("id", "action card id is required")
-	case len(card.ID) > MaxCardIDLength:
+	case limits && len(card.ID) > MaxCardIDLength:
 		fields.add("id", lengthReason(MaxCardIDLength))
-	case !cardIDPattern.MatchString(card.ID):
+	case limits && !cardIDPattern.MatchString(card.ID):
 		fields.add("id", "must contain only letters, digits, '-' and '_'")
 	}
 	switch {
 	case strings.TrimSpace(card.Name) == "":
 		fields.add("name", "action card name is required")
-	case len(card.Name) > MaxNameLength:
+	case limits && len(card.Name) > MaxNameLength:
 		fields.add("name", lengthReason(MaxNameLength))
 	}
-	if len(card.Description) > MaxDescriptionLength {
+	if limits && len(card.Description) > MaxDescriptionLength {
 		fields.add("description", lengthReason(MaxDescriptionLength))
 	}
-	if !ValidIcon(card.Icon) {
+	if limits && !ValidIcon(card.Icon) {
 		fields.add("icon", fmt.Sprintf("must be empty or a %q class of at most %d characters", IconPrefix, MaxIconLength))
 	}
-	fields.merge("primary", card.Primary.Validate())
+	fields.merge("primary", card.Primary.validate(limits).err())
 	if card.Status != nil {
-		fields.merge("status", card.Status.Validate())
+		fields.merge("status", card.Status.validate(limits).err())
 	}
 	if card.PollingIntervalSeconds < 0 {
 		fields.add("pollingIntervalSeconds", "polling interval cannot be negative")
@@ -251,10 +285,10 @@ func (card ActionCard) Validate() error {
 	if card.FastPollingWindowSeconds < 0 {
 		fields.add("fastPollingWindowSeconds", "fast polling window cannot be negative")
 	}
-	if card.PollingIntervalSeconds > 0 && card.FastPollingIntervalSeconds >= card.PollingIntervalSeconds {
+	if limits && card.PollingIntervalSeconds > 0 && card.FastPollingIntervalSeconds >= card.PollingIntervalSeconds {
 		fields.add("fastPollingIntervalSeconds", "fast polling interval must be less than polling interval")
 	}
-	return fields.err()
+	return fields
 }
 
 // ValidIcon reports whether an icon value is empty or a PrimeIcons class

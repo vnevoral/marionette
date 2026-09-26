@@ -4,14 +4,7 @@ import { RouterLink, useRoute, useRouter } from "vue-router";
 import Button from "primevue/button";
 import ProgressSpinner from "primevue/progressspinner";
 import { useConfirm } from "primevue/useconfirm";
-import {
-	ApiError,
-	enqueuePrimary,
-	enqueueStatus,
-	deleteCard,
-	getCard,
-	type ActionCard,
-} from "@/api";
+import { ApiError, deleteCard, getCard, type ActionCard } from "@/api";
 import ActionControls from "@/components/ActionControls.vue";
 import DetailErrorState from "@/components/DetailErrorState.vue";
 import DetailPanel from "@/components/DetailPanel.vue";
@@ -22,7 +15,8 @@ import StatusBadge from "@/components/StatusBadge.vue";
 import StatusSummary from "@/components/StatusSummary.vue";
 import StatusTimeline from "@/components/StatusTimeline.vue";
 import { useCardActivity } from "@/composables/useCardActivity";
-import { expectsFollowUpCheck, useCardStatus, waitBudgetMs } from "@/composables/useCardStatus";
+import { outcomeResult, requestAction } from "@/composables/useActionRequest";
+import { useCardStatus } from "@/composables/useCardStatus";
 import { useTransientMessage } from "@/composables/useTransientMessage";
 import { singleParam } from "@/router/params";
 import type { ActionKind, PendingRequest } from "@/types";
@@ -97,36 +91,26 @@ async function runAction(action: ActionKind) {
 	const current = card.value;
 	if (!current || (action === "status" && !current.status)) return;
 	const generation = loadGeneration;
-	const previousCheckedAt = status.value?.checkedAt;
-	pending.value = { action, phase: "queued" };
-	showMessage(FEEDBACK.queued, "info", false);
 	const controller = new AbortController();
 	pendingWait = controller;
 	try {
-		if (action === "primary") await enqueuePrimary(current.id);
-		else await enqueueStatus(current.id);
-		if (generation !== loadGeneration) return;
-		if (!expectsFollowUpCheck(current, action)) {
-			showMessage(FEEDBACK.actionAccepted, "success");
-			void activity.load();
-			return;
-		}
-		pending.value = { action, phase: "running" };
-		showMessage(FEEDBACK.actionQueued, "info", false);
-		const result = await cardStatus.waitForNewer(previousCheckedAt, {
+		const outcome = await requestAction(current, action, {
 			signal: controller.signal,
-			maxWaitMs: waitBudgetMs(current),
+			onPhase(phase) {
+				pending.value = { action, phase };
+				showMessage(phase === "queued" ? FEEDBACK.queued : FEEDBACK.actionQueued, "info", false);
+			},
+			onSnapshot: (snapshot) => cardStatus.apply(current.id, snapshot),
+			onError: () => cardStatus.fail(current.id),
 		});
-		if (result === "aborted" || generation !== loadGeneration) return;
-		if (result === "updated") showMessage(FEEDBACK.statusUpdated, "success");
-		else showMessage(FEEDBACK.resultUnavailable, "error");
-		void activity.load();
-	} catch (actionError) {
 		if (generation !== loadGeneration) return;
-		showMessage(
-			actionError instanceof Error ? actionError.message : FEEDBACK.unableToQueue,
-			"error",
-		);
+		const result = outcomeResult(outcome, {
+			accepted: FEEDBACK.actionAccepted,
+			updated: FEEDBACK.statusUpdated,
+		});
+		if (!result) return;
+		showMessage(result.message, result.tone);
+		if (outcome.kind !== "failed") void activity.load();
 	} finally {
 		if (pendingWait === controller) pendingWait = undefined;
 		if (generation === loadGeneration) pending.value = null;
@@ -202,13 +186,15 @@ onBeforeUnmount(() => {
 					</div>
 				</template>
 				<template #actions>
-					<RouterLink
-						class="primary-action-link"
-						:to="`/cards/${encodeURIComponent(card.id)}/edit`"
-					>
-						<i class="pi pi-pencil" aria-hidden="true" />
-						<span>{{ ACTIONS.editCard }}</span>
-					</RouterLink>
+					<Button v-slot="slotProps" as-child>
+						<RouterLink
+							:class="[slotProps.class, 'primary-action-button']"
+							:to="`/cards/${encodeURIComponent(card.id)}/edit`"
+						>
+							<i class="pi pi-pencil p-button-icon p-button-icon-left" aria-hidden="true" />
+							<span class="p-button-label">{{ ACTIONS.editCard }}</span>
+						</RouterLink>
+					</Button>
 					<Button
 						:label="ACTIONS.deleteCard"
 						icon="pi pi-trash"

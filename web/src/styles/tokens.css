@@ -164,28 +164,9 @@ select {
 	text-decoration: underline;
 }
 
-.primary-action-link {
-	display: inline-flex;
-	align-items: center;
-	gap: var(--space-2);
-	min-height: 42px;
-	padding: 0 var(--space-4);
-	border: 1px solid var(--color-accent);
-	border-radius: var(--radius-sm);
-	background: var(--color-accent-soft);
-	color: var(--color-accent-strong);
-	font-family: var(--font-ui);
-	font-weight: var(--font-weight-medium);
-	text-decoration: none;
-}
-
-.primary-action-link:hover {
-	border-color: var(--color-accent-strong);
-	background: var(--color-accent-soft-hover);
-	color: var(--color-accent-strong);
-}
-
+/* Shared by real Buttons and router links rendered through <Button asChild>. */
 .primary-action-button.p-button {
+	text-decoration: none;
 	border-color: var(--color-accent);
 	background: var(--color-accent-soft);
 	box-shadow: none;
