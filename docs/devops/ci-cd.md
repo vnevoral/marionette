@@ -15,8 +15,8 @@ Na každý push a pull request:
 Stejnou sadu spouští lokálně `make verify`; CI ji pouze zrcadlí. CI běh
 musí projít čistě (lint warningy selhávají build, nepotlačují se) před
 mergem do hlavní větve. Dependabot (`.github/dependabot.yml`) otevírá týdenní
-PR pro Go moduly, npm a GitHub Actions; major verze klíčových UI závislostí a
-PrimeFlex jsou vyloučené (ADR-0003, ADR-0009).
+PR pro Go moduly, npm a GitHub Actions; major verze klíčových UI závislostí
+jsou vyloučené (ADR-0003, ADR-0010).
 
 ## Release proces (cílový stav, viz roadmapa fáze 7)
 
@@ -40,6 +40,7 @@ PrimeFlex jsou vyloučené (ADR-0003, ADR-0009).
   Před přijetím nové major verze jakékoli klíčové závislosti (Vite, Vue,
   PrimeVue, TypeScript) ověřit changelog a napsat/aktualizovat ADR, pokud
   přináší breaking changes.
-- PrimeFlex je připnutý na `4.0.0` jako zamrzlá layout vrstva pro MVP (viz
-  [ADR-0009](../architecture/decisions/0009-primeflex-frozen-layout-layer.md));
-  Dependabot ho neaktualizuje a migrace na Tailwind se zváží až po fázi 8.
+- Layout utility jsou vlastní `web/src/styles/layout.css` (14 tříd, viz
+  [ADR-0010](../architecture/decisions/0010-own-layout-utilities-replace-primeflex.md));
+  PrimeFlex byl odstraněn v bloku 0035. PrimeVue zůstává na v4 (MIT), verze 5
+  má komerční licenci a vyžaduje nové ADR.

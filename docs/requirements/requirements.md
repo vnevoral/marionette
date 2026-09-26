@@ -311,7 +311,7 @@ fáze 8).
 | Omezená fronta akcí vs. FR-18  | Fronta je omezená, plná fronta vrací 503 + `Retry-After`; stejná karta + druh akce ve frontě → idempotentní 202 (FR-18 upřesněno, blok 0027).               |
 | Prostředí spouštěných akcí     | Minimální základ `PATH`, `HOME`, `LANG`, `TZ` + `Env` akce; nedědí se `os.Environ()` služby (NFR-01 c, blok 0034).                                          |
 | Endpoint pro globální nastavení | `Store.UpdateSettings` se z veřejného API store odstraní (YAGNI); limit souběžnosti se mění v souboru a projeví se po restartu (blok 0034).                 |
-| Budoucnost PrimeFlex           | Zůstává jako zamrzlá, připnutá layout vrstva pro MVP; migrace na Tailwind se zváží až po fázi 8 ([ADR-0009](../architecture/decisions/0009-primeflex-frozen-layout-layer.md)). |
+| Budoucnost PrimeFlex           | Po fázi 8 odstraněn a nahrazen vlastní utility vrstvou se stejnými třídami; Tailwind zamítnut, PrimeVue zůstává na v4 (MIT) kvůli licenci v5 ([ADR-0010](../architecture/decisions/0010-own-layout-utilities-replace-primeflex.md), blok 0035). |
 | Cross-site ochrana API         | NFR-12 přijat; implementace v bloku 0026.                                                                                                                   |
 | Licence repozitáře             | MIT (blok 0031 přidá `LICENSE`).                                                                                                                            |
 

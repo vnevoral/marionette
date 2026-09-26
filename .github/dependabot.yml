@@ -9,9 +9,8 @@ updates:
     schedule:
       interval: weekly
     ignore:
-      # Pinned as a frozen layout layer for the MVP, see ADR-0009.
-      - dependency-name: primeflex
-      # Major upgrades of core UI dependencies require an ADR (ADR-0003).
+      # Major upgrades of core UI dependencies require an ADR (ADR-0003,
+      # ADR-0010: PrimeVue 5 changed its licence, the project stays on v4).
       - dependency-name: primevue
         update-types: ["version-update:semver-major"]
       - dependency-name: "@primevue/themes"

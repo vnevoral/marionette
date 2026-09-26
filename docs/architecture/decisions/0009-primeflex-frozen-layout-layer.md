@@ -1,6 +1,6 @@
 # ADR-0009: PrimeFlex jako zamrzlá layout vrstva pro MVP
 
-- **Stav**: Přijato
+- **Stav**: Nahrazeno ADR-0010
 - **Datum**: 2026-09-26
 
 ## Kontext
@@ -54,3 +54,6 @@ knihovna a nemigruje se na Tailwind. Podmínky:
   ADR-0003.
 - `docs/devops/ci-cd.md` (verzování závislostí) a UX specifikace uvádějí
   PrimeFlex jako připnutou závislost s omezenou sadou tříd.
+
+> Nahrazeno 2026-09-26: PrimeFlex byl odstraněn a nahrazen vlastní utility
+> vrstvou, viz [ADR-0010](0010-own-layout-utilities-replace-primeflex.md).

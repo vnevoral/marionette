@@ -45,3 +45,9 @@ ověření changelogu/migrace a aktualizaci tohoto ADR.
 
 > Doplněno 2026-09-26: rozhodnutí o ponechání PrimeFlex jako zamrzlé layout
 > vrstvy pro MVP je v [ADR-0009](0009-primeflex-frozen-layout-layer.md).
+
+> Doplněno 2026-09-26 (blok 0035): PrimeVue 5.0.x přešlo z MIT na komerční
+> PrimeUI License s licenčním klíčem; projekt zůstává na větvi v4 (MIT,
+> dist-tag `v4-stable`). PrimeFlex byl nahrazen vlastní utility vrstvou
+> ([ADR-0010](0010-own-layout-utilities-replace-primeflex.md)); věta
+> o PrimeFlexu v Rozhodnutí a Důsledcích výše je tím překonaná.

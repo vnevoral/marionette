@@ -232,6 +232,13 @@ views (values as implemented in blocks 0019/0020 and confirmed in 0033):
 }
 ```
 
+Layout utilities (`grid`, `col-12`, `md:col-4`, `md:col-6`, `lg:col-4`,
+`flex`, `flex-column`, `flex-wrap`, `align-items-center`,
+`justify-content-between`, `gap-2`, `gap-3`, `p-2`, `mt-4`) are the
+project's own classes in `web/src/styles/layout.css` with PrimeFlex-compatible
+values and breakpoints (768 px, 992 px); a new utility is added there only when
+a view needs it (ADR-0010).
+
 Views use semantic tokens rather than local hex values. PrimeVue components
 take the same palette from `web/src/theme/preset.ts` (`definePreset(Aura, …)`:
 primary and surface scales, form field, text, content and overlay tokens), so
