@@ -7,7 +7,8 @@
 		"types": ["node"],
 		"noEmit": true,
 		"tsBuildInfoFile": "./node_modules/.tmp/tsconfig.node.tsbuildinfo",
-		"strict": true
+		"strict": true,
+		"allowImportingTsExtensions": true
 	},
 	"include": ["vite.config.ts", "vitest.config.ts"]
 }
