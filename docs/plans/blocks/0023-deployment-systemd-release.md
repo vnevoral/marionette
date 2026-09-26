@@ -97,8 +97,31 @@ Viz [Definition of Done](../../devops/definition-of-done.md) +:
   prošly. Archiv obsahuje binárku, unit, default konfiguraci, JSON šablonu a
   instalační skript; binárka je ELF64 AArch64 a statická. Staged instalace
   ověřila idempotenci a zachování existující konfigurace.
-- **Zbývá ověřit**: `systemd-analyze verify`, start/stop/restart, health endpoint
-  a rollback na referenčním Ubuntu 24.x hostu. Devcontainer nástroj
-  `systemd-analyze` neposkytuje.
+- **Ověření v devcontaineru (x86_64, 2026-09-26)**: `sudo ./deploy/install.sh
+  bin/marionette` (skutečná, ne staged instalace) odhalilo chybu — binárka
+  se instalovala do `/usr/local/marionette`, zatímco unita spouští
+  `/usr/local/bin/marionette`; opraveno (`binary_target=$prefix/bin/marionette`).
+  Po opravě: `systemd-analyze verify /etc/systemd/system/marionette.service`
+  (systemd 252 doinstalován jako balík, bez běžícího PID 1) prošel bez
+  nálezu. Služba spuštěna s prostředím unity (`runuser -u marionette`,
+  `EnvironmentFile`, `WorkingDirectory`, `umask 077`): `GET /api/health`
+  → `{"status":"ok","version":"e68c28d"}`, SPA `lang="en"`, `POST /api/cards`
+  s `Origin: https://evil.example` → 403, `Content-Type: text/plain` → 415,
+  scénář TLS proxy (`Origin: https://pi.local`, `Host: pi.local`) → 201
+  (blok 0036), primární akce → 202 a záznam v `runs`, `marionette.json`
+  `0640 marionette:marionette`. SIGTERM: kroky „stop HTTP server“, „save
+  history“, „close action queue“, „stop status scheduler“ v logu, historie
+  v souboru; po opětovném startu jsou karta i běh načtené. Třetí běh
+  instalátoru (update/rollback stejným postupem) zachoval `marionette.json`
+  i `/etc/default/marionette`. Instalátor v containeru hlásí „installed and
+  started“, protože `systemctl` je zde shim vracející 0 — na hostu se
+  systemd to neplatí.
+- **Zbývá ověřit na referenčním Ubuntu 24.x ARM64 hostu**: skutečné
+  `systemctl enable/start/stop/restart`, `Restart=on-failure` po zabití
+  procesu, náběh po rebootu, běh ARM64 artefaktu a chování hardening
+  direktiv (`ProtectSystem=strict`, `ReadWritePaths`) s reálným systemd.
+  Poznámka: `systemd-analyze security` hodnotí unitu 8.6 „EXPOSED“; další
+  zpřísnění (`ProtectKernelTunables`, `RestrictAddressFamilies`,
+  `SystemCallFilter`…) je mimo rozsah bloku a vyžaduje test na hostu.
 - **Dokumentace aktualizována**: README, `docs/devops/ci-cd.md`, requirements,
   testing strategy a roadmapa.

@@ -88,8 +88,12 @@ uloží do `docs/plans/blocks/NNNN-nazev.md`. Blok se implementuje promptem
   artefakt](blocks/0023-deployment-systemd-release.md) pro obecný Linux se
   systemd; Ubuntu 24.x na Raspberry Pi ARM64 slouží jako referenční validační
   prostředí.
-  Blok zůstává `Probíhá`: chybí ověření `systemd-analyze verify`,
-  start/stop/restart, health endpointu a rollbacku na referenčním hostu.
+  Blok zůstává `Probíhá`. V devcontaineru (x86_64, 2026-09-26) prošly
+  `systemd-analyze verify`, skutečná instalace (odhalila a opravila chybnou
+  cestu binárky v `install.sh`), health, cross-site ochrana, graceful stop
+  s uložením historie, restart se zachovanými daty a opakovaná instalace.
+  Na referenčním ARM64 hostu chybí jen reálné `systemctl` start/stop/restart,
+  `Restart=on-failure`, náběh po rebootu a běh ARM64 artefaktu.
 
 - Fáze 8 byla 2026-09-26 rozpracována na základě revize projektu a kódu do
   bloků 0024–0034 a téhož dne **schválena** vlastníkem. Jde převážně o opravy

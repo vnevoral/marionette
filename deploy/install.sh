@@ -33,7 +33,7 @@ rooted_path() {
 	printf '%s%s' "$destdir" "$1"
 }
 
-binary_target=$(rooted_path "$prefix/marionette")
+binary_target=$(rooted_path "$prefix/bin/marionette")
 data_target=$(rooted_path "$data_dir")
 defaults_target=$(rooted_path "$defaults_file")
 unit_target=$(rooted_path "$unit_file")
