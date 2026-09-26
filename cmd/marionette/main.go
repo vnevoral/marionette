@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"errors"
+	"fmt"
 	"log"
 	"net/http"
 	"os"
@@ -21,16 +22,9 @@ func main() {
 	if configPath == "" {
 		configPath = "./marionette.json"
 	}
-	store, err := config.LoadFile(configPath)
+	store, err := openStore(configPath, time.Now)
 	if err != nil {
-		log.Printf("config load failed: %v; starting with an empty store", err)
-		store = config.NewStore(config.Settings{
-			HistorySize:          config.DefaultHistorySize,
-			MaxConcurrentActions: config.DefaultMaxConcurrentActions,
-		})
-	}
-	store.OnChange = func(changedStore *config.Store) error {
-		return changedStore.SaveFile(configPath)
+		log.Fatalf("open config store: %v", err)
 	}
 	statusEvents := server.NewStatusEventBroker()
 
@@ -101,4 +95,44 @@ func main() {
 	if err := store.SaveFileWithHistory(configPath); err != nil {
 		log.Printf("config save failed: %v", err)
 	}
+}
+
+// openStore loads the configuration file and wires persistence. A missing file
+// starts an empty store that is created on the first change. A corrupt file is
+// moved aside (quarantined) before anything is written, so its content is
+// never lost. An unreadable file starts an empty store with persistence
+// disabled: every mutation fails and is rolled back until the operator fixes
+// the file and restarts the service.
+func openStore(configPath string, now func() time.Time) (*config.Store, error) {
+	store, err := config.LoadFile(configPath)
+	switch {
+	case err == nil:
+	case errors.Is(err, config.ErrConfigCorrupt):
+		quarantined, quarantineErr := config.QuarantineFile(configPath, now())
+		if quarantineErr != nil {
+			return nil, fmt.Errorf("config load failed (%v) and the file could not be quarantined: %w", err, quarantineErr)
+		}
+		log.Printf("warning: config load failed: %v; original file moved to %q, starting with an empty store", err, quarantined)
+		store = emptyStore()
+	case errors.Is(err, config.ErrConfigUnreadable):
+		log.Printf("warning: config load failed: %v; starting read-only with an empty store, configuration changes will be rejected until the file is readable", err)
+		store = emptyStore()
+		store.OnChange = func(*config.Store) error {
+			return fmt.Errorf("configuration file %q is not readable; fix its permissions and restart the service", configPath)
+		}
+		return store, nil
+	default:
+		return nil, err
+	}
+	store.OnChange = func(changedStore *config.Store) error {
+		return changedStore.SaveFile(configPath)
+	}
+	return store, nil
+}
+
+func emptyStore() *config.Store {
+	return config.NewStore(config.Settings{
+		HistorySize:          config.DefaultHistorySize,
+		MaxConcurrentActions: config.DefaultMaxConcurrentActions,
+	})
 }

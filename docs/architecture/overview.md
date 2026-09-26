@@ -20,7 +20,7 @@ flowchart LR
 | HTTP server / routing  | `internal/server` | API routy, SPA fallback                                         | Implementováno (CRUD, enqueue, status read) |
 | Embed vestavěného UI   | `internal/webui`  | `go:embed` `web/dist`                                           | Implementováno                              |
 | SPA (Vue 3 + PrimeVue) | `web/src`         | Dashboard, správa karet                                         | Implementován skelet (health check demo)    |
-| Config store           | `internal/config` | In-memory karty, Settings, JSON perzistence a historie          | Implementováno — fáze 2                     |
+| Config store           | `internal/config` | In-memory karty, Settings, JSON perzistence a historie (viz [Ochrana konfiguračního souboru](#ochrana-konfiguračního-souboru)) | Implementováno — fáze 2                     |
 | Execution engine       | `internal/exec`   | Bezpečné spouštění akcí na hostu, capture výstupu               | Implementováno — fáze 3                     |
 | Status/health engine   | `internal/status` | Vyhodnocení stavu karty, transition historie, volitelný polling | Implementováno — fáze 4                     |
 | REST API domény        | `internal/server` | CRUD karet/akcí, async enqueue, čtení stavu                     | Implementováno — fáze 5                     |
@@ -39,3 +39,29 @@ vstupu (spouštět přes `exec.Command(name, args...)`, ne přes shell string),
 timeoutem pro každý běh, a omezením přístupu k UI/API (viz NFR-01 a otevřené
 otázky v requirements.md). Toto se doladí samostatným ADR před implementací
 fáze 3.
+
+## Ochrana konfiguračního souboru
+
+Konfigurace (`MARIONETTE_CONFIG`, FR-30..FR-35) se při startu načítá takto
+(blok 0025):
+
+- **soubor neexistuje** — aplikace startuje s prázdnou konfigurací a soubor
+  vytvoří při první změně;
+- **soubor je poškozený** (neplatný JSON, neplatná nastavení nebo karta,
+  duplicitní ID) — soubor se před jakýmkoli zápisem přejmenuje na
+  `<cesta>.corrupt-<UTC čas>` (při kolizi s číselným sufixem), do logu se
+  zapíše varování s novou cestou a aplikace startuje s prázdnou konfigurací;
+  původní obsah tak nikdy nepřepíše; pokud přejmenování selže, aplikace
+  odmítne nastartovat;
+- **soubor nelze přečíst** (např. oprávnění) — aplikace startuje s prázdnou
+  konfigurací v režimu jen pro čtení: každá změna přes API vrátí 500 a v paměti
+  se vrátí zpět, dokud operátor soubor nezpřístupní a službu nerestartuje;
+- **neplatný runtime stav** (status, historie) uvnitř jinak platného souboru se
+  ignoruje s varováním (FR-35), soubor se nepovažuje za poškozený.
+
+Každá persistovaná mutace store (vytvoření, úprava, smazání karty, nastavení)
+je atomická vůči paměti: pokud zápis na disk selže, změna se v paměti vrátí
+zpět a API vrátí 500, takže stav v paměti vždy odpovídá poslednímu úspěšně
+uloženému souboru. Zápis probíhá do `<cesta>.tmp` s `fsync`, přejmenováním
+přes cílový soubor a `fsync` adresáře; existující soubor si zachová práva,
+nový vzniká s `0600`.

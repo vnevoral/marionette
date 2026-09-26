@@ -21,7 +21,7 @@ uloží do `docs/plans/blocks/NNNN-nazev.md`. Blok se implementuje promptem
 | 5    | REST API (CRUD karet/akcí, spuštění, čtení stavu)                                            | **Hotovo**                                       | FR-40, FR-41                   |
 | 6    | Dashboard UI (karty, stavové indikátory, formuláře správy)                                   | **Hotovo**                                       | FR-20..23                      |
 | 7    | Balíčkování a nasazení (systemd unit, install skript, arm64 release)                         | **Probíhá** (0023)                               | FR-01..04, NFR-02              |
-| 8    | Zpevnění (auth/access control, logování, chybové stavy, testy, dokumentace)                  | **Probíhá** (0024, 0031 hotovo; ostatní schváleny) | NFR-01, NFR-04..06, NFR-12     |
+| 8    | Zpevnění (auth/access control, logování, chybové stavy, testy, dokumentace)                  | **Probíhá** (0024, 0025, 0031 hotovo; ostatní schváleny) | NFR-01, NFR-04..06, NFR-12     |
 | 9    | UX redesign a sdílený design systém                                                          | **Hotovo**                                       | FR-24..29, NFR-08..10          |
 | 10   | Realtime doručování statusů přes SSE                                                         | **Hotovo**                                       | FR-42, NFR-11                  |
 
@@ -103,7 +103,8 @@ uloží do `docs/plans/blocks/NNNN-nazev.md`. Blok se implementuje promptem
      — **Hotovo** (2026-09-26); timeout zabíjí celou procesní skupinu, nový
      výsledek běhu `canceled`.
   2. [0025 — Ochrana konfigurace při poškozeném souboru a konzistence persistence](blocks/0025-config-corruption-safety-and-persistence.md)
-     — poškozený config je dnes při první změně přepsán.
+     — **Hotovo** (2026-09-26); karanténa `.corrupt-*`, rollback mutací,
+     sentinel chyby, 422 pro validaci.
   3. [0026 — Ochrana mutujících endpointů před cross-site požadavky](blocks/0026-csrf-origin-protection.md)
      — NFR-12 přijat 2026-09-26.
   4. [0027 — Řízené ukončení: pořadí kroků, SSE a fronta akcí](blocks/0027-shutdown-lifecycle-hardening.md)

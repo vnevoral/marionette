@@ -10,11 +10,20 @@ import (
 	"time"
 )
 
-// ErrNotFound indicates that a requested card does not exist in the store.
-var ErrNotFound = errors.New("config item not found")
+// Errors returned by store operations. They are wrapped with context, so
+// callers classify them with errors.Is.
+var (
+	// ErrNotFound indicates that a requested card does not exist in the store.
+	ErrNotFound = errors.New("config item not found")
+	// ErrAlreadyExists indicates that a card with the same ID is already stored.
+	ErrAlreadyExists = errors.New("config item already exists")
+	// ErrValidation indicates that the supplied configuration is invalid.
+	ErrValidation = errors.New("invalid configuration")
+)
 
-// PersistenceError indicates that a store mutation succeeded in memory but
-// could not be persisted to the configured backing file.
+// PersistenceError indicates that a store mutation could not be persisted to
+// the configured backing file. The in-memory change has been rolled back, so
+// the store still matches the last successfully persisted state.
 type PersistenceError struct {
 	Operation string
 	Err       error
@@ -30,7 +39,10 @@ func (err *PersistenceError) Unwrap() error {
 
 // Store keeps action-card configuration and run history in memory.
 type Store struct {
-	mu            sync.RWMutex
+	mu sync.RWMutex
+	// persistMu serialises persisted mutations from the in-memory change up to
+	// and including OnChange, so a failed OnChange can be rolled back without
+	// interleaving with another persisted mutation.
 	persistMu     sync.Mutex
 	settings      Settings
 	cards         map[string]ActionCard
@@ -94,6 +106,8 @@ func (store *Store) GetCard(id string) (ActionCard, bool) {
 
 // CreateCard validates and stores a card. A missing ID is generated.
 func (store *Store) CreateCard(card ActionCard) (ActionCard, error) {
+	store.persistMu.Lock()
+	defer store.persistMu.Unlock()
 	store.mu.Lock()
 
 	if card.ID == "" {
@@ -106,11 +120,11 @@ func (store *Store) CreateCard(card ActionCard) (ActionCard, error) {
 	}
 	if err := card.Validate(); err != nil {
 		store.mu.Unlock()
-		return ActionCard{}, err
+		return ActionCard{}, fmt.Errorf("%w: %w", ErrValidation, err)
 	}
 	if _, exists := store.cards[card.ID]; exists {
 		store.mu.Unlock()
-		return ActionCard{}, fmt.Errorf("card %q already exists", card.ID)
+		return ActionCard{}, fmt.Errorf("card %q: %w", card.ID, ErrAlreadyExists)
 	}
 
 	card = cloneCard(card)
@@ -118,7 +132,10 @@ func (store *Store) CreateCard(card ActionCard) (ActionCard, error) {
 	created := cloneCard(card)
 	store.mu.Unlock()
 	if err := store.notifyChange(); err != nil {
-		return created, &PersistenceError{Operation: "card creation", Err: err}
+		store.mu.Lock()
+		delete(store.cards, card.ID)
+		store.mu.Unlock()
+		return ActionCard{}, &PersistenceError{Operation: "card creation", Err: err}
 	}
 	return created, nil
 }
@@ -126,16 +143,19 @@ func (store *Store) CreateCard(card ActionCard) (ActionCard, error) {
 // UpdateCard validates and replaces an existing card while retaining the
 // identifier supplied by the caller.
 func (store *Store) UpdateCard(id string, card ActionCard) (ActionCard, error) {
+	store.persistMu.Lock()
+	defer store.persistMu.Unlock()
 	store.mu.Lock()
 
-	if _, exists := store.cards[id]; !exists {
+	previous, exists := store.cards[id]
+	if !exists {
 		store.mu.Unlock()
 		return ActionCard{}, ErrNotFound
 	}
 	card.ID = id
 	if err := card.Validate(); err != nil {
 		store.mu.Unlock()
-		return ActionCard{}, err
+		return ActionCard{}, fmt.Errorf("%w: %w", ErrValidation, err)
 	}
 
 	card = cloneCard(card)
@@ -143,25 +163,46 @@ func (store *Store) UpdateCard(id string, card ActionCard) (ActionCard, error) {
 	updated := cloneCard(card)
 	store.mu.Unlock()
 	if err := store.notifyChange(); err != nil {
-		return updated, &PersistenceError{Operation: "card update", Err: err}
+		store.mu.Lock()
+		store.cards[id] = previous
+		store.mu.Unlock()
+		return ActionCard{}, &PersistenceError{Operation: "card update", Err: err}
 	}
 	return updated, nil
 }
 
 // DeleteCard removes a card and all run history associated with it.
 func (store *Store) DeleteCard(id string) error {
+	store.persistMu.Lock()
+	defer store.persistMu.Unlock()
 	store.mu.Lock()
 
-	if _, exists := store.cards[id]; !exists {
+	previousCard, exists := store.cards[id]
+	if !exists {
 		store.mu.Unlock()
 		return ErrNotFound
 	}
+	previousHistory, hadHistory := store.history[id]
+	previousStatus, hadStatus := store.statuses[id]
+	previousStatusHistory, hadStatusHistory := store.statusHistory[id]
 	delete(store.cards, id)
 	delete(store.history, id)
 	delete(store.statuses, id)
 	delete(store.statusHistory, id)
 	store.mu.Unlock()
 	if err := store.notifyChange(); err != nil {
+		store.mu.Lock()
+		store.cards[id] = previousCard
+		if hadHistory {
+			store.history[id] = previousHistory
+		}
+		if hadStatus {
+			store.statuses[id] = previousStatus
+		}
+		if hadStatusHistory {
+			store.statusHistory[id] = previousStatusHistory
+		}
+		store.mu.Unlock()
 		return &PersistenceError{Operation: "card deletion", Err: err}
 	}
 	return nil
@@ -178,10 +219,18 @@ func (store *Store) GetSettings() Settings {
 // trimmed to the newest records when the history limit is reduced.
 func (store *Store) UpdateSettings(settings Settings) error {
 	if err := settings.Validate(); err != nil {
-		return err
+		return fmt.Errorf("%w: %w", ErrValidation, err)
 	}
 
+	store.persistMu.Lock()
+	defer store.persistMu.Unlock()
 	store.mu.Lock()
+	previousSettings := store.settings
+	previousHistory := cloneHistory(store.history)
+	previousStatusHistory := make(map[string][]StatusChange, len(store.statusHistory))
+	for cardID, changes := range store.statusHistory {
+		previousStatusHistory[cardID] = cloneStatusChanges(changes)
+	}
 	store.settings = settings
 	for cardID, histories := range store.history {
 		for actionKind, runs := range histories {
@@ -193,6 +242,11 @@ func (store *Store) UpdateSettings(settings Settings) error {
 	}
 	store.mu.Unlock()
 	if err := store.notifyChange(); err != nil {
+		store.mu.Lock()
+		store.settings = previousSettings
+		store.history = previousHistory
+		store.statusHistory = previousStatusHistory
+		store.mu.Unlock()
 		return &PersistenceError{Operation: "settings update", Err: err}
 	}
 	return nil
@@ -257,8 +311,8 @@ func (store *Store) GetStatusChanges(cardID string) ([]StatusChange, error) {
 // UpdateStatus stores the latest status check and records a transition only
 // when the interpreted state differs from the previous state.
 func (store *Store) UpdateStatus(cardID string, snapshot StatusSnapshot) error {
-	if snapshot.State != StatusStateUnknown && snapshot.State != StatusStateOK && snapshot.State != StatusStateFail {
-		return fmt.Errorf("unsupported status state %q", snapshot.State)
+	if !validStatusState(snapshot.State) {
+		return fmt.Errorf("%w: unsupported status state %q", ErrValidation, snapshot.State)
 	}
 	if snapshot.CheckedAt.IsZero() {
 		snapshot.CheckedAt = time.Now()
@@ -299,14 +353,29 @@ func (store *Store) UpdateStatus(cardID string, snapshot StatusSnapshot) error {
 	return nil
 }
 
+// notifyChange runs OnChange. The caller must hold persistMu and must not
+// hold mu, because OnChange typically snapshots the store under a read lock.
 func (store *Store) notifyChange() error {
-	store.persistMu.Lock()
-	defer store.persistMu.Unlock()
-
 	if store.OnChange == nil {
 		return nil
 	}
 	return store.OnChange(store)
+}
+
+func validStatusState(state StatusState) bool {
+	return state == StatusStateUnknown || state == StatusStateOK || state == StatusStateFail
+}
+
+func cloneHistory(history map[string]map[string][]Run) map[string]map[string][]Run {
+	cloned := make(map[string]map[string][]Run, len(history))
+	for cardID, histories := range history {
+		clonedHistories := make(map[string][]Run, len(histories))
+		for actionKind, runs := range histories {
+			clonedHistories[actionKind] = append([]Run(nil), runs...)
+		}
+		cloned[cardID] = clonedHistories
+	}
+	return cloned
 }
 
 func generateCardID() (string, error) {

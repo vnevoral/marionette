@@ -3,10 +3,22 @@ package config
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log"
 	"os"
 	"path/filepath"
+	"time"
+)
+
+// Errors returned by LoadFile. Both wrap the underlying cause.
+var (
+	// ErrConfigCorrupt means the file exists but its content could not be
+	// decoded or validated. Callers must not overwrite such a file.
+	ErrConfigCorrupt = errors.New("config file is corrupt")
+	// ErrConfigUnreadable means the file exists but could not be read (for
+	// example because of permissions). Its content may be perfectly valid.
+	ErrConfigUnreadable = errors.New("config file is not readable")
 )
 
 type persistedFile struct {
@@ -22,8 +34,11 @@ type persistedHistory struct {
 }
 
 // LoadFile loads settings and cards from a JSON file. A missing file creates an
-// empty store with default settings. Invalid configuration is returned with an
-// error; invalid history is ignored with a warning.
+// empty store with default settings and no error. A file that cannot be read
+// returns an empty store and an error wrapping ErrConfigUnreadable; a file
+// that cannot be decoded or validated returns an empty store and an error
+// wrapping ErrConfigCorrupt. Invalid runtime state (status, history) is
+// ignored with a warning and never makes the file corrupt.
 func LoadFile(path string) (*Store, error) {
 	data, err := os.ReadFile(path)
 	if err != nil {
@@ -33,24 +48,24 @@ func LoadFile(path string) (*Store, error) {
 				MaxConcurrentActions: DefaultMaxConcurrentActions,
 			}), nil
 		}
-		return NewStore(Settings{}), fmt.Errorf("read config file %q: %w", path, err)
+		return NewStore(Settings{}), fmt.Errorf("read config file %q: %w: %w", path, ErrConfigUnreadable, err)
 	}
 
 	var file persistedFile
 	if err := json.Unmarshal(data, &file); err != nil {
-		return NewStore(Settings{}), fmt.Errorf("decode config file %q: %w", path, err)
+		return NewStore(Settings{}), fmt.Errorf("decode config file %q: %w: %w", path, ErrConfigCorrupt, err)
 	}
 	if err := file.Settings.Validate(); err != nil {
-		return NewStore(Settings{}), fmt.Errorf("invalid settings in config file %q: %w", path, err)
+		return NewStore(Settings{}), fmt.Errorf("invalid settings in config file %q: %w: %w", path, ErrConfigCorrupt, err)
 	}
 
 	store := NewStore(file.Settings)
 	for _, card := range file.Cards {
 		if err := card.Validate(); err != nil {
-			return NewStore(Settings{}), fmt.Errorf("invalid card %q in config file %q: %w", card.ID, path, err)
+			return NewStore(Settings{}), fmt.Errorf("invalid card %q in config file %q: %w: %w", card.ID, path, ErrConfigCorrupt, err)
 		}
 		if _, exists := store.cards[card.ID]; exists {
-			return NewStore(Settings{}), fmt.Errorf("duplicate card %q in config file %q", card.ID, path)
+			return NewStore(Settings{}), fmt.Errorf("duplicate card %q in config file %q: %w", card.ID, path, ErrConfigCorrupt)
 		}
 		store.cards[card.ID] = cloneCard(card)
 	}
@@ -58,6 +73,29 @@ func LoadFile(path string) (*Store, error) {
 	loadStatus(store, file.Status, path)
 	loadHistory(store, file.History, path)
 	return store, nil
+}
+
+// QuarantineFile renames a config file that could not be loaded to
+// "<path>.corrupt-<UTC timestamp>" so that a later save never overwrites it.
+// A numeric suffix is appended when that name is already taken. The new path
+// is returned.
+func QuarantineFile(path string, now time.Time) (string, error) {
+	base := path + ".corrupt-" + now.UTC().Format("20060102T150405Z")
+	target := base
+	for suffix := 1; ; suffix++ {
+		_, err := os.Lstat(target)
+		if errors.Is(err, os.ErrNotExist) {
+			break
+		}
+		if err != nil {
+			return "", fmt.Errorf("inspect quarantine target %q: %w", target, err)
+		}
+		target = fmt.Sprintf("%s-%d", base, suffix)
+	}
+	if err := os.Rename(path, target); err != nil {
+		return "", fmt.Errorf("quarantine config file %q: %w", path, err)
+	}
+	return target, nil
 }
 
 // SaveFile atomically saves settings and cards without run history.
@@ -122,6 +160,10 @@ func loadStatus(store *Store, raw map[string]StatusSnapshot, path string) {
 			log.Printf("warning: ignoring status for unknown card %q in config file %q", cardID, path)
 			continue
 		}
+		if !validStatusState(snapshot.State) {
+			log.Printf("warning: ignoring status with unknown state %q for card %q in config file %q", snapshot.State, cardID, path)
+			continue
+		}
 		store.statuses[cardID] = cloneStatusSnapshot(snapshot)
 	}
 }
@@ -163,18 +205,24 @@ func loadHistory(store *Store, raw json.RawMessage, path string) {
 	}
 }
 
+// writePersistedFile replaces path atomically: the content is written to
+// "<path>.tmp", fsynced, renamed over the target and the directory entry is
+// fsynced. An existing file keeps its permission bits; a new file is 0600.
 func writePersistedFile(path string, file persistedFile) error {
 	data, err := json.MarshalIndent(file, "", "  ")
 	if err != nil {
 		return fmt.Errorf("encode config file %q: %w", path, err)
 	}
 
-	directory := filepath.Dir(path)
-	temporary, err := os.CreateTemp(directory, "marionette-*.json")
-	if err != nil {
-		return fmt.Errorf("create temporary config file in %q: %w", directory, err)
+	mode := os.FileMode(0o600)
+	if info, err := os.Stat(path); err == nil {
+		mode = info.Mode().Perm()
 	}
-	temporaryName := temporary.Name()
+	temporaryName := path + ".tmp"
+	temporary, err := os.OpenFile(temporaryName, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, mode)
+	if err != nil {
+		return fmt.Errorf("create temporary config file %q: %w", temporaryName, err)
+	}
 	cleanup := func() {
 		_ = temporary.Close()
 		_ = os.Remove(temporaryName)
@@ -192,9 +240,29 @@ func writePersistedFile(path string, file persistedFile) error {
 		_ = os.Remove(temporaryName)
 		return fmt.Errorf("close temporary config file %q: %w", temporaryName, err)
 	}
+	// OpenFile applies the umask; make the permission bits explicit.
+	if err := os.Chmod(temporaryName, mode); err != nil {
+		_ = os.Remove(temporaryName)
+		return fmt.Errorf("set permissions of temporary config file %q: %w", temporaryName, err)
+	}
 	if err := os.Rename(temporaryName, path); err != nil {
 		_ = os.Remove(temporaryName)
 		return fmt.Errorf("replace config file %q: %w", path, err)
 	}
+	if err := syncDirectory(filepath.Dir(path)); err != nil {
+		return fmt.Errorf("sync config directory for %q: %w", path, err)
+	}
 	return nil
+}
+
+func syncDirectory(path string) error {
+	directory, err := os.Open(path)
+	if err != nil {
+		return err
+	}
+	if err := directory.Sync(); err != nil {
+		_ = directory.Close()
+		return err
+	}
+	return directory.Close()
 }

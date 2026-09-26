@@ -56,6 +56,13 @@ The installer creates the `marionette` service account, preserves an existing
 `/var/lib/marionette/marionette.json`, installs the unit, and starts the
 service. Runtime settings are read from `/etc/default/marionette`.
 
+If the configuration file cannot be parsed at startup, Marionette moves it to
+`marionette.json.corrupt-<timestamp>` (logged as a warning), starts with an
+empty configuration and never overwrites the original. Fix the quarantined
+file and move it back to restore the cards. If the file exists but is not
+readable, the service starts read-only and rejects configuration changes
+until the permissions are fixed and the service is restarted.
+
 For an update, run the installer again with the new binary. It keeps the
 existing configuration and restarts the service. To roll back, run the
 installer with the previous binary; configuration data is not removed.

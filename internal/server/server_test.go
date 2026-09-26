@@ -328,8 +328,13 @@ func TestRouterMapsPersistenceFailureToInternalServerError(t *testing.T) {
 	if response.Code != http.StatusInternalServerError {
 		t.Fatalf("persistence failure response = %d", response.Code)
 	}
-	if _, exists := store.GetCard("persist-failure"); !exists {
-		t.Fatal("card mutation was unexpectedly rolled back")
+	if _, exists := store.GetCard("persist-failure"); exists {
+		t.Fatal("card mutation was not rolled back after the persistence failure")
+	}
+	getResponse := httptest.NewRecorder()
+	handler.ServeHTTP(getResponse, httptest.NewRequest(http.MethodGet, "/api/cards/persist-failure", nil))
+	if getResponse.Code != http.StatusNotFound {
+		t.Fatalf("GET after failed create = %d, want 404", getResponse.Code)
 	}
 }
 
@@ -433,4 +438,21 @@ func TestBackgroundActionsCloseCancelsRunningJob(t *testing.T) {
 		t.Fatalf("primary runs after cancel = %#v, error = %v", runs, err)
 	}
 	actions.Close() // second Close must be a no-op
+}
+
+func TestRouterMapsValidationErrorsToUnprocessableEntity(t *testing.T) {
+	store := config.NewStore(config.Settings{HistorySize: 5, MaxConcurrentActions: 1})
+	handler := NewRouter(store)
+	invalid := validServerCard("invalid")
+	invalid.Name = ""
+	response := requestJSON(t, handler, http.MethodPost, "/api/cards", invalid)
+	if response.Code != http.StatusUnprocessableEntity {
+		t.Fatalf("invalid create response = %d, want 422: %s", response.Code, response.Body.String())
+	}
+	createServerCard(t, store, "existing")
+	invalid.ID = "existing"
+	response = requestJSON(t, handler, http.MethodPut, "/api/cards/existing", invalid)
+	if response.Code != http.StatusUnprocessableEntity {
+		t.Fatalf("invalid update response = %d, want 422: %s", response.Code, response.Body.String())
+	}
 }

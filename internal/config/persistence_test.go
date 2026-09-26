@@ -31,12 +31,118 @@ func TestLoadFileCorruptJSONReturnsEmptyStoreAndError(t *testing.T) {
 	}
 
 	store, err := LoadFile(path)
-	if err == nil {
-		t.Fatal("LoadFile() returned nil error for corrupt JSON")
+	if !errors.Is(err, ErrConfigCorrupt) {
+		t.Fatalf("LoadFile() error = %v, want ErrConfigCorrupt", err)
 	}
 	if store == nil || len(store.ListCards()) != 0 {
 		t.Fatal("LoadFile() did not return an empty store for corrupt JSON")
 	}
+}
+
+func TestLoadFileUnreadableReturnsUnreadableError(t *testing.T) {
+	if os.Geteuid() == 0 {
+		t.Skip("root ignores file permissions")
+	}
+	path := filepath.Join(t.TempDir(), "config.json")
+	if err := os.WriteFile(path, []byte("{}"), 0o000); err != nil {
+		t.Fatalf("WriteFile() error = %v", err)
+	}
+	_, err := LoadFile(path)
+	if !errors.Is(err, ErrConfigUnreadable) {
+		t.Fatalf("LoadFile() error = %v, want ErrConfigUnreadable", err)
+	}
+	if errors.Is(err, ErrConfigCorrupt) {
+		t.Fatal("unreadable file must not be reported as corrupt")
+	}
+}
+
+func TestQuarantineFilePreservesContentAndAvoidsCollisions(t *testing.T) {
+	directory := t.TempDir()
+	path := filepath.Join(directory, "config.json")
+	now := time.Date(2026, time.September, 26, 10, 30, 0, 0, time.UTC)
+	if err := os.WriteFile(path, []byte("{broken"), 0o600); err != nil {
+		t.Fatalf("WriteFile() error = %v", err)
+	}
+	first, err := QuarantineFile(path, now)
+	if err != nil {
+		t.Fatalf("QuarantineFile() error = %v", err)
+	}
+	if first != path+".corrupt-20260926T103000Z" {
+		t.Fatalf("QuarantineFile() path = %q", first)
+	}
+	if _, err := os.Stat(path); !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("original path still exists after quarantine: %v", err)
+	}
+	content, err := os.ReadFile(first)
+	if err != nil || string(content) != "{broken" {
+		t.Fatalf("quarantined content = %q, error = %v", content, err)
+	}
+
+	if err := os.WriteFile(path, []byte("{again"), 0o600); err != nil {
+		t.Fatalf("WriteFile() error = %v", err)
+	}
+	second, err := QuarantineFile(path, now)
+	if err != nil {
+		t.Fatalf("second QuarantineFile() error = %v", err)
+	}
+	if second != first+"-1" {
+		t.Fatalf("second QuarantineFile() path = %q, want %q", second, first+"-1")
+	}
+	if _, err := QuarantineFile(filepath.Join(directory, "missing.json"), now); err == nil {
+		t.Fatal("QuarantineFile() succeeded for a missing file")
+	}
+}
+
+func TestSaveFilePreservesExistingPermissions(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "config.json")
+	store := NewStore(validSettings())
+	if err := store.SaveFile(path); err != nil {
+		t.Fatalf("SaveFile() error = %v", err)
+	}
+	info, err := os.Stat(path)
+	if err != nil || info.Mode().Perm() != 0o600 {
+		t.Fatalf("new config file mode = %v, error = %v, want 0600", info.Mode(), err)
+	}
+	if err := os.Chmod(path, 0o644); err != nil {
+		t.Fatalf("Chmod() error = %v", err)
+	}
+	if err := store.SaveFileWithHistory(path); err != nil {
+		t.Fatalf("SaveFileWithHistory() error = %v", err)
+	}
+	info, err = os.Stat(path)
+	if err != nil || info.Mode().Perm() != 0o644 {
+		t.Fatalf("rewritten config file mode = %v, error = %v, want 0644", info.Mode(), err)
+	}
+	if _, err := os.Stat(path + ".tmp"); !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("temporary file left behind: %v", err)
+	}
+}
+
+func TestLoadFileIgnoresStatusWithUnknownState(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "config.json")
+	card := validCard()
+	card.ID = "status-card"
+	data := []byte(`{"settings":{"historySize":5,"maxConcurrentActions":1},"cards":[` +
+		mustJSON(t, card) + `],"status":{"status-card":{"state":"bogus","checkedAt":"2026-09-26T10:00:00Z"}}}`)
+	if err := os.WriteFile(path, data, 0o600); err != nil {
+		t.Fatalf("WriteFile() error = %v", err)
+	}
+	store, err := LoadFile(path)
+	if err != nil {
+		t.Fatalf("LoadFile() error = %v, want nil (invalid runtime state is ignored)", err)
+	}
+	if _, exists := store.GetStatus(card.ID); exists {
+		t.Fatal("status with unknown state was loaded")
+	}
+}
+
+func mustJSON(t *testing.T, value any) string {
+	t.Helper()
+	data, err := json.Marshal(value)
+	if err != nil {
+		t.Fatalf("json.Marshal() error = %v", err)
+	}
+	return string(data)
 }
 
 func TestSaveFileRoundTripExcludesHistory(t *testing.T) {
@@ -176,8 +282,8 @@ func TestLoadFileInvalidCardReturnsErrorAndEmptyStore(t *testing.T) {
 	}
 
 	store, err := LoadFile(path)
-	if err == nil {
-		t.Fatal("LoadFile() returned nil error for invalid card")
+	if !errors.Is(err, ErrConfigCorrupt) {
+		t.Fatalf("LoadFile() error = %v, want ErrConfigCorrupt for invalid card", err)
 	}
 	if store == nil || len(store.ListCards()) != 0 {
 		t.Fatal("LoadFile() did not return an empty store for invalid card")
@@ -232,7 +338,11 @@ func TestStoreOnChangeHookPersistsMutationsButNotRuns(t *testing.T) {
 		t.Fatalf("OnChange calls after mutations = %d, want 4", calls)
 	}
 
-	if _, err := LoadFile(path); err != nil && !errors.Is(err, os.ErrNotExist) {
+	loaded, err := LoadFile(path)
+	if err != nil {
 		t.Fatalf("persisted hook file could not be loaded: %v", err)
+	}
+	if len(loaded.ListCards()) != 0 {
+		t.Fatalf("persisted file still contains %d cards after delete", len(loaded.ListCards()))
 	}
 }

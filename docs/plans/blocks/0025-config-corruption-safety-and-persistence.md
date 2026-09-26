@@ -3,7 +3,7 @@
 - **Fáze**: 8 — Zpevnění
 - **Vazba na požadavky**: FR-30, FR-31, FR-33, FR-35, NFR-04
 - **Vazba na ADR**: ADR-0004
-- **Stav**: Schváleno
+- **Stav**: Hotovo
 - **Závislosti**: Bloky 0002–0003 (store a persistence), 0010 (REST API), 0012 (kompozice)
 
 ## Cíl bloku
@@ -87,6 +87,35 @@ Viz [Definition of Done](../../devops/definition-of-done.md) +:
 
 ## Uzavření
 
-- **Stav po implementaci**: čeká
-- **Ověření**: čeká
-- **Dokumentace aktualizována**: čeká
+- **Stav po implementaci**: Hotovo (2026-09-26)
+- **Ověření**: `make verify` prošel (golangci-lint, eslint, vue-tsc, prettier,
+  `go test -race -count=1 ./...`, build, vet). Nové testy (všechny běžely,
+  žádný přeskočen — testy oprávnění jsou podmíněné `os.Geteuid() != 0`):
+  `TestLoadFileUnreadableReturnsUnreadableError`,
+  `TestQuarantineFilePreservesContentAndAvoidsCollisions`,
+  `TestSaveFilePreservesExistingPermissions` (0644 zachováno, nový soubor
+  0600, žádný `.tmp` nezůstává), `TestLoadFileIgnoresStatusWithUnknownState`,
+  `TestStoreRollsBackMutationsWhenPersistenceFails` (create/update/delete
+  vč. obnovy historie a statusu, settings), `TestStoreErrorsAreClassifiable`,
+  `TestRouterMapsValidationErrorsToUnprocessableEntity`, upravený
+  `TestRouterMapsPersistenceFailureToInternalServerError` (karta po 500
+  neexistuje, GET vrací 404), `TestOpenStoreMissingFileStartsEmptyAndPersists`,
+  `TestOpenStoreQuarantinesCorruptFile` (původní obsah zachován i po dalším
+  uložení), `TestOpenStoreUnreadableFileRejectsChanges`.
+- **Odchylky od návrhu**: (1) nečitelný soubor (EACCES) se nekarantenuje —
+  jeho obsah může být v pořádku, proto se rozlišuje `ErrConfigUnreadable` a
+  aplikace startuje jen pro čtení (mutace vrací 500 a vrací se zpět), zatímco
+  `ErrConfigCorrupt` vede ke karanténě; (2) `loadStatus` neplatný stav
+  ignoruje s varováním místo odmítnutí souboru, protože jde o runtime stav
+  a FR-35 vyžaduje, aby poškozený runtime stav aplikaci ani konfiguraci
+  neshodil; (3) `main` byl refaktorován jen na `openStore(path, now)`,
+  plný `run(ctx, env)` je naplánován v bloku 0027 spolu se shutdownem;
+  (4) chybějící soubor nevrací sentinel `ErrConfigMissing` — zůstává
+  dosavadní kontrakt „prázdný store, nil“ (FR-33); (5) `UpdateStatus`
+  rollback nepotřebuje, protože status se nepersistuje při změně (ADR-0004);
+  (6) validační chyby se mapují na 422 už v tomto bloku (dříve 400), v
+  souladu s návrhem bloku 0028.
+- **Dokumentace aktualizována**: ano — `docs/architecture/overview.md`
+  (sekce „Ochrana konfiguračního souboru“), README (chování `.corrupt-*`
+  a režimu jen pro čtení), godoc na `LoadFile`, `QuarantineFile`,
+  `PersistenceError`, `writePersistedFile`, `writeStoreError`, roadmapa.

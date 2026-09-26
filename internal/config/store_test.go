@@ -428,3 +428,88 @@ func TestStoreStatusChangeCallbackOnlyRunsForTransitions(t *testing.T) {
 	default:
 	}
 }
+
+func TestStoreRollsBackMutationsWhenPersistenceFails(t *testing.T) {
+	store := NewStore(validSettings())
+	card := validCard()
+	card.ID = "kept"
+	if _, err := store.CreateCard(card); err != nil {
+		t.Fatalf("CreateCard() error = %v", err)
+	}
+	if err := store.AppendRun(card.ID, Run{ActionKind: "primary", Outcome: RunOutcomeOK}); err != nil {
+		t.Fatalf("AppendRun() error = %v", err)
+	}
+	if err := store.UpdateStatus(card.ID, StatusSnapshot{State: StatusStateOK}); err != nil {
+		t.Fatalf("UpdateStatus() error = %v", err)
+	}
+	failing := errors.New("disk full")
+	store.OnChange = func(*Store) error { return failing }
+	var persistenceErr *PersistenceError
+
+	extra := validCard()
+	extra.ID = "extra"
+	if _, err := store.CreateCard(extra); !errors.As(err, &persistenceErr) || !errors.Is(err, failing) {
+		t.Fatalf("CreateCard() error = %v, want PersistenceError wrapping the cause", err)
+	}
+	if _, exists := store.GetCard(extra.ID); exists {
+		t.Fatal("card created despite persistence failure")
+	}
+
+	renamed := card
+	renamed.Name = "renamed"
+	if _, err := store.UpdateCard(card.ID, renamed); !errors.As(err, &persistenceErr) {
+		t.Fatalf("UpdateCard() error = %v", err)
+	}
+	if got, _ := store.GetCard(card.ID); got.Name != card.Name {
+		t.Fatalf("card updated despite persistence failure: %q", got.Name)
+	}
+
+	if err := store.DeleteCard(card.ID); !errors.As(err, &persistenceErr) {
+		t.Fatalf("DeleteCard() error = %v", err)
+	}
+	if _, exists := store.GetCard(card.ID); !exists {
+		t.Fatal("card deleted despite persistence failure")
+	}
+	if runs, err := store.GetRuns(card.ID, "primary"); err != nil || len(runs) != 1 {
+		t.Fatalf("run history not restored after failed delete: %v, %v", runs, err)
+	}
+	if snapshot, exists := store.GetStatus(card.ID); !exists || snapshot.State != StatusStateOK {
+		t.Fatalf("status not restored after failed delete: %#v, %v", snapshot, exists)
+	}
+	if changes, err := store.GetStatusChanges(card.ID); err != nil || len(changes) != 1 {
+		t.Fatalf("status history not restored after failed delete: %v, %v", changes, err)
+	}
+
+	settings := validSettings()
+	settings.HistorySize = 1
+	if err := store.UpdateSettings(settings); !errors.As(err, &persistenceErr) {
+		t.Fatalf("UpdateSettings() error = %v", err)
+	}
+	if got := store.GetSettings(); got != validSettings() {
+		t.Fatalf("settings changed despite persistence failure: %#v", got)
+	}
+}
+
+func TestStoreErrorsAreClassifiable(t *testing.T) {
+	store := NewStore(validSettings())
+	card := validCard()
+	card.ID = "dup"
+	if _, err := store.CreateCard(card); err != nil {
+		t.Fatalf("CreateCard() error = %v", err)
+	}
+	if _, err := store.CreateCard(card); !errors.Is(err, ErrAlreadyExists) {
+		t.Fatalf("duplicate CreateCard() error = %v, want ErrAlreadyExists", err)
+	}
+	if _, err := store.CreateCard(ActionCard{ID: "invalid"}); !errors.Is(err, ErrValidation) {
+		t.Fatalf("invalid CreateCard() error = %v, want ErrValidation", err)
+	}
+	if _, err := store.UpdateCard("dup", ActionCard{}); !errors.Is(err, ErrValidation) {
+		t.Fatalf("invalid UpdateCard() error = %v, want ErrValidation", err)
+	}
+	if _, err := store.UpdateCard("missing", card); !errors.Is(err, ErrNotFound) {
+		t.Fatalf("UpdateCard() error = %v, want ErrNotFound", err)
+	}
+	if err := store.UpdateStatus("dup", StatusSnapshot{State: "bogus"}); !errors.Is(err, ErrValidation) {
+		t.Fatalf("UpdateStatus() error = %v, want ErrValidation", err)
+	}
+}

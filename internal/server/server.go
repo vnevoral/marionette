@@ -119,16 +119,7 @@ func (api cardAPI) createCard(w http.ResponseWriter, request *http.Request) {
 	}
 	created, err := api.store.CreateCard(card)
 	if err != nil {
-		var persistenceErr *config.PersistenceError
-		if errors.As(err, &persistenceErr) {
-			writeError(w, http.StatusInternalServerError, err)
-			return
-		}
-		if strings.Contains(err.Error(), "already exists") {
-			writeError(w, http.StatusConflict, err)
-			return
-		}
-		writeError(w, http.StatusBadRequest, err)
+		writeStoreError(w, err)
 		return
 	}
 	if api.reconciler != nil {
@@ -156,16 +147,7 @@ func (api cardAPI) updateCard(w http.ResponseWriter, request *http.Request) {
 	}
 	updated, err := api.store.UpdateCard(request.PathValue("id"), card)
 	if err != nil {
-		var persistenceErr *config.PersistenceError
-		if errors.As(err, &persistenceErr) {
-			writeError(w, http.StatusInternalServerError, err)
-			return
-		}
-		if errors.Is(err, config.ErrNotFound) {
-			writeError(w, http.StatusNotFound, err)
-			return
-		}
-		writeError(w, http.StatusBadRequest, err)
+		writeStoreError(w, err)
 		return
 	}
 	if api.reconciler != nil {
@@ -179,11 +161,7 @@ func (api cardAPI) updateCard(w http.ResponseWriter, request *http.Request) {
 
 func (api cardAPI) deleteCard(w http.ResponseWriter, request *http.Request) {
 	if err := api.store.DeleteCard(request.PathValue("id")); err != nil {
-		if errors.Is(err, config.ErrNotFound) {
-			writeError(w, http.StatusNotFound, err)
-			return
-		}
-		writeError(w, http.StatusInternalServerError, err)
+		writeStoreError(w, err)
 		return
 	}
 	if api.reconciler != nil {
@@ -297,6 +275,25 @@ func writeJSON(w http.ResponseWriter, status int, value any) {
 
 func writeError(w http.ResponseWriter, status int, err error) {
 	writeJSON(w, status, map[string]string{"error": err.Error()})
+}
+
+// writeStoreError maps config store errors to HTTP statuses: not found → 404,
+// duplicate → 409, validation → 422, persistence failure (rolled back) → 500,
+// anything else → 400.
+func writeStoreError(w http.ResponseWriter, err error) {
+	var persistenceErr *config.PersistenceError
+	switch {
+	case errors.As(err, &persistenceErr):
+		writeError(w, http.StatusInternalServerError, err)
+	case errors.Is(err, config.ErrNotFound):
+		writeError(w, http.StatusNotFound, err)
+	case errors.Is(err, config.ErrAlreadyExists):
+		writeError(w, http.StatusConflict, err)
+	case errors.Is(err, config.ErrValidation):
+		writeError(w, http.StatusUnprocessableEntity, err)
+	default:
+		writeError(w, http.StatusBadRequest, err)
+	}
 }
 
 func handleHealth(w http.ResponseWriter, _ *http.Request) {
