@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { ActionCard } from "@/api";
 import {
 	actionFrom,
-	argumentRows,
+	commandLineOf,
 	copyAction,
 	emptyAction,
 	emptyCard,
@@ -21,12 +21,16 @@ function validForm(): ActionCard {
 	};
 }
 
+function checked(overrides: Partial<EditorState> = {}) {
+	return validate({ ...state(), ...overrides });
+}
+
 function state(overrides: Partial<EditorState> = {}): EditorState {
 	return {
 		form: validForm(),
 		statusEnabled: false,
-		primaryArgs: [],
-		statusArgs: [],
+		primaryLine: "true",
+		statusLine: "",
 		primaryEnv: [],
 		statusEnv: [],
 		...overrides,
@@ -34,22 +38,23 @@ function state(overrides: Partial<EditorState> = {}): EditorState {
 }
 
 describe("actionFrom", () => {
-	it("trims strings and drops blank arguments and environment rows", () => {
+	it("splits the command line, trims strings and drops blank environment rows", () => {
 		const action = actionFrom(
 			{
 				...emptyAction(),
-				command: "ping",
+				command: "stale",
 				dir: " /tmp ",
 				rule: { type: "match", pattern: " ok " },
 			},
-			argumentRows([" -c ", "", "1", "   "]),
+			"  ping  -c 1 '' 'My Disk' ",
 			[
 				{ id: "a", key: " TZ ", value: "UTC" },
 				{ id: "b", key: "", value: "ignored" },
 				{ id: "c", key: "  ", value: "ignored" },
 			],
 		);
-		expect(action.args).toEqual(["-c", "1"]);
+		expect(action.command).toBe("ping");
+		expect(action.args).toEqual(["-c", "1", "", "My Disk"]);
 		expect(action.env).toEqual({ TZ: "UTC" });
 		expect(action.dir).toBe("/tmp");
 		expect(action.rule).toEqual({ type: "match", pattern: "ok" });
@@ -58,38 +63,65 @@ describe("actionFrom", () => {
 	it("clears the pattern for exit-code rules", () => {
 		const action = actionFrom(
 			{ ...emptyAction(), command: "true", rule: { type: "exit_code", pattern: "stale" } },
-			[],
+			"true",
 			[],
 		);
 		expect(action.rule).toEqual({ type: "exit_code", pattern: undefined });
+	});
+
+	it("keeps a line that does not parse as the command so the form stays dirty", () => {
+		const action = actionFrom(emptyAction(), "ping host | grep ttl", []);
+		expect(action.command).toBe("ping host | grep ttl");
+		expect(action.args).toEqual([]);
+	});
+});
+
+describe("commandLineOf", () => {
+	it("shows a stored action as one line and reads back the same action", () => {
+		const stored = { ...emptyAction(), command: "/bin/ls", args: ["-l", "/mnt/My Disk"] };
+		expect(commandLineOf(stored)).toBe("/bin/ls -l '/mnt/My Disk'");
+		const saved = actionFrom(stored, commandLineOf(stored), []);
+		expect([saved.command, saved.args]).toEqual([stored.command, stored.args]);
+		expect(commandLineOf(undefined)).toBe("");
 	});
 });
 
 describe("validate", () => {
 	it("accepts a complete form", () => {
-		expect(validate(validForm(), false)).toEqual({ fieldErrors: {}, firstError: "" });
+		expect(checked()).toEqual({ fieldErrors: {}, firstError: "" });
 	});
 
 	it("reports every missing field and the first message", () => {
 		const form = validForm();
 		form.name = "  ";
-		form.primary.command = "";
 		form.primary.timeoutSec = 0;
-		const result = validate(form, false);
+		const result = checked({ form, primaryLine: "   " });
 		expect(result.firstError).toBe("Card name is required");
 		expect(Object.keys(result.fieldErrors)).toEqual(["name", "primaryCommand", "primaryTimeout"]);
 	});
 
+	it("reports a command line that does not parse beside the command", () => {
+		const result = checked({ primaryLine: "ping host | grep ttl" });
+		expect(result.fieldErrors.primaryCommand).toContain('"|" needs a shell');
+		expect(checked({ primaryLine: "echo 'open" }).fieldErrors.primaryCommand).toBe(
+			"Missing closing ' quote.",
+		);
+		expect(checked({ primaryLine: "'' -x" }).fieldErrors.primaryCommand).toBe(
+			"Primary command is required",
+		);
+	});
+
 	it("checks the status action only when it is enabled", () => {
-		const form = validForm();
-		expect(validate(form, false).firstError).toBe("");
-		const enabled = validate(form, true);
-		expect(enabled.fieldErrors).toMatchObject({
+		expect(checked({ statusLine: "ping |" }).firstError).toBe("");
+		expect(checked({ statusEnabled: true }).fieldErrors).toEqual({
 			statusCommand: "Status command is required",
-			statusTimeout: "Status timeout must be positive",
 		});
-		form.status = { ...emptyAction(), command: "ping", timeoutSec: 5 };
-		expect(validate(form, true).firstError).toBe("");
+		const form = validForm();
+		form.status = { ...emptyAction(), timeoutSec: 0 };
+		expect(
+			checked({ form, statusEnabled: true, statusLine: "ping -c 1 host" }).fieldErrors,
+		).toEqual({ statusTimeout: "Status timeout must be positive" });
+		expect(checked({ statusEnabled: true, statusLine: "ping -c 1 host" }).firstError).toBe("");
 	});
 });
 
@@ -97,7 +129,8 @@ describe("fingerprint", () => {
 	it("is stable for equivalent states and changes with edits", () => {
 		const base = fingerprint(state());
 		expect(fingerprint(state())).toBe(base);
-		expect(fingerprint(state({ primaryArgs: argumentRows([" ", ""]) }))).toBe(base);
+		expect(fingerprint(state({ primaryLine: "  true   " }))).toBe(base);
+		expect(fingerprint(state({ primaryLine: "true -v" }))).not.toBe(base);
 		const edited = state();
 		edited.form.name = "Renamed";
 		expect(fingerprint(edited)).not.toBe(base);
@@ -106,6 +139,7 @@ describe("fingerprint", () => {
 	it("ignores the status action while the toggle is off", () => {
 		const withStatus = state();
 		withStatus.form.status = { ...emptyAction(), command: "ping" };
+		withStatus.statusLine = "ping";
 		expect(fingerprint(withStatus)).toBe(fingerprint(state()));
 		expect(fingerprint({ ...withStatus, statusEnabled: true })).not.toBe(fingerprint(state()));
 	});
@@ -132,13 +166,10 @@ describe("copyAction and environmentRows", () => {
 	});
 });
 
-describe("argumentRows and environmentRows", () => {
+describe("environmentRows", () => {
 	it("give every row a distinct id", () => {
-		const args = argumentRows(["a", "b"]);
 		const env = environmentRows({ A: "1", B: "2" });
-		const ids = [...args, ...env].map((row) => row.id);
-		expect(new Set(ids).size).toBe(4);
-		expect(args.map((row) => row.value)).toEqual(["a", "b"]);
+		expect(new Set(env.map((row) => row.id)).size).toBe(2);
 		expect(env.map((row) => [row.key, row.value])).toEqual([
 			["A", "1"],
 			["B", "2"],
@@ -158,6 +189,7 @@ describe("fieldErrorsFromServer", () => {
 			"status.args": "must have at most 64 items",
 			"primary.args[2]": "must be at most 1024 characters",
 			"primary.args[5]": "second argument message",
+			"status.command": "action command is required",
 			"status.dir": "too long",
 			fastPollingIntervalSeconds: "fast polling interval must be less than polling interval",
 			id: "must contain only letters, digits, '-' and '_'",
@@ -169,8 +201,9 @@ describe("fieldErrorsFromServer", () => {
 			primaryTimeout: "must be between 1 and 3600",
 			primaryPattern: "output rule pattern is required",
 			statusEnv: "environment variable name is too long",
-			statusArgs: "must have at most 64 items",
-			primaryArgs: "must be at most 1024 characters",
+			// Arguments are part of the command line (ADR-0012); the first
+			// message for the line wins.
+			statusCommand: "must have at most 64 items",
 			statusDir: "too long",
 			fastPollingIntervalSeconds: "fast polling interval must be less than polling interval",
 		});

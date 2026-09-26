@@ -64,7 +64,10 @@ export async function requestAction(
 	return { kind: result };
 }
 
-/** The feedback line for an outcome; null when nothing should be shown. */
+/**
+ * The feedback for an outcome; null when nothing should be reported. An
+ * updated status is quiet: the badge already shows the new state.
+ */
 export function outcomeResult(
 	outcome: ActionOutcome,
 	labels: { accepted: string; updated: string },
@@ -73,7 +76,7 @@ export function outcomeResult(
 		case "accepted":
 			return { tone: "success", message: labels.accepted };
 		case "updated":
-			return { tone: "success", message: labels.updated };
+			return { tone: "success", message: labels.updated, quiet: true };
 		case "timeout":
 			return { tone: "error", message: FEEDBACK.resultUnavailable };
 		case "failed":

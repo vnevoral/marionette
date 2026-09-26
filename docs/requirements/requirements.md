@@ -7,7 +7,7 @@
 > 2026-09-25; doplněno o UX požadavky FR-24 až FR-29 a NFR-08 až NFR-10,
 > 2026-09-25; revize projektu a kódu 2026-09-26: NFR-12, upřesnění FR-18 a
 > NFR-01, viz [Rozhodnutí — revize 2026-09-26](#13-rozhodnutí-revize-projektu-2026-09-26);
-> doplněno FR-05 a FR-21a po validaci na Raspberry Pi, 2026-09-26).
+> doplněno FR-05, FR-21a a FR-22a po validaci na Raspberry Pi, 2026-09-26).
 > Otevřené otázky z v0.1 byly rozhodnuty
 > s vlastníkem projektu, viz [Rozhodnutí fáze 1](#7-rozhodnutí-fáze-1),
 > [Rozhodnutí — polling a terminace](#9-rozhodnutí-polling-a-terminace-2026-09-25)
@@ -128,6 +128,16 @@ spustitelný soubor.
   Dashboard zůstává skenovatelný; výstup na kartě nezobrazuje.
 - **FR-22**: Existuje samostatná obrazovka pro správu (konfiguraci) karet a
   akcí (CRUD).
+- **FR-22a** _(doplněno 2026-09-26)_: V editoru karty se primární i status
+  akce zadává jako **jeden příkazový řádek** (např.
+  `/usr/bin/ping -c 1 -W 2 192.168.1.10`), ne jako samostatný příkaz a
+  opakovatelné řádky argumentů. UI řádek rozloží na příkaz a argumenty
+  (uvozovky a `\` pro argumenty s mezerou, bez expanze proměnných a globů)
+  a pod polem zobrazí výsledek rozkladu; existující akce se zobrazí zpět
+  jako jeden řádek. Shellové znaky (`|`, `&`, `;`, `<`, `>`, `(`, `)`,
+  `` ` ``, `$`) mimo uvozovky editor odmítne s vysvětlením. Uložený tvar
+  akce, API a spouštění se nemění (FR-11, NFR-01 a); viz
+  [ADR-0012](../architecture/decisions/0012-single-line-command-editor.md).
 - **FR-23**: UI je postaveno na Vue 3 + PrimeVue (viz
   [ADR-0003](../architecture/decisions/0003-vue-primevue-frontend.md)).
 

@@ -25,8 +25,9 @@ export interface PendingRequest {
 export interface RequestResult {
 	tone: "success" | "error";
 	message: string;
+	/** The badge already shows it; only assistive technology hears it (spec §4). */
+	quiet?: boolean;
 }
 
 /** Repeatable editor rows carry a stable id so Vue keys survive removal. */
-export type ArgumentRow = { id: string; value: string };
 export type EnvironmentRow = { id: string; key: string; value: string };

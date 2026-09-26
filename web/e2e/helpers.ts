@@ -4,11 +4,18 @@ export interface CardInput {
 	id: string;
 	name: string;
 	withStatus?: boolean;
+	/** Status action command line; implies withStatus. */
+	statusCommand?: { command: string; args?: string[] };
 }
 
 /** Creates a card through the API as a non-browser client (no Origin header). */
 export async function createCard(request: APIRequestContext, input: CardInput) {
-	const action = { command: "true", timeoutSec: 5, rule: { type: "exit_code" } };
+	const action = {
+		command: "true",
+		...input.statusCommand,
+		timeoutSec: 5,
+		rule: { type: "exit_code" },
+	};
 	const response = await request.post("/api/cards", {
 		headers: { "Content-Type": "application/json" },
 		data: {
@@ -20,7 +27,7 @@ export async function createCard(request: APIRequestContext, input: CardInput) {
 				timeoutSec: 5,
 				rule: { type: "exit_code" },
 			},
-			...(input.withStatus ? { status: action } : {}),
+			...(input.withStatus || input.statusCommand ? { status: action } : {}),
 		},
 	});
 	expect(response.status()).toBe(201);

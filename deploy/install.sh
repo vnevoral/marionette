@@ -10,6 +10,7 @@ defaults_file=${DEFAULTS_FILE:-/etc/default/marionette}
 unit_file=${UNIT_FILE:-/etc/systemd/system/marionette.service}
 service_user=${SERVICE_USER:-marionette}
 service_group=${SERVICE_GROUP:-marionette}
+ping_group_range_file=${PING_GROUP_RANGE_FILE:-/proc/sys/net/ipv4/ping_group_range}
 
 if [[ ! -f "$binary_path" || ! -x "$binary_path" ]]; then
 	echo "executable Marionette binary not found: $binary_path" >&2
@@ -81,9 +82,43 @@ print_pairing_hint() {
 	echo '  journalctl -u marionette | grep "pairing code"'
 }
 
+# print_ping_hint tells the operator how to enable unprivileged ICMP when the
+# kernel does not allow it for the service group. The unit sets
+# NoNewPrivileges=true, so ping cannot use its cap_net_raw file capability
+# and needs net.ipv4.ping_group_range to cover the service group; otherwise
+# every ping status check fails with "socket: Operation not permitted".
+# The check is informational only: it never changes sysctl settings and never
+# fails the installation.
+print_ping_hint() {
+	local min max gid
+	[[ -r "$ping_group_range_file" ]] || return 0
+	read -r min max <"$ping_group_range_file" 2>/dev/null || return 0
+	[[ "$min" =~ ^[0-9]+$ && "$max" =~ ^[0-9]+$ ]] || return 0
+	# The primary group of the service user decides; fall back to the
+	# configured group when the user does not exist yet.
+	gid=$(id -g "$service_user" 2>/dev/null) ||
+		gid=$(getent group "$service_group" 2>/dev/null | cut -d: -f3) || gid=
+	if [[ "$gid" =~ ^[0-9]+$ ]]; then
+		((gid >= min && gid <= max)) && return 0
+	else
+		# Neither exists yet (staged install): only an empty range is
+		# certainly a problem.
+		((min <= max)) && return 0
+	fi
+	echo
+	echo "Unprivileged ping is not allowed for the $service_user service user"
+	echo "(net.ipv4.ping_group_range = $min $max). The service runs with"
+	echo "NoNewPrivileges=true, so ping status checks would fail with"
+	echo "\"socket: Operation not permitted\". To allow it, run:"
+	echo
+	echo "  echo 'net.ipv4.ping_group_range = 0 2147483647' | sudo tee /etc/sysctl.d/99-marionette-ping.conf"
+	echo "  sudo sysctl --system"
+}
+
 if [[ -n "$destdir" ]]; then
 	echo "staged Marionette installation under $destdir"
 	print_pairing_hint
+	print_ping_hint
 	exit 0
 fi
 
@@ -108,3 +143,4 @@ fi
 
 echo "Marionette installed and started"
 print_pairing_hint
+print_ping_hint

@@ -103,11 +103,20 @@ Rules:
   because that is when the server activates fast polling. The stream is
   shared by all views; while it is down, the card list is re-read over REST
   every 5 s and the statuses it carries are applied to the dashboard.
-- When the wait ends, the controls are released immediately and the outcome
-  (**Updated**, **Result not available yet**, or the enqueue error) stays
-  visible for about 4 s. A card without a status action, or a primary action
-  that no check follows, shows **Accepted** right after the request is
-  queued.
+- When the wait ends, the controls are released immediately. The badge
+  shows the new state, so **Updated** is not repeated in text; only an
+  outcome the badge cannot show (**Result not available yet**, or the
+  enqueue error) stays visible for about 4 s. A card without a status
+  action, or a primary action that no check follows, shows **Accepted**
+  right after the request is queued.
+- The pending phases (**Queued**, **Running**) are shown by the badge and
+  the button spinner only, never by a second line of text. Every phase and
+  outcome, **Updated** included, is announced through a visually hidden
+  live region that takes no space.
+- Action feedback never changes the size of a card or panel: a visible
+  outcome replaces the quiet line in place (**Last checked ...** on a
+  card, the asynchronous note in the detail Actions panel) and the line
+  returns when the outcome expires.
 - A snapshot never replaces a newer one: a slow REST read cannot undo a
   transition that arrived through the stream in the meantime.
 - An enqueue failure is an operation error, not automatically a device
@@ -121,7 +130,8 @@ Rules:
 
 Feedback channels:
 
-- **Inline** (next to its subject) for everything that belongs to one card,
+- **Inline** (next to its subject, in place of the quiet line for action
+  outcomes) for everything that belongs to one card,
   one form field or the current page: action outcomes on a card or in the
   detail, validation and server errors, load errors, a failed delete. Several
   cards can report at once without covering each other.
@@ -157,7 +167,9 @@ Every card has the same hierarchy:
 - icon and status badge;
 - card name;
 - description limited to three lines;
-- `Last checked ...` or `Not checked yet`;
+- `Last checked ...` or `Not checked yet`, replaced in place by an action
+  outcome the badge cannot show (§4); the line is reserved, empty, on a
+  card without a status action so every card keeps its height;
 - primary **Run action** button;
 - secondary **Check status** button when a status action exists;
 - overflow menu with **View details** and **Edit**.
@@ -177,12 +189,17 @@ management views.
 The detail header contains the card name, icon, current state, and last check.
 The body contains:
 
-- **Summary**: current state, state duration, and last check;
+- **Summary**: current state, state duration, and last check with its
+  outcome, exit code, duration, and expandable output (FR-21a), so the
+  cause of a **Problem** is visible without the API;
 - **Actions**: run primary action and manually check status; both buttons
-  are blocked while a check is pending, the **Action queued** note is
-  replaced by the outcome, and recent runs and status history are refetched
-  once a newer check is visible; when no check follows (§4) the view shows
-  **Action accepted** and refetches the runs right away;
+  are blocked while a check is pending (the badge shows **Queued** /
+  **Running**), and recent runs and status history are refetched once a
+  newer check is visible; an outcome the badge cannot show (**Result not
+  available yet**, an enqueue error, or **Action accepted** when no check
+  follows, §4) replaces the panel's asynchronous note in place; after
+  **Action accepted** the runs are refetched right away. The page-level
+  line above the summary is used only for deleting the card;
 - **Recent runs**: time, outcome, duration, and expandable output;
 - **Status history**: chronological transition timeline with duration;
 - **Configuration**: link to edit, not inline configuration in diagnostics.
@@ -198,14 +215,22 @@ standalone workflow and does not combine a card list with a configuration form.
 ### 7.2 Form sections
 
 1. **Card identity**: name, description, icon.
-2. **Primary action**: command, arguments, working directory, environment,
+2. **Primary action**: command line, working directory, environment,
    timeout, and output rule.
 3. **Status check**: enable/disable switch and the same action editor.
 4. **Automatic checks**: standard interval, fast interval, and fast window.
 5. **Save bar**: sticky save/cancel actions.
 
-The ID is optional on creation and immutable during editing. Arguments and
-environment variables are repeatable rows, not an opaque JSON editor.
+The ID is optional on creation and immutable during editing. The command and
+its arguments are one **Command line** field, as typed in a terminal
+(`/usr/bin/ping -c 1 -W 2 192.168.1.10`); below it a live preview shows the
+command and each argument as the process receives them, and a line that
+needs a shell (unquoted `|`, `&`, `;`, `<`, `>`, `(`, `)`, `` ` ``, `$`), an
+unclosed quote, or a trailing backslash is explained beside the field and
+cannot be saved. Quotes and backslashes follow
+[ADR-0012](../architecture/decisions/0012-single-line-command-editor.md); a
+stored action is shown as one line with quotes added where needed.
+Environment variables are repeatable rows, not an opaque JSON editor.
 
 ### 7.3 Validation and unsaved changes
 

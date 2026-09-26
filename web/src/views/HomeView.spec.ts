@@ -75,6 +75,17 @@ function mountHome() {
 	});
 }
 
+type Wrapper = ReturnType<ReturnType<typeof mountHome>["find"]>;
+
+/** Visible text of the card's Last checked / outcome line. */
+function noteText(card: Wrapper) {
+	return card.find(".action-note .action-note-text").text();
+}
+
+function announcement(card: Wrapper) {
+	return card.find(".action-note [role='status']").text();
+}
+
 function cardByName(wrapper: ReturnType<typeof mountHome>, name: string) {
 	const card = wrapper.findAll(".action-card").find((candidate) => candidate.text().includes(name));
 	if (!card) throw new Error(`card ${name} not rendered`);
@@ -131,13 +142,16 @@ describe("HomeView", () => {
 		expect(buttonByLabel(card, "Run action").attributes("disabled")).toBeUndefined();
 		expect(buttonByLabel(card, "Check status").attributes("disabled")).toBeUndefined();
 		expect(buttonByLabel(card, "Run action").classes()).not.toContain("p-button-loading");
-		expect(card.find(".request-feedback").text()).toBe("Updated");
-		expect(card.find(".request-feedback").classes()).toContain("request-feedback-success");
+		// The badge shows the new state; the card keeps its Last checked line
+		// and only announces the outcome (UX spec §4).
 		expect(card.text()).toContain("Problem");
+		expect(noteText(card)).toMatch(/^Last checked /);
+		expect(announcement(card)).toBe("Updated");
+		expect(card.find(".action-note").classes()).not.toContain("action-note-success");
 
 		vi.advanceTimersByTime(4000);
 		await flushPromises();
-		expect(card.find(".request-feedback").exists()).toBe(false);
+		expect(announcement(card)).toBe("");
 
 		await buttonByLabel(card, "Check status").trigger("click");
 		await flushPromises();
@@ -167,7 +181,7 @@ describe("HomeView", () => {
 
 		FakeEventSource.last().status({ cardId: "printer", snapshot: snapshot(after) });
 		await flushPromises();
-		expect(card.find(".request-feedback").text()).toBe("Updated");
+		expect(announcement(card)).toBe("Updated");
 		expect(card.text()).toContain("Healthy");
 		wrapper.unmount();
 	});
@@ -182,8 +196,8 @@ describe("HomeView", () => {
 		await flushPromises();
 		expect(buttonByLabel(card, "Run action").attributes("disabled")).toBeUndefined();
 		expect(buttonByLabel(card, "Run action").classes()).not.toContain("p-button-loading");
-		expect(card.find(".request-feedback").text()).toBe("queue is full");
-		expect(card.find(".request-feedback").classes()).toContain("request-feedback-error");
+		expect(noteText(card)).toBe("queue is full");
+		expect(card.find(".action-note").classes()).toContain("action-note-error");
 		expect(card.text()).toContain("Healthy");
 		wrapper.unmount();
 	});
@@ -202,7 +216,7 @@ describe("HomeView", () => {
 		await buttonByLabel(card, "Run action").trigger("click");
 		await flushPromises();
 		expect(buttonByLabel(card, "Run action").attributes("disabled")).toBeUndefined();
-		expect(card.find(".request-feedback").text()).toBe("Accepted");
+		expect(noteText(card)).toBe("Accepted");
 		wrapper.unmount();
 	});
 
@@ -221,7 +235,7 @@ describe("HomeView", () => {
 		await flushPromises();
 		expect(buttonByLabel(card, "Run action").attributes("disabled")).toBeUndefined();
 		expect(buttonByLabel(card, "Check status").attributes("disabled")).toBeUndefined();
-		expect(card.find(".request-feedback").text()).toBe("Accepted");
+		expect(noteText(card)).toBe("Accepted");
 		expect(getStatus).not.toHaveBeenCalled();
 		wrapper.unmount();
 	});

@@ -4,7 +4,7 @@ import { RouterLink } from "vue-router";
 import Card from "primevue/card";
 import type { ActionCard, StatusSnapshot } from "@/api";
 import ActionControls from "@/components/ActionControls.vue";
-import RequestState from "@/components/RequestState.vue";
+import ActionNote from "@/components/ActionNote.vue";
 import StatusBadge from "@/components/StatusBadge.vue";
 import type { PendingRequest, RequestResult } from "@/types";
 import { DEFAULT_CARD_ICON } from "@/ui/icons";
@@ -20,7 +20,8 @@ import {
 } from "@/ui/vocabulary";
 
 // Dashboard card (UX spec §5.2): icon and badge, name, description, last
-// check, feedback line and the two action buttons.
+// check (replaced in place by an action outcome the badge cannot show) and
+// the two action buttons.
 const props = defineProps<{
 	card: ActionCard;
 	status?: StatusSnapshot | null;
@@ -39,11 +40,9 @@ const badge = computed(() => {
 	return statusPresentation(props.status?.state);
 });
 
-const feedback = computed(() => {
-	if (props.pending) return { message: REQUEST[props.pending.phase].label, tone: "info" as const };
-	if (props.result) return props.result;
-	return { message: "", tone: "info" as const };
-});
+const lastChecked = computed(() =>
+	props.card.status ? lastCheckedLabel(props.status?.checkedAt) : "",
+);
 
 const detailLink = computed(() => `/cards/${encodeURIComponent(props.card.id)}`);
 </script>
@@ -63,12 +62,17 @@ const detailLink = computed(() => `/cards/${encodeURIComponent(props.card.id)}`)
 		</template>
 		<template #content>
 			<p class="card-description">{{ card.description || EMPTY.description }}</p>
-			<p v-if="card.status" class="card-checked">{{ lastCheckedLabel(status?.checkedAt) }}</p>
+			<ActionNote
+				class="card-checked"
+				:fallback="lastChecked"
+				:pending="pending"
+				:result="result"
+				single-line
+			/>
 			<p v-if="card.status && statusUnavailable" class="card-unavailable">
 				<i class="pi pi-exclamation-circle" aria-hidden="true" />
 				<span>{{ FEEDBACK.statusUnavailable }}</span>
 			</p>
-			<RequestState class="card-feedback" :message="feedback.message" :tone="feedback.tone" />
 		</template>
 		<template #footer>
 			<div class="card-footer">
@@ -152,11 +156,6 @@ const detailLink = computed(() => `/cards/${encodeURIComponent(props.card.id)}`)
 }
 .card-checked {
 	margin: var(--space-3) 0 0;
-	color: var(--color-muted);
-	font-size: 0.85rem;
-}
-.card-feedback {
-	margin-top: var(--space-4);
 }
 .card-footer {
 	display: flex;

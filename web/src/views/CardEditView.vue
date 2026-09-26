@@ -15,7 +15,7 @@ import { useUnsavedChangesGuard } from "@/composables/useUnsavedChangesGuard";
 import { ACTIONS, FEEDBACK, LOADING } from "@/ui/vocabulary";
 import {
 	actionFrom,
-	argumentRows,
+	commandLineOf,
 	copyAction,
 	emptyAction,
 	emptyCard,
@@ -25,7 +25,6 @@ import {
 	rememberSavedCard,
 	takeSavedCard,
 	validate as validateCard,
-	type ArgumentRow,
 	type EnvironmentRow,
 } from "@/views/cardEditModel";
 import { singleParam } from "@/router/params";
@@ -45,8 +44,9 @@ const initialFingerprint = ref("");
 const fieldErrors = reactive<Record<string, string>>({});
 
 const form = reactive<ActionCard>(emptyCard());
-const primaryArgs = ref<ArgumentRow[]>([]);
-const statusArgs = ref<ArgumentRow[]>([]);
+// Each action is edited as one command line (ADR-0012).
+const primaryLine = ref("");
+const statusLine = ref("");
 const primaryEnv = ref<EnvironmentRow[]>([]);
 const statusEnv = ref<EnvironmentRow[]>([]);
 // Bumped on every route change so a response for a previous card is ignored.
@@ -56,8 +56,8 @@ function formFingerprint() {
 	return fingerprint({
 		form,
 		statusEnabled: statusEnabled.value,
-		primaryArgs: primaryArgs.value,
-		statusArgs: statusArgs.value,
+		primaryLine: primaryLine.value,
+		statusLine: statusLine.value,
 		primaryEnv: primaryEnv.value,
 		statusEnv: statusEnv.value,
 	});
@@ -78,8 +78,8 @@ function applyCard(card: ActionCard) {
 		status: card.status ? copyAction(card.status) : undefined,
 	});
 	statusEnabled.value = Boolean(card.status);
-	primaryArgs.value = argumentRows(card.primary.args);
-	statusArgs.value = argumentRows(card.status?.args);
+	primaryLine.value = commandLineOf(card.primary);
+	statusLine.value = commandLineOf(card.status);
 	primaryEnv.value = environmentRows(card.primary.env);
 	statusEnv.value = environmentRows(card.status?.env);
 	markClean();
@@ -91,14 +91,18 @@ function actionErrors(scope: "primary" | "status") {
 		dir: fieldErrors[`${scope}Dir`],
 		timeoutSec: fieldErrors[`${scope}Timeout`],
 		pattern: fieldErrors[`${scope}Pattern`],
-		args: fieldErrors[`${scope}Args`],
 		env: fieldErrors[`${scope}Env`],
 	};
 }
 
 function validate() {
 	for (const key of Object.keys(fieldErrors)) delete fieldErrors[key];
-	const result = validateCard(form, statusEnabled.value);
+	const result = validateCard({
+		form,
+		statusEnabled: statusEnabled.value,
+		primaryLine: primaryLine.value,
+		statusLine: statusLine.value,
+	});
 	Object.assign(fieldErrors, result.fieldErrors);
 	return result.firstError;
 }
@@ -119,11 +123,10 @@ async function save() {
 		...form,
 		id: isNew() ? "" : cardID(),
 		name: form.name.trim(),
-		primary: actionFrom(form.primary, primaryArgs.value, primaryEnv.value),
-		status:
-			statusEnabled.value && form.status
-				? actionFrom(form.status, statusArgs.value, statusEnv.value)
-				: undefined,
+		primary: actionFrom(form.primary, primaryLine.value, primaryEnv.value),
+		status: statusEnabled.value
+			? actionFrom(form.status ?? emptyAction(), statusLine.value, statusEnv.value)
+			: undefined,
 	};
 	try {
 		const saved = isNew() ? await createCard(payload) : await updateCard(payload);
@@ -217,7 +220,7 @@ useUnsavedChangesGuard(isDirty, () => saving.value);
 
 				<ActionEditor
 					v-model="form.primary"
-					v-model:args="primaryArgs"
+					v-model:command-line="primaryLine"
 					v-model:environment="primaryEnv"
 					title="Primary action"
 					:errors="actionErrors('primary')"
@@ -230,7 +233,7 @@ useUnsavedChangesGuard(isDirty, () => saving.value);
 
 				<ActionEditor
 					v-if="statusEnabled"
-					v-model:args="statusArgs"
+					v-model:command-line="statusLine"
 					v-model:environment="statusEnv"
 					:model-value="form.status ?? emptyAction()"
 					title="Status action"

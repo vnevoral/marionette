@@ -142,7 +142,7 @@ describe("requestAction", () => {
 describe("outcomeResult", () => {
 	const labels = { accepted: "Accepted", updated: "Updated" };
 
-	it("maps outcomes to feedback lines and hides an abort", () => {
+	it("maps outcomes to feedback, keeps an update quiet and hides an abort", () => {
 		expect(outcomeResult({ kind: "accepted" }, labels)).toEqual({
 			tone: "success",
 			message: "Accepted",
@@ -150,6 +150,7 @@ describe("outcomeResult", () => {
 		expect(outcomeResult({ kind: "updated" }, labels)).toEqual({
 			tone: "success",
 			message: "Updated",
+			quiet: true,
 		});
 		expect(outcomeResult({ kind: "timeout" }, labels)).toEqual({
 			tone: "error",

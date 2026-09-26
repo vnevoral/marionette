@@ -77,6 +77,24 @@ echo 'MARIONETTE_AUTH=off' >>"$root$environment_file"
 output=$(DESTDIR="$root" "$script_dir/install.sh" "$binary")
 if grep -qF "$hint" <<<"$output"; then fail "pairing hint shown with access control off"; fi
 
+# The ping hint (block 0046) appears when the kernel forbids unprivileged
+# ICMP and stays silent when it is allowed or the setting cannot be read.
+ping_hint="sudo tee /etc/sysctl.d/99-marionette-ping.conf"
+printf '1\t0\n' >"$work/ping_disabled"
+printf '0\t2147483647\n' >"$work/ping_enabled"
+output=$(PING_GROUP_RANGE_FILE="$work/ping_disabled" DESTDIR="$root" "$script_dir/install.sh" "$binary")
+grep -qF "$ping_hint" <<<"$output" || fail "no ping hint with ping_group_range 1 0"
+grep -qF "sudo sysctl --system" <<<"$output" || fail "ping hint does not reload sysctl"
+output=$(PING_GROUP_RANGE_FILE="$work/ping_enabled" DESTDIR="$root" "$script_dir/install.sh" "$binary")
+if grep -qF "$ping_hint" <<<"$output"; then fail "ping hint shown with ping_group_range 0 2147483647"; fi
+# An existing service user is checked against its primary group: root (GID 0)
+# lies outside a non-empty range that starts at 1.
+printf '1\t2147483647\n' >"$work/ping_without_root"
+output=$(SERVICE_USER=root PING_GROUP_RANGE_FILE="$work/ping_without_root" DESTDIR="$root" "$script_dir/install.sh" "$binary")
+grep -qF "$ping_hint" <<<"$output" || fail "no ping hint when the service user's group is outside ping_group_range"
+output=$(PING_GROUP_RANGE_FILE="$work/missing" DESTDIR="$root" "$script_dir/install.sh" "$binary")
+if grep -qF "$ping_hint" <<<"$output"; then fail "ping hint shown without a readable ping_group_range"; fi
+
 # A file that is not an ELF executable is refused.
 printf '#!/bin/sh\n' >"$work/script"
 chmod 0755 "$work/script"

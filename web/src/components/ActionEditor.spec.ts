@@ -3,15 +3,15 @@ import { mount } from "@vue/test-utils";
 import PrimeVue from "primevue/config";
 import type { Action } from "@/api";
 import ActionEditor from "@/components/ActionEditor.vue";
-import type { ArgumentRow, EnvironmentRow } from "@/views/cardEditModel";
+import type { EnvironmentRow } from "@/views/cardEditModel";
 
 type EditorProps = {
-	args: ArgumentRow[];
+	commandLine: string;
 	environment: EnvironmentRow[];
 	errors: Record<string, string>;
 };
 
-// Mounts the editor with v-model wiring so emitted rows flow back into props,
+// Mounts the editor with v-model wiring so emitted values flow back into props,
 // as they do under the real parent.
 function mountEditor(overrides: Partial<EditorProps> = {}) {
 	const action: Action = {
@@ -22,11 +22,11 @@ function mountEditor(overrides: Partial<EditorProps> = {}) {
 	const wrapper = mount(ActionEditor, {
 		props: {
 			modelValue: action,
-			args: overrides.args ?? [{ id: "a1", value: "-c" }],
+			commandLine: overrides.commandLine ?? "ping -c 1",
 			environment: overrides.environment ?? [{ id: "e1", key: "TZ", value: "UTC" }],
 			title: "Primary action",
 			errors: overrides.errors,
-			"onUpdate:args": (value: ArgumentRow[]) => void wrapper.setProps({ args: value }),
+			"onUpdate:commandLine": (value: string) => void wrapper.setProps({ commandLine: value }),
 			"onUpdate:environment": (value: EnvironmentRow[]) =>
 				void wrapper.setProps({ environment: value }),
 		},
@@ -42,27 +42,42 @@ function lastEmitted<T>(wrapper: ReturnType<typeof mountEditor>, event: string):
 }
 
 describe("ActionEditor", () => {
-	it("adds and removes argument rows itself and keeps row ids stable", async () => {
+	it("edits the command as one line and shows how it is split (ADR-0012)", async () => {
 		const wrapper = mountEditor();
-		await wrapper
-			.findAll("button")
-			.find((b) => b.text() === "Add argument")!
-			.trigger("click");
-		const added = lastEmitted<ArgumentRow[]>(wrapper, "update:args");
-		expect(added).toHaveLength(2);
-		expect(added[0]).toEqual({ id: "a1", value: "-c" });
-		expect(added[1].id).not.toBe("a1");
-		expect(added[1].value).toBe("");
+		const input = wrapper.find("input.command-line");
+		expect((input.element as HTMLInputElement).value).toBe("ping -c 1");
+		expect(wrapper.find(".preview-command").text()).toBe("ping");
+		expect(wrapper.findAll(".preview-arg").map((item) => item.text())).toEqual(["-c", "1"]);
 
-		await wrapper.find('button[aria-label="Remove argument 1"]').trigger("click");
-		const remaining = lastEmitted<ArgumentRow[]>(wrapper, "update:args");
-		expect(remaining).toEqual([added[1]]);
-
-		await wrapper.find('input[aria-label="Argument 1"]').setValue("-n");
-		expect(lastEmitted<ArgumentRow[]>(wrapper, "update:args")).toEqual([
-			{ id: added[1].id, value: "-n" },
+		await input.setValue("/usr/bin/ping -c 1 'My Disk' ''");
+		expect(lastEmitted<string>(wrapper, "update:commandLine")).toBe(
+			"/usr/bin/ping -c 1 'My Disk' ''",
+		);
+		expect(wrapper.find(".preview-command").text()).toBe("/usr/bin/ping");
+		expect(wrapper.findAll(".preview-arg").map((item) => item.text())).toEqual([
+			"-c",
+			"1",
+			"My Disk",
+			"empty",
 		]);
-		expect(wrapper.findAll('input[aria-label^="Argument"]')).toHaveLength(1);
+		expect(wrapper.emitted("update:modelValue")).toBeUndefined();
+	});
+
+	it("explains a line that does not parse instead of showing a preview", async () => {
+		const wrapper = mountEditor({ commandLine: "ping host | grep ttl" });
+		expect(wrapper.find(".command-preview li").exists()).toBe(false);
+		expect(wrapper.find(".field-error").text()).toContain('"|" needs a shell');
+		expect(wrapper.find("input.command-line").attributes("aria-invalid")).toBe("true");
+
+		await wrapper.find("input.command-line").setValue("ping host");
+		expect(wrapper.find(".field-error").exists()).toBe(false);
+		expect(wrapper.find(".preview-command").text()).toBe("ping");
+	});
+
+	it("shows no preview for an empty line", () => {
+		const wrapper = mountEditor({ commandLine: "  " });
+		expect(wrapper.find(".command-preview li").exists()).toBe(false);
+		expect(wrapper.find(".field-error").exists()).toBe(false);
 	});
 
 	it("edits environment rows by id", async () => {
@@ -92,13 +107,14 @@ describe("ActionEditor", () => {
 
 	it("emits the action with the changed field only", async () => {
 		const wrapper = mountEditor();
-		const command = wrapper
+		const directory = wrapper
 			.findAll("label")
-			.find((label) => label.text().startsWith("Command"))!
+			.find((label) => label.text().startsWith("Working directory"))!
 			.find("input");
-		await command.setValue("curl");
+		await directory.setValue("/tmp");
 		expect(lastEmitted<Action>(wrapper, "update:modelValue")).toEqual({
-			command: "curl",
+			command: "ping",
+			dir: "/tmp",
 			timeoutSec: 5,
 			rule: { type: "match", pattern: "ok" },
 		});
@@ -119,10 +135,13 @@ describe("ActionEditor", () => {
 		for (const input of wrapper.findAll("input")) {
 			const element = input.element;
 			const wrappedByLabel = element.closest("label")?.textContent?.trim();
+			const labelFor = element.id ? wrapper.find(`label[for="${element.id}"]`) : undefined;
+			const labelText = labelFor?.exists() ? labelFor.text() : undefined;
 			const named =
 				element.getAttribute("aria-label") ||
 				element.getAttribute("aria-labelledby") ||
-				wrappedByLabel;
+				wrappedByLabel ||
+				labelText;
 			expect(named, `input ${element.outerHTML} has no accessible name`).toBeTruthy();
 		}
 		const combobox = wrapper.find('[role="combobox"]');

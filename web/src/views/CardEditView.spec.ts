@@ -35,6 +35,10 @@ function inputInLabel(wrapper: VueWrapper, label: string) {
 	return node.find("input, textarea");
 }
 
+function commandLine(wrapper: VueWrapper) {
+	return wrapper.find<HTMLInputElement>("input.command-line");
+}
+
 async function mountEdit(path: string) {
 	const router: Router = createRouter({
 		history: createMemoryHistory(),
@@ -95,7 +99,7 @@ describe("CardEditView", () => {
 		expect((inputInLabel(wrapper, "Name").element as HTMLInputElement).value).toBe(
 			"Printer renamed",
 		);
-		expect((inputInLabel(wrapper, "Command").element as HTMLInputElement).value).toBe("wake");
+		expect(commandLine(wrapper).element.value).toBe("wake --now");
 		wrapper.unmount();
 	});
 
@@ -132,7 +136,7 @@ describe("CardEditView", () => {
 		const { wrapper, router, confirm, toast } = await mountEdit("/cards/new/edit");
 		expect(wrapper.find("h1").text()).toBe("New card");
 		await inputInLabel(wrapper, "Name").setValue("Lamp");
-		await inputInLabel(wrapper, "Command").setValue("switch");
+		await commandLine(wrapper).setValue("switch --on 'Living room'");
 		await wrapper
 			.findAll("button")
 			.find((b) => b.text().includes("Save card"))!
@@ -140,7 +144,11 @@ describe("CardEditView", () => {
 		await flushPromises();
 
 		expect(createCard).toHaveBeenCalledTimes(1);
-		expect(vi.mocked(createCard).mock.calls[0][0]).toMatchObject({ id: "", name: "Lamp" });
+		expect(vi.mocked(createCard).mock.calls[0][0]).toMatchObject({
+			id: "",
+			name: "Lamp",
+			primary: { command: "switch", args: ["--on", "Living room"] },
+		});
 		expect(router.currentRoute.value.path).toBe("/cards/card-1/edit");
 		expect(getCard).not.toHaveBeenCalled();
 		expect((inputInLabel(wrapper, "Name").element as HTMLInputElement).value).toBe("Lamp");
@@ -153,6 +161,44 @@ describe("CardEditView", () => {
 		});
 		expect(wrapper.find("h1").text()).toBe("Edit card");
 		expect(confirm.require).not.toHaveBeenCalled();
+		wrapper.unmount();
+	});
+
+	it("saves a status action typed only as a command line", async () => {
+		vi.mocked(createCard).mockImplementation(async (card) => ({ ...card, id: "card-2" }));
+		const { wrapper } = await mountEdit("/cards/new/edit");
+		await inputInLabel(wrapper, "Name").setValue("PC");
+		await commandLine(wrapper).setValue("/usr/bin/wakeonlan AA:BB:CC:DD:EE:FF");
+		await wrapper.find("#status-enabled").setValue(true);
+		await wrapper.findAll("input.command-line")[1].setValue("/usr/bin/ping -c 1 -W 2 192.168.1.10");
+		await wrapper
+			.findAll("button")
+			.find((b) => b.text().includes("Save card"))!
+			.trigger("click");
+		await flushPromises();
+
+		expect(vi.mocked(createCard).mock.calls[0][0]).toMatchObject({
+			primary: { command: "/usr/bin/wakeonlan", args: ["AA:BB:CC:DD:EE:FF"] },
+			status: {
+				command: "/usr/bin/ping",
+				args: ["-c", "1", "-W", "2", "192.168.1.10"],
+				timeoutSec: 30,
+			},
+		});
+		wrapper.unmount();
+	});
+
+	it("does not save a command line that needs a shell", async () => {
+		const { wrapper } = await mountEdit("/cards/printer/edit");
+		await commandLine(wrapper).setValue("wake --now | tee log");
+		await wrapper
+			.findAll("button")
+			.find((b) => b.text().includes("Save card"))!
+			.trigger("click");
+		await flushPromises();
+
+		expect(updateCard).not.toHaveBeenCalled();
+		expect(wrapper.find(".field-error").text()).toContain('"|" needs a shell');
 		wrapper.unmount();
 	});
 });

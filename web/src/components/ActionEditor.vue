@@ -5,12 +5,8 @@ import InputNumber from "primevue/inputnumber";
 import InputText from "primevue/inputtext";
 import Select from "primevue/select";
 import type { Action } from "@/api";
-import {
-	newRowId,
-	type ActionFieldErrors,
-	type ArgumentRow,
-	type EnvironmentRow,
-} from "@/views/cardEditModel";
+import { newRowId, type ActionFieldErrors, type EnvironmentRow } from "@/views/cardEditModel";
+import { parseCommandLine } from "@/views/commandLine";
 
 type RuleType = Action["rule"]["type"];
 
@@ -19,10 +15,12 @@ const props = defineProps<{
 	errors?: ActionFieldErrors;
 }>();
 
-// The editor owns the repeatable rows: adding and removing happens here and
-// the parent only receives the new arrays.
+// The command and its arguments are edited as one line (ADR-0012) and shown
+// split underneath; the parent splits the line again when it saves. The
+// editor owns the environment rows: adding and removing happens here and the
+// parent only receives the new array.
 const action = defineModel<Action>({ required: true });
-const args = defineModel<ArgumentRow[]>("args", { required: true });
+const commandLine = defineModel<string>("commandLine", { required: true });
 const environment = defineModel<EnvironmentRow[]>("environment", { required: true });
 
 const RULE_OPTIONS: { label: string; value: RuleType }[] = [
@@ -33,13 +31,24 @@ const RULE_OPTIONS: { label: string; value: RuleType }[] = [
 
 const ids = useId();
 const ruleLabelId = computed(() => `${ids}-rule`);
+const commandHelpId = computed(() => `${ids}-command-help`);
+const commandPreviewId = computed(() => `${ids}-command-preview`);
+
+const parsed = computed(() => parseCommandLine(commandLine.value));
+// A save error wins; otherwise a parse error shows while typing.
+const commandError = computed(
+	() => props.errors?.command || (parsed.value.ok ? "" : parsed.value.message),
+);
+const preview = computed(() =>
+	parsed.value.ok && parsed.value.command ? parsed.value : undefined,
+);
 
 function updateAction(patch: Partial<Action>) {
 	action.value = { ...action.value, ...patch };
 }
 
-function updateCommand(value: unknown) {
-	updateAction({ command: String(value ?? "") });
+function updateCommandLine(value: unknown) {
+	commandLine.value = String(value ?? "");
 }
 
 function updateDirectory(value: unknown) {
@@ -56,20 +65,6 @@ function updateRuleType(value: unknown) {
 
 function updatePattern(value: unknown) {
 	updateAction({ rule: { ...action.value.rule, pattern: String(value ?? "") } });
-}
-
-function updateArgument(id: string, value: unknown) {
-	args.value = args.value.map((row) =>
-		row.id === id ? { ...row, value: String(value ?? "") } : row,
-	);
-}
-
-function addArgument() {
-	args.value = [...args.value, { id: newRowId(), value: "" }];
-}
-
-function removeArgument(id: string) {
-	args.value = args.value.filter((row) => row.id !== id);
 }
 
 function updateEnvironment(id: string, key: "key" | "value", value: unknown) {
@@ -91,16 +86,39 @@ function removeEnvironment(id: string) {
 	<section class="action-editor">
 		<h2>{{ title }}</h2>
 		<div class="form-grid grid">
-			<label class="col-12 md:col-6"
-				>Command
+			<div class="col-12 field">
+				<label :for="`${ids}-command`" class="field-label">Command line</label>
 				<InputText
-					:model-value="action.command"
-					:invalid="Boolean(props.errors?.command)"
-					:aria-invalid="Boolean(props.errors?.command)"
-					@update:model-value="updateCommand"
+					:id="`${ids}-command`"
+					class="command-line"
+					:model-value="commandLine"
+					placeholder="/usr/bin/ping -c 1 -W 2 192.168.1.10"
+					spellcheck="false"
+					autocapitalize="off"
+					autocomplete="off"
+					:invalid="Boolean(commandError)"
+					:aria-invalid="Boolean(commandError)"
+					:aria-describedby="`${commandHelpId} ${commandPreviewId}`"
+					@update:model-value="updateCommandLine"
 				/>
-				<small v-if="props.errors?.command" class="field-error">{{ props.errors.command }}</small>
-			</label>
+				<small v-if="commandError" class="field-error">{{ commandError }}</small>
+				<small :id="commandHelpId" class="field-help">
+					Separate arguments with spaces. Quote an argument that contains spaces, such as
+					<code>'My Disk'</code>. No shell is used: pipes and variables are not available.
+				</small>
+				<div :id="commandPreviewId" class="command-preview" aria-live="polite">
+					<template v-if="preview">
+						<span class="preview-label">Runs</span>
+						<ol class="preview-words" aria-label="Command and arguments">
+							<li class="preview-command">{{ preview.command }}</li>
+							<li v-for="(arg, index) in preview.args" :key="index" class="preview-arg">
+								<span v-if="arg">{{ arg }}</span>
+								<em v-else>empty</em>
+							</li>
+						</ol>
+					</template>
+				</div>
+			</div>
 			<label class="col-12 md:col-6"
 				>Working directory
 				<InputText
@@ -143,35 +161,6 @@ function removeEnvironment(id: string) {
 				/>
 				<small v-if="props.errors?.pattern" class="field-error">{{ props.errors.pattern }}</small>
 			</label>
-		</div>
-		<div class="dynamic-block flex flex-column gap-2 mt-4">
-			<strong>Arguments</strong>
-			<small v-if="props.errors?.args" class="field-error">{{ props.errors.args }}</small>
-			<div v-for="(row, index) in args" :key="row.id" class="row-line">
-				<InputText
-					:model-value="row.value"
-					:aria-label="`Argument ${index + 1}`"
-					@update:model-value="updateArgument(row.id, $event)"
-				/>
-				<Button
-					type="button"
-					icon="pi pi-times"
-					text
-					rounded
-					severity="secondary"
-					:aria-label="`Remove argument ${index + 1}`"
-					@click="removeArgument(row.id)"
-				/>
-			</div>
-			<Button
-				type="button"
-				label="Add argument"
-				icon="pi pi-plus"
-				text
-				size="small"
-				class="add-row"
-				@click="addArgument"
-			/>
 		</div>
 		<div class="dynamic-block flex flex-column gap-2 mt-4">
 			<strong>Environment</strong>
@@ -234,6 +223,52 @@ label,
 	font-family: var(--font-ui);
 	font-size: 0.85rem;
 	font-weight: var(--font-weight-medium);
+}
+.command-line {
+	font-family: monospace;
+}
+.field-help {
+	color: var(--color-muted);
+	font-weight: normal;
+	line-height: 1.5;
+}
+.command-preview {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: baseline;
+	gap: var(--space-2);
+	min-width: 0;
+}
+.preview-label {
+	color: var(--color-muted);
+}
+.preview-words {
+	display: flex;
+	flex-wrap: wrap;
+	gap: var(--space-1);
+	min-width: 0;
+	margin: 0;
+	padding: 0;
+	list-style: none;
+}
+.preview-words li {
+	max-width: 100%;
+	padding: 0 var(--space-2);
+	overflow-wrap: anywhere;
+	border: 1px solid var(--color-border);
+	border-radius: var(--radius-sm);
+	background: var(--color-canvas);
+	color: var(--color-ink);
+	font-family: monospace;
+	white-space: pre-wrap;
+}
+.preview-words .preview-command {
+	border-color: var(--color-accent);
+	color: var(--color-accent);
+}
+.preview-words em {
+	color: var(--color-muted);
+	font-family: var(--font-ui);
 }
 .row-line {
 	display: flex;

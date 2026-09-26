@@ -3,7 +3,7 @@
 - **Fáze**: 8 — Zpevnění (dodatek po uzavření fáze)
 - **Vazba na požadavky**: FR-21a, FR-13, FR-17, FR-24
 - **Vazba na ADR**: ADR-0007 (UX a design systém); nové ADR není potřeba
-- **Stav**: Návrh
+- **Stav**: Hotovo
 - **Závislosti**: Bloky 0018 (detail karty), 0033 (sdílené komponenty),
   0040 (viditelné selhání čtení statusu)
 
@@ -42,9 +42,9 @@ kód, dobu běhu a rozbalitelný výstup poslední kontroly.
 
 ## Schválení
 
-- **Schválil**: čeká
-- **Datum schválení**: čeká
-- **Poznámky k rozhodnutí**: —
+- **Schválil**: projektový vlastník
+- **Datum schválení**: 2026-09-26
+- **Poznámky k rozhodnutí**: Schváleno vlastníkem („vše schvaluji“).
 
 ## Návrh řešení
 
@@ -70,6 +70,15 @@ Viz [Definition of Done](../../devops/definition-of-done.md) +:
 
 ## Uzavření
 
-- **Stav po implementaci**: —
-- **Ověření**: —
-- **Dokumentace aktualizována**: —
+- **Stav po implementaci**: Hotovo (2026-09-26)
+- **Ověření**: `make verify` prošel; `make e2e` prošel včetně nového
+  scénáře `shows the output of a failed status check in the detail`
+  (status akce `ls /marionette-e2e-missing`: badge Problem, exit kód
+  různý od 0, rozbalený výstup obsahuje chybovou hlášku).
+- **Implementace**: `RunOutput.vue` (rozbalitelný výstup, `...` při
+  zkrácení) sdílí `RunTable` i `StatusSummary`; `StatusSummary` přidává
+  řádky **Exit code** a **Duration** a výstup poslední kontroly; nový
+  `StatusSummary.spec.ts`; popisek **View output** ve slovníku
+  (`ACTIONS.viewOutput`).
+- **Odchylky od návrhu**: žádné.
+- **Dokumentace aktualizována**: ano — UX specifikace §6, roadmapa.

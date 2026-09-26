@@ -3,10 +3,11 @@
 // be unit-tested directly (block 0030).
 import type { Action, ActionCard } from "@/api";
 import { DEFAULT_CARD_ICON } from "@/ui/icons";
+import { formatCommandLine, parseCommandLine } from "@/views/commandLine";
 
-import type { ArgumentRow, EnvironmentRow } from "@/types";
+import type { EnvironmentRow } from "@/types";
 
-export type { ArgumentRow, EnvironmentRow };
+export type { EnvironmentRow };
 
 let rowSequence = 0;
 
@@ -15,8 +16,9 @@ export function newRowId(): string {
 	return `row-${rowSequence}`;
 }
 
-export function argumentRows(args: string[] | undefined): ArgumentRow[] {
-	return (args ?? []).map((value) => ({ id: newRowId(), value }));
+/** The command line the editor shows for a stored action (ADR-0012). */
+export function commandLineOf(action: Action | undefined): string {
+	return action ? formatCommandLine(action.command, action.args ?? []) : "";
 }
 
 export function emptyAction(): Action {
@@ -46,20 +48,24 @@ export function environmentRows(env: Record<string, string> | undefined): Enviro
 	return Object.entries(env ?? {}).map(([key, value]) => ({ id: newRowId(), key, value }));
 }
 
-/** Builds the action payload sent to the API from the editor state: blank
- * arguments and environment rows are dropped, strings are trimmed and the
- * rule pattern is cleared for exit-code rules. */
+/** Builds the action payload sent to the API from the editor state: the
+ * command line is split into command and arguments (ADR-0012), blank
+ * environment rows are dropped, strings are trimmed and the rule pattern is
+ * cleared for exit-code rules. A line that does not parse is kept as the
+ * command; validate() stops such a form from being saved. */
 export function actionFrom(
 	action: Action,
-	args: ArgumentRow[],
+	commandLine: string,
 	environment: EnvironmentRow[],
 ): Action {
+	const parsed = parseCommandLine(commandLine);
 	const env = Object.fromEntries(
 		environment.filter((row) => row.key.trim()).map((row) => [row.key.trim(), row.value]),
 	);
 	return {
 		...action,
-		args: args.map((row) => row.value.trim()).filter(Boolean),
+		command: parsed.ok ? parsed.command : commandLine,
+		args: parsed.ok ? parsed.args : [],
 		env,
 		dir: action.dir?.trim(),
 		rule: {
@@ -72,25 +78,25 @@ export function actionFrom(
 export interface EditorState {
 	form: ActionCard;
 	statusEnabled: boolean;
-	primaryArgs: ArgumentRow[];
-	statusArgs: ArgumentRow[];
+	primaryLine: string;
+	statusLine: string;
 	primaryEnv: EnvironmentRow[];
 	statusEnv: EnvironmentRow[];
 }
 
 /** Serialises the editable part of the form; two states with the same
- * fingerprint would produce the same save payload. */
+ * fingerprint would produce the same save payload (so an extra space in a
+ * command line does not make the form dirty). */
 export function fingerprint(state: EditorState): string {
 	const { form } = state;
 	return JSON.stringify({
 		name: form.name,
 		description: form.description,
 		icon: form.icon,
-		primary: actionFrom(form.primary, state.primaryArgs, state.primaryEnv),
-		status:
-			state.statusEnabled && form.status
-				? actionFrom(form.status, state.statusArgs, state.statusEnv)
-				: undefined,
+		primary: actionFrom(form.primary, state.primaryLine, state.primaryEnv),
+		status: state.statusEnabled
+			? actionFrom(form.status ?? emptyAction(), state.statusLine, state.statusEnv)
+			: undefined,
 		pollingIntervalSeconds: form.pollingIntervalSeconds,
 		fastPollingIntervalSeconds: form.fastPollingIntervalSeconds,
 		fastPollingWindowSeconds: form.fastPollingWindowSeconds,
@@ -104,7 +110,18 @@ export interface ValidationResult {
 	firstError: string;
 }
 
-export function validate(form: ActionCard, statusEnabled: boolean): ValidationResult {
+/** Client-side check of one command line: required and parseable. */
+function commandLineError(line: string, label: string): string {
+	const parsed = parseCommandLine(line);
+	if (!parsed.ok) return parsed.message;
+	if (!parsed.command) return `${label} command is required`;
+	return "";
+}
+
+export function validate(
+	state: Pick<EditorState, "form" | "statusEnabled" | "primaryLine" | "statusLine">,
+): ValidationResult {
+	const { form, statusEnabled } = state;
 	const fieldErrors: Record<string, string> = {};
 	let firstError = "";
 	const addError = (key: string, message: string) => {
@@ -112,11 +129,14 @@ export function validate(form: ActionCard, statusEnabled: boolean): ValidationRe
 		if (!firstError) firstError = message;
 	};
 	if (!form.name.trim()) addError("name", "Card name is required");
-	if (!form.primary.command.trim()) addError("primaryCommand", "Primary command is required");
+	const primaryError = commandLineError(state.primaryLine, "Primary");
+	if (primaryError) addError("primaryCommand", primaryError);
 	if (form.primary.timeoutSec <= 0) addError("primaryTimeout", "Primary timeout must be positive");
 	if (statusEnabled) {
-		if (!form.status?.command.trim()) addError("statusCommand", "Status command is required");
-		if (!form.status || form.status.timeoutSec <= 0)
+		const statusError = commandLineError(state.statusLine, "Status");
+		if (statusError) addError("statusCommand", statusError);
+		// The status editor shows emptyAction() until one of its fields changes.
+		if ((form.status ?? emptyAction()).timeoutSec <= 0)
 			addError("statusTimeout", "Status timeout must be positive");
 	}
 	return { fieldErrors, firstError };
@@ -128,7 +148,6 @@ export interface ActionFieldErrors {
 	dir?: string;
 	timeoutSec?: string;
 	pattern?: string;
-	args?: string;
 	env?: string;
 }
 
@@ -138,7 +157,7 @@ const actionFieldKeys: Record<string, keyof ActionFieldErrors> = {
 	timeoutSec: "timeoutSec",
 	"rule.pattern": "pattern",
 	"rule.type": "pattern",
-	args: "args",
+	args: "command",
 	env: "env",
 };
 
@@ -147,7 +166,6 @@ const editorFieldKeys: Record<keyof ActionFieldErrors, string> = {
 	dir: "Dir",
 	timeoutSec: "Timeout",
 	pattern: "Pattern",
-	args: "Args",
 	env: "Env",
 };
 
@@ -157,13 +175,13 @@ const editorFieldKeys: Record<keyof ActionFieldErrors, string> = {
  * `statusEnv`, `name`, …). Paths without an input of their own are returned
  * separately so the summary can still show them.
  */
-// `env.NAME` and `args[N]` messages belong to the Environment and Arguments
-// blocks, which have no per-item error slot.
+// `env.NAME` messages belong to the Environment block, which has no per-item
+// error slot; `args[N]` messages belong to the command line (ADR-0012).
 function actionFieldKey(rest: string[]): keyof ActionFieldErrors | undefined {
 	const known = actionFieldKeys[rest.join(".")];
 	if (known) return known;
 	if (rest[0] === "env") return "env";
-	if (rest[0]?.startsWith("args[")) return "args";
+	if (rest[0]?.startsWith("args[")) return "command";
 	return undefined;
 }
 

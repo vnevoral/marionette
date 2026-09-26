@@ -4,7 +4,7 @@
 - **Vazba na požadavky**: FR-05, FR-16, FR-02
 - **Vazba na ADR**: ADR-0002 (nové ADR není potřeba: nemění se architektura
   ani unita, jen instalátor a dokumentace)
-- **Stav**: Návrh
+- **Stav**: Hotovo
 - **Závislosti**: Blok 0023 (instalátor, unita), blok 0045 (vzor
   `print_pairing_hint`)
 
@@ -50,11 +50,9 @@ README popíše příčinu a způsob ověření v prostředí služby.
 
 ## Schválení
 
-- **Schválil**: čeká
-- **Datum schválení**: čeká
-- **Poznámky k rozhodnutí**: Otevřená otázka pro vlastníka — má instalátor
-  místo pouhého návodu sysctl soubor rovnou nainstalovat (např. volbou
-  `--enable-ping`)? Návrh počítá jen s návodem.
+- **Schválil**: projektový vlastník
+- **Datum schválení**: 2026-09-26
+- **Poznámky k rozhodnutí**: Schváleno vlastníkem („vše schvaluji“). Otevřená otázka rozhodnuta ve prospěch návrhu: instalátor jen vypíše návod, sysctl sám nemění.
 
 ## Návrh řešení
 
@@ -80,6 +78,23 @@ Viz [Definition of Done](../../devops/definition-of-done.md) +:
 
 ## Uzavření
 
-- **Stav po implementaci**: —
-- **Ověření**: —
-- **Dokumentace aktualizována**: —
+- **Stav po implementaci**: Hotovo (2026-09-26)
+- **Ověření**: `bash -n deploy/install.sh` a `bash deploy/install_test.sh`
+  prošly (varianty `1 0` → návod, `0 2147483647` → bez návodu, chybějící
+  soubor → bez návodu, existující uživatel `root` s rozsahem
+  `1 2147483647` → návod). `shellcheck` v prostředí není k dispozici.
+  `make verify` prošel (včetně `install_test`). Manuální ověření na referenčním
+  Raspberry Pi zbývá provést při příští instalaci.
+- **Odchylky od návrhu**:
+  - proměnná prostředí pro test se jmenuje `PING_GROUP_RANGE_FILE` (v
+    souladu s `DATA_DIR`, `UNIT_FILE` …);
+  - posuzuje se primární skupina existujícího servisního uživatele
+    (`id -g`), jinak GID skupiny `SERVICE_GROUP`; pokud neexistuje ani
+    jedno, rozhoduje jen prázdný rozsah (`min > max`). Test navíc pokrývá
+    větev s existujícím uživatelem;
+  - sekce v README je anglicky („Ping status check reports Problem“), protože
+    celé README je v angličtině;
+  - odkaz z bloku 0023 na tento nález existuje už z plánování bloku
+    (sekce „Nález na Raspberry Pi“).
+- **Dokumentace aktualizována**: ano — README (instalace + sekce
+  „Ping status check reports Problem“).

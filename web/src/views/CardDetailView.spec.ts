@@ -15,6 +15,7 @@ import {
 	type StatusSnapshot,
 } from "@/api";
 import CardDetailView from "@/views/CardDetailView.vue";
+import { FEEDBACK } from "@/ui/vocabulary";
 import { fakeConfirm } from "@/test/fakeConfirm";
 import { fakeToast } from "@/test/fakeToast";
 import { FakeEventSource } from "@/test/fakeEventSource";
@@ -77,6 +78,17 @@ const cards: Record<string, ActionCard> = {
 	},
 };
 
+const ASYNC_NOTE = FEEDBACK.actionsAsync;
+
+/** Visible text of the Actions panel note (without the screen-reader region). */
+function noteText(wrapper: ReturnType<typeof mount>) {
+	return wrapper.find(".action-note .action-note-text").text();
+}
+
+function announcement(wrapper: ReturnType<typeof mount>) {
+	return wrapper.find(".action-note [role='status']").text();
+}
+
 function buttonByLabel(wrapper: ReturnType<typeof mount>, label: string) {
 	const button = wrapper.findAll("button").find((candidate) => candidate.text().includes(label));
 	if (!button) throw new Error(`button ${label} not rendered`);
@@ -138,14 +150,19 @@ describe("CardDetailView", () => {
 		await buttonByLabel(wrapper, "Run action").trigger("click");
 		await flushPromises();
 		expect(enqueuePrimary).toHaveBeenCalledWith("printer");
-		expect(wrapper.find(".request-feedback").text()).toBe("Action queued");
+		// The badge and the button spinner carry the pending state; the note
+		// keeps its quiet text and only announces the phase (UX spec §4).
+		expect(wrapper.find(".request-feedback").exists()).toBe(false);
+		expect(noteText(wrapper)).toBe(ASYNC_NOTE);
+		expect(announcement(wrapper)).toBe("Running");
 		expect(buttonByLabel(wrapper, "Run action").attributes("disabled")).toBeDefined();
 		expect(buttonByLabel(wrapper, "Check status").attributes("disabled")).toBeDefined();
 		expect(wrapper.text()).toContain("Running");
 
 		FakeEventSource.last().status({ cardId: "printer", snapshot: snapshot(after, "fail") });
 		await flushPromises();
-		expect(wrapper.find(".request-feedback").text()).toBe("Status updated");
+		expect(noteText(wrapper)).toBe(ASYNC_NOTE);
+		expect(announcement(wrapper)).toBe("Status updated");
 		expect(buttonByLabel(wrapper, "Run action").attributes("disabled")).toBeUndefined();
 		expect(buttonByLabel(wrapper, "Check status").attributes("disabled")).toBeUndefined();
 		expect(wrapper.text()).toContain("Problem");
@@ -198,7 +215,9 @@ describe("CardDetailView", () => {
 		const { wrapper } = await mountDetail("printer");
 		await buttonByLabel(wrapper, "Run action").trigger("click");
 		await flushPromises();
-		expect(wrapper.find(".request-feedback").text()).toBe("queue is full");
+		expect(noteText(wrapper)).toBe("queue is full");
+		expect(wrapper.find(".action-note").classes()).toContain("action-note-error");
+		expect(wrapper.find(".request-feedback").exists()).toBe(false);
 		expect(buttonByLabel(wrapper, "Run action").attributes("disabled")).toBeUndefined();
 		wrapper.unmount();
 	});
@@ -233,7 +252,7 @@ describe("CardDetailView", () => {
 		const { wrapper } = await mountDetail("lamp");
 		await buttonByLabel(wrapper, "Run action").trigger("click");
 		await flushPromises();
-		expect(wrapper.find(".request-feedback").text()).toBe("Action accepted");
+		expect(noteText(wrapper)).toBe("Action accepted");
 		expect(buttonByLabel(wrapper, "Run action").attributes("disabled")).toBeUndefined();
 		expect(getRuns).toHaveBeenCalledTimes(2);
 		wrapper.unmount();
@@ -249,7 +268,7 @@ describe("CardDetailView", () => {
 		const { wrapper } = await mountDetail("sensor");
 		await buttonByLabel(wrapper, "Run action").trigger("click");
 		await flushPromises();
-		expect(wrapper.find(".request-feedback").text()).toBe("Action accepted");
+		expect(noteText(wrapper)).toBe("Action accepted");
 		expect(buttonByLabel(wrapper, "Run action").attributes("disabled")).toBeUndefined();
 		expect(buttonByLabel(wrapper, "Check status").attributes("disabled")).toBeUndefined();
 		expect(getStatus).not.toHaveBeenCalled();
@@ -311,10 +330,10 @@ describe("CardDetailView", () => {
 			const { wrapper } = await mountDetail("printer");
 			await buttonByLabel(wrapper, "Run action").trigger("click");
 			await flushPromises();
-			expect(wrapper.find(".request-feedback").text()).toBe("queue is full");
+			expect(noteText(wrapper)).toBe("queue is full");
 			vi.advanceTimersByTime(4000);
 			await flushPromises();
-			expect(wrapper.find(".request-feedback").exists()).toBe(false);
+			expect(noteText(wrapper)).toBe(ASYNC_NOTE);
 			wrapper.unmount();
 		} finally {
 			vi.useRealTimers();

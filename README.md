@@ -69,7 +69,9 @@ sudo ./install.sh ./marionette-linux-arm64
 The installer creates the `marionette` service account, preserves an existing
 `/var/lib/marionette/marionette.json`, installs the unit, and starts the
 service. On a host without paired devices it ends with the command that shows
-the first pairing code (see [Pairing devices](#pairing-devices)). Runtime settings are read from `/etc/default/marionette`:
+the first pairing code (see [Pairing devices](#pairing-devices)). If the
+kernel does not allow unprivileged ping for the service account, it also prints
+the fix (see [Ping status check reports Problem](#ping-status-check-reports-problem)). Runtime settings are read from `/etc/default/marionette`:
 
 | Variable                      | Default             | Meaning                                                                                                   |
 | ----------------------------- | ------------------- | --------------------------------------------------------------------------------------------------------- |
@@ -153,6 +155,42 @@ until the permissions are fixed and the service is restarted.
 For an update, run the installer again with the new binary. It keeps the
 existing configuration and restarts the service. To roll back, run the
 installer with the previous binary; configuration data is not removed.
+
+### Ping status check reports Problem
+
+A card whose status action is `ping` (for example the Wake-on-LAN + ping
+scenario) always reports **Problem**, even though the target host is up, and
+the action output shows `ping: socket: Operation not permitted` (exit code 2).
+Running `sudo -u marionette ping <ip>` by hand works.
+
+**Cause.** The unit runs with `NoNewPrivileges=true`, so the kernel ignores
+the `cap_net_raw` file capability of `/usr/bin/ping`. Ping then needs
+unprivileged ICMP sockets, which the kernel allows only for groups inside
+`net.ipv4.ping_group_range`. Some images ship `1 0` (an empty range), which
+disables them for everyone. The installer checks this and prints the fix.
+
+**Verify** in the same sandbox as the service:
+
+```bash
+cat /proc/sys/net/ipv4/ping_group_range
+sudo systemd-run --pty --wait --collect -p User=marionette -p NoNewPrivileges=true \
+  /usr/bin/ping -c 1 -W 2 <ip>
+```
+
+**Fix.** Allow unprivileged ICMP for all groups, persistently:
+
+```bash
+echo 'net.ipv4.ping_group_range = 0 2147483647' | sudo tee /etc/sysctl.d/99-marionette-ping.conf
+sudo sysctl --system
+```
+
+The change takes effect immediately; no service restart is needed. The
+`systemd-run` command above should now succeed and the card report
+**Healthy** on its next status check.
+
+Granting `AmbientCapabilities=CAP_NET_RAW` to the unit instead is not
+recommended: every action process would inherit raw socket access, not just
+ping. Unprivileged ICMP sockets can only send echo requests.
 
 ## License
 

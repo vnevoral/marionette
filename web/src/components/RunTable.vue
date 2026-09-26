@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import type { Run } from "@/api";
 import InlineError from "@/components/InlineError.vue";
+import RunOutput from "@/components/RunOutput.vue";
 import StatusBadge from "@/components/StatusBadge.vue";
 import { formatDate, formatDuration } from "@/ui/format";
 import { EMPTY, LOADING, outcomePresentation } from "@/ui/vocabulary";
@@ -21,10 +22,7 @@ withDefaults(defineProps<{ runs: Run[]; loading: boolean; error?: string }>(), {
 				<span>{{ formatDuration(run.duration) }}</span>
 			</div>
 			<small>Exit code {{ run.exitCode }}</small>
-			<details v-if="run.output">
-				<summary>View output</summary>
-				<pre>{{ run.output }}<span v-if="run.truncated">...</span></pre>
-			</details>
+			<RunOutput :output="run.output" :truncated="run.truncated" />
 		</article>
 	</div>
 </template>
@@ -56,18 +54,5 @@ withDefaults(defineProps<{ runs: Run[]; loading: boolean; error?: string }>(), {
 }
 .run-row small {
 	color: var(--color-muted);
-}
-.run-row details {
-	color: var(--color-info);
-}
-.run-row pre {
-	max-width: 100%;
-	margin: var(--space-3) 0 0;
-	padding: var(--space-3);
-	overflow: auto;
-	background: var(--color-canvas);
-	color: var(--color-ink);
-	font-family: monospace;
-	white-space: pre-wrap;
 }
 </style>

@@ -1,4 +1,5 @@
 import { onBeforeUnmount, ref } from "vue";
+import type { RequestResult } from "@/types";
 
 export type MessageTone = "info" | "success" | "error";
 
@@ -28,4 +29,20 @@ export function useTransientMessage() {
 	onBeforeUnmount(() => clearTimeout(timer));
 
 	return { feedback, show, clear };
+}
+
+/** The outcome of the last card action, cleared after messageVisibleMs. */
+export function useTransientResult() {
+	const result = ref<RequestResult | null>(null);
+	let timer: ReturnType<typeof setTimeout> | undefined;
+
+	function show(next: RequestResult | null) {
+		clearTimeout(timer);
+		result.value = next;
+		if (next) timer = setTimeout(() => (result.value = null), messageVisibleMs);
+	}
+
+	onBeforeUnmount(() => clearTimeout(timer));
+
+	return { result, show };
 }

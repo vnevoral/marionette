@@ -44,6 +44,7 @@ export const ACTIONS = {
 	refresh: "Refresh",
 	newCard: "New card",
 	viewDetails: "View details",
+	viewOutput: "View output",
 	editCard: "Edit card",
 	deleteCard: "Delete card",
 	saveCard: "Save card",
@@ -55,13 +56,12 @@ export const ACTIONS = {
 } as const;
 
 export const FEEDBACK = {
-	queued: "Queued",
-	actionQueued: "Action queued",
 	accepted: "Accepted",
 	actionAccepted: "Action accepted",
 	updated: "Updated",
 	statusUpdated: "Status updated",
 	resultUnavailable: "Result not available yet",
+	actionsAsync: "Actions are queued asynchronously and may take a moment to report a new status.",
 	statusUnavailable: "Status could not be refreshed",
 	cardSaved: "Card saved",
 	cardDeleted: "Card deleted",

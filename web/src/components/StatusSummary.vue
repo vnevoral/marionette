@@ -1,11 +1,13 @@
 <script setup lang="ts">
 import { computed } from "vue";
 import type { StatusChange, StatusSnapshot } from "@/api";
-import { formatDate, transitionDuration } from "@/ui/format";
+import RunOutput from "@/components/RunOutput.vue";
+import { formatDate, formatDuration, transitionDuration } from "@/ui/format";
 import { EMPTY, FEEDBACK, outcomePresentation } from "@/ui/vocabulary";
 
-// Summary of the current device state (UX spec §6): last check, last outcome
-// and how long the card has been in this state (FR-17).
+// Summary of the current device state (UX spec §6): last check, its outcome,
+// exit code, duration and output on demand (FR-21a), and how long the card
+// has been in this state (FR-17).
 const props = defineProps<{
 	hasStatus: boolean;
 	status?: StatusSnapshot | null;
@@ -36,12 +38,28 @@ const lastOutcome = computed(() =>
 			<dt>Last outcome</dt>
 			<dd>{{ lastOutcome }}</dd>
 		</div>
+		<template v-if="status?.lastCheck">
+			<div>
+				<dt>Exit code</dt>
+				<dd>{{ status.lastCheck.exitCode }}</dd>
+			</div>
+			<div>
+				<dt>Duration</dt>
+				<dd>{{ formatDuration(status.lastCheck.duration) }}</dd>
+			</div>
+		</template>
 		<div v-if="currentTransition">
 			<dt>In this state for</dt>
 			<dd>{{ transitionDuration(currentTransition, now) }}</dd>
 		</div>
 	</dl>
-	<p v-else class="muted-copy">{{ EMPTY.statusNotConfigured }}</p>
+	<RunOutput
+		v-if="hasStatus && status?.lastCheck"
+		class="summary-output"
+		:output="status.lastCheck.output"
+		:truncated="status.lastCheck.truncated"
+	/>
+	<p v-if="!hasStatus" class="muted-copy">{{ EMPTY.statusNotConfigured }}</p>
 </template>
 
 <style scoped>
@@ -70,6 +88,9 @@ dt {
 dd {
 	margin: 0;
 	text-align: right;
+}
+.summary-output {
+	margin-top: var(--space-3);
 }
 .muted-copy {
 	margin: var(--space-4) 0 0;

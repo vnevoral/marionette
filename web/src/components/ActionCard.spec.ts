@@ -76,7 +76,10 @@ describe("ActionCard", () => {
 		});
 		expect(queued.find(".status-badge").text()).toBe("Queued");
 		expect(queued.find(".status-badge").classes()).toContain("status-warning");
-		expect(queued.find(".request-feedback").text()).toBe("Queued");
+		// No second "Queued" next to the badge: the line keeps Last checked
+		// and the phase is only announced (UX spec §4).
+		expect(queued.find(".action-note-text").text()).toMatch(/^Last checked /);
+		expect(queued.find(".action-note [role='status']").text()).toBe("Queued");
 		for (const button of queued.findAll("button")) {
 			expect(button.attributes("disabled")).toBeDefined();
 		}
@@ -88,13 +91,40 @@ describe("ActionCard", () => {
 		expect(running.findAll("button")[1].classes()).toContain("p-button-loading");
 	});
 
-	it("shows the last result and emits run and check", async () => {
-		const wrapper = mountCard({
+	it("keeps an updated status quiet and shows other outcomes in place of Last checked", () => {
+		const updated = mountCard({
 			status: snapshot("ok"),
-			result: { tone: "success", message: "Updated" },
+			result: { tone: "success", message: "Updated", quiet: true },
 		});
-		expect(wrapper.find(".request-feedback").text()).toBe("Updated");
-		expect(wrapper.find(".request-feedback").classes()).toContain("request-feedback-success");
+		expect(updated.find(".action-note-text").text()).toMatch(/^Last checked /);
+		expect(updated.find(".action-note [role='status']").text()).toBe("Updated");
+
+		const failed = mountCard({
+			status: snapshot("ok"),
+			result: { tone: "error", message: "Result not available yet" },
+		});
+		expect(failed.find(".action-note-text").text()).toBe("Result not available yet");
+		expect(failed.find(".action-note").classes()).toContain("action-note-error");
+		expect(failed.find(".action-note").attributes("title")).toBe("Result not available yet");
+		expect(failed.text()).not.toContain("Last checked");
+		expect(failed.find(".request-feedback").exists()).toBe(false);
+	});
+
+	it("reserves the note line on a card without a status action", () => {
+		const plain = mountCard({ card: { ...card, status: undefined } });
+		expect(plain.find(".action-note").exists()).toBe(true);
+		expect(plain.find(".action-note-text").text()).toBe("");
+
+		const accepted = mountCard({
+			card: { ...card, status: undefined },
+			result: { tone: "success", message: "Accepted" },
+		});
+		expect(accepted.find(".action-note-text").text()).toBe("Accepted");
+		expect(accepted.find(".action-note").classes()).toContain("action-note-success");
+	});
+
+	it("emits run and check and links to the detail", async () => {
+		const wrapper = mountCard({ status: snapshot("ok") });
 		const [run, check] = wrapper.findAll("button");
 		await run.trigger("click");
 		await check.trigger("click");

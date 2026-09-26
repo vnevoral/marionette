@@ -6,6 +6,7 @@ import ProgressSpinner from "primevue/progressspinner";
 import { useConfirm } from "primevue/useconfirm";
 import { ApiError, deleteCard, getCard, type ActionCard } from "@/api";
 import ActionControls from "@/components/ActionControls.vue";
+import ActionNote from "@/components/ActionNote.vue";
 import DetailErrorState from "@/components/DetailErrorState.vue";
 import DetailPanel from "@/components/DetailPanel.vue";
 import PageHeader from "@/components/PageHeader.vue";
@@ -18,7 +19,7 @@ import { useCardActivity } from "@/composables/useCardActivity";
 import { outcomeResult, requestAction } from "@/composables/useActionRequest";
 import { useCardStatus } from "@/composables/useCardStatus";
 import { useNotify } from "@/composables/useNotify";
-import { useTransientMessage } from "@/composables/useTransientMessage";
+import { useTransientMessage, useTransientResult } from "@/composables/useTransientMessage";
 import { singleParam } from "@/router/params";
 import type { ActionKind, PendingRequest } from "@/types";
 import { DEFAULT_CARD_ICON } from "@/ui/icons";
@@ -43,6 +44,9 @@ const notFound = ref(false);
 const error = ref("");
 const { feedback, show: showMessage, clear: clearMessage } = useTransientMessage();
 const pending = ref<PendingRequest | null>(null);
+// Outcome of the last action, shown in the Actions panel (UX spec §6); the
+// page-level feedback line above the summary is left to deleting the card.
+const { result: actionResult, show: showActionResult } = useTransientResult();
 const deleting = ref(false);
 
 const cardID = computed(() => singleParam(route.params.id));
@@ -67,6 +71,7 @@ async function loadDetail() {
 	pendingWait?.abort();
 	pendingWait = undefined;
 	pending.value = null;
+	showActionResult(null);
 	clearMessage();
 	loading.value = true;
 	error.value = "";
@@ -102,7 +107,7 @@ async function runAction(action: ActionKind) {
 			signal: controller.signal,
 			onPhase(phase) {
 				pending.value = { action, phase };
-				showMessage(phase === "queued" ? FEEDBACK.queued : FEEDBACK.actionQueued, "info", false);
+				showActionResult(null);
 			},
 			onSnapshot: (snapshot) => cardStatus.apply(current.id, snapshot),
 			onError: () => cardStatus.fail(current.id),
@@ -113,7 +118,7 @@ async function runAction(action: ActionKind) {
 			updated: FEEDBACK.statusUpdated,
 		});
 		if (!result) return;
-		showMessage(result.message, result.tone);
+		showActionResult(result);
 		if (outcome.kind !== "failed") void activity.load();
 	} finally {
 		if (pendingWait === controller) pendingWait = undefined;
@@ -237,9 +242,12 @@ onBeforeUnmount(() => {
 							@run="runAction('primary')"
 							@check="runAction('status')"
 						/>
-						<p class="muted-copy">
-							Actions are queued asynchronously and may take a moment to report a new status.
-						</p>
+						<ActionNote
+							class="action-note-slot"
+							:fallback="FEEDBACK.actionsAsync"
+							:pending="pending"
+							:result="actionResult"
+						/>
 					</DetailPanel>
 				</div>
 			</section>
@@ -279,9 +287,9 @@ onBeforeUnmount(() => {
 .detail-feedback {
 	margin-bottom: var(--space-6);
 }
-.muted-copy {
+.action-note-slot {
+	/* Room for the two-line fallback so an outcome never changes the height. */
+	min-height: 3em;
 	margin: var(--space-4) 0 0;
-	color: var(--color-muted);
-	font-size: 0.9rem;
 }
 </style>
