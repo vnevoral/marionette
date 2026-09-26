@@ -165,6 +165,33 @@ describe("api request helper", () => {
 		}
 	});
 
+	it("times out a response whose body never completes", async () => {
+		vi.useFakeTimers();
+		try {
+			fetchMock.mockImplementation(async (_url, init) => {
+				const body = new ReadableStream<Uint8Array>({
+					start(controller) {
+						init?.signal?.addEventListener("abort", () =>
+							controller.error(new DOMException("aborted", "AbortError")),
+						);
+					},
+				});
+				return new Response(body, {
+					status: 200,
+					headers: { "content-type": "application/json" },
+				});
+			});
+			const outcome = listCards().catch((error: unknown) => error);
+			await vi.advanceTimersByTimeAsync(REQUEST_TIMEOUT_MS);
+			const failure = (await outcome) as ApiError;
+			expect(failure).toBeInstanceOf(ApiError);
+			expect(failure.message).toBe("Request timed out");
+			expect(failure.status).toBe(0);
+		} finally {
+			vi.useRealTimers();
+		}
+	});
+
 	it("falls back to the HTTP status when a 5xx body is not JSON", async () => {
 		fetchMock.mockImplementation(
 			async () => new Response("<html>bad gateway</html>", { status: 502 }),

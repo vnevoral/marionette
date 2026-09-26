@@ -47,6 +47,19 @@ const monitored: ActionCard = {
 	name: "Printer",
 	primary: { command: "true", timeoutSec: 5, rule: { type: "exit_code" } },
 	status: { command: "true", timeoutSec: 5, rule: { type: "exit_code" } },
+	pollingIntervalSeconds: 60,
+	fastPollingIntervalSeconds: 10,
+	fastPollingWindowSeconds: 120,
+	currentStatus: snapshot(before),
+};
+
+// A status action without automatic checks: nothing runs after the primary
+// action, so there is nothing to wait for.
+const unpolled: ActionCard = {
+	id: "sensor",
+	name: "Sensor",
+	primary: { command: "true", timeoutSec: 5, rule: { type: "exit_code" } },
+	status: { command: "true", timeoutSec: 5, rule: { type: "exit_code" } },
 	currentStatus: snapshot(before),
 };
 
@@ -82,7 +95,7 @@ describe("HomeView", () => {
 		FakeEventSource.reset();
 		vi.stubGlobal("EventSource", FakeEventSource);
 		vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout", "setInterval", "clearInterval"] });
-		vi.mocked(listCards).mockResolvedValue([monitored, plain]);
+		vi.mocked(listCards).mockReset().mockResolvedValue([monitored, unpolled, plain]);
 		vi.mocked(getStatus).mockResolvedValue(snapshot(before));
 		vi.mocked(enqueuePrimary).mockReset();
 		vi.mocked(enqueueStatus).mockReset();
@@ -167,21 +180,70 @@ describe("HomeView", () => {
 		wrapper.unmount();
 	});
 
-	it("falls back to REST polling of monitored cards while the stream is down", async () => {
+	it("reports acceptance immediately for a monitored card without automatic checks", async () => {
+		vi.mocked(enqueuePrimary).mockResolvedValue({
+			cardId: "sensor",
+			actionKind: "primary",
+			status: "accepted",
+		});
 		const wrapper = mountHome();
 		await flushPromises();
-		expect(getStatus).toHaveBeenCalledTimes(1);
+		const card = cardByName(wrapper, "Sensor");
+		expect(card.findAll("button")).toHaveLength(2);
+
+		await buttonByLabel(card, "Run action").trigger("click");
+		await flushPromises();
+		expect(buttonByLabel(card, "Run action").attributes("disabled")).toBeUndefined();
+		expect(buttonByLabel(card, "Check status").attributes("disabled")).toBeUndefined();
+		expect(card.find(".request-feedback").text()).toBe("Accepted");
+		expect(getStatus).not.toHaveBeenCalled();
+		wrapper.unmount();
+	});
+
+	it("re-reads the card list instead of every status while the stream is down", async () => {
+		const wrapper = mountHome();
+		await flushPromises();
+		expect(listCards).toHaveBeenCalledTimes(1);
+		expect(getStatus).not.toHaveBeenCalled();
+
+		vi.mocked(listCards).mockResolvedValue([
+			{ ...monitored, currentStatus: snapshot(after, "fail") },
+			unpolled,
+			plain,
+		]);
 		vi.advanceTimersByTime(5000);
 		await flushPromises();
-		expect(getStatus).toHaveBeenCalledTimes(2);
-		expect(vi.mocked(getStatus).mock.calls.every(([id]) => id === "printer")).toBe(true);
+		expect(listCards).toHaveBeenCalledTimes(2);
+		expect(getStatus).not.toHaveBeenCalled();
+		expect(cardByName(wrapper, "Printer").text()).toContain("Problem");
 
 		FakeEventSource.last().open();
 		await flushPromises();
-		expect(getStatus).toHaveBeenCalledTimes(3);
+		expect(listCards).toHaveBeenCalledTimes(3);
 		vi.advanceTimersByTime(10000);
 		await flushPromises();
-		expect(getStatus).toHaveBeenCalledTimes(3);
+		expect(listCards).toHaveBeenCalledTimes(3);
+		wrapper.unmount();
+	});
+
+	it("does not let a slow refresh overwrite a newer snapshot from the stream", async () => {
+		const wrapper = mountHome();
+		await flushPromises();
+		let finishRefresh!: (cards: ActionCard[]) => void;
+		vi.mocked(listCards).mockImplementationOnce(
+			() => new Promise<ActionCard[]>((resolve) => (finishRefresh = resolve)),
+		);
+		vi.advanceTimersByTime(5000);
+		await flushPromises();
+		expect(listCards).toHaveBeenCalledTimes(2);
+
+		FakeEventSource.last().status({ cardId: "printer", snapshot: snapshot(after, "fail") });
+		await flushPromises();
+		expect(cardByName(wrapper, "Printer").text()).toContain("Problem");
+
+		finishRefresh([monitored, unpolled, plain]);
+		await flushPromises();
+		expect(cardByName(wrapper, "Printer").text()).toContain("Problem");
 		wrapper.unmount();
 	});
 });

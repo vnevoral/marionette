@@ -120,15 +120,22 @@ func TestReadOnlyRoutesIgnoreForeignOrigin(t *testing.T) {
 }
 
 func TestAllowedHostsRestrictMutatingRequests(t *testing.T) {
-	handler := protectedRouter(t, "pi.local:8080", " Marionette.Home ")
+	handler := protectedRouter(t, "pi.local:8080", " Marionette.Home ", "proxied.local:80")
 	path := "/api/cards/protected/actions/primary"
-	request := httptest.NewRequest(http.MethodPost, path, nil)
-	request.Host = "192.168.1.5:8080"
-	response := httptest.NewRecorder()
-	handler.ServeHTTP(response, request)
-	assertJSONError(t, response, http.StatusForbidden)
+	for _, host := range []string{"192.168.1.5:8080", "pi.local", "pi.local:80", "proxied.local:8080"} {
+		request := httptest.NewRequest(http.MethodPost, path, nil)
+		request.Host = host
+		response := httptest.NewRecorder()
+		handler.ServeHTTP(response, request)
+		assertJSONError(t, response, http.StatusForbidden)
+	}
 
-	for _, host := range []string{"pi.local:8080", "PI.LOCAL:8080", "marionette.home"} {
+	// Default ports (80, 443, none) are interchangeable on both sides so a
+	// TLS-terminating proxy and an allowlist entry with ":80" both work.
+	for _, host := range []string{
+		"pi.local:8080", "PI.LOCAL:8080", "marionette.home", "marionette.home:80", "marionette.home:443",
+		"proxied.local", "proxied.local:443",
+	} {
 		request := httptest.NewRequest(http.MethodPost, path, nil)
 		request.Host = host
 		response := httptest.NewRecorder()
@@ -138,9 +145,9 @@ func TestAllowedHostsRestrictMutatingRequests(t *testing.T) {
 		}
 	}
 	// Read-only routes are not restricted by the allowlist.
-	request = httptest.NewRequest(http.MethodGet, "/api/cards", nil)
+	request := httptest.NewRequest(http.MethodGet, "/api/cards", nil)
 	request.Host = "192.168.1.5:8080"
-	response = httptest.NewRecorder()
+	response := httptest.NewRecorder()
 	handler.ServeHTTP(response, request)
 	if response.Code != http.StatusOK {
 		t.Fatalf("GET with unlisted host: status = %d", response.Code)
@@ -150,28 +157,52 @@ func TestAllowedHostsRestrictMutatingRequests(t *testing.T) {
 func TestSameOriginComparison(t *testing.T) {
 	cases := []struct {
 		origin, host string
-		tls          bool
 		want         bool
 	}{
-		{"http://pi.local:8080", "pi.local:8080", false, true},
-		{"HTTP://PI.LOCAL:8080", "pi.local:8080", false, true},
-		{"http://pi.local", "pi.local:80", false, true},
-		{"http://pi.local", "pi.local", false, true},
-		{"https://pi.local", "pi.local:443", true, true},
-		{"https://pi.local", "pi.local", false, false},
-		{"http://pi.local:8080", "pi.local:9090", false, false},
-		{"http://pi.local:8080", "pi.local", false, false},
-		{"http://[::1]:8080", "[::1]:8080", false, true},
-		{"http://[::1]", "[::1]:80", false, true},
-		{"http://evil.example:8080", "pi.local:8080", false, false},
-		{"null", "pi.local:8080", false, false},
-		{"", "pi.local:8080", false, false},
-		{"ftp://pi.local:8080", "pi.local:8080", false, false},
-		{"http://pi.local:8080/path", "pi.local:8080", false, true},
+		{"http://pi.local:8080", "pi.local:8080", true},
+		{"HTTP://PI.LOCAL:8080", "pi.local:8080", true},
+		{"http://pi.local", "pi.local:80", true},
+		{"http://pi.local", "pi.local", true},
+		{"https://pi.local", "pi.local:443", true},
+		// TLS-terminating proxy: the browser sees https, the service plain http.
+		{"https://pi.local", "pi.local", true},
+		{"https://pi.local", "pi.local:80", true},
+		{"http://pi.local", "pi.local:443", true},
+		{"https://pi.local:8443", "pi.local", false},
+		{"http://pi.local", "pi.local:8080", false},
+		{"http://pi.local:8080", "pi.local:9090", false},
+		{"http://pi.local:8080", "pi.local", false},
+		{"http://[::1]:8080", "[::1]:8080", true},
+		{"http://[::1]", "[::1]:80", true},
+		{"http://[::1]", "[::1]", true},
+		{"http://evil.example:8080", "pi.local:8080", false},
+		{"null", "pi.local:8080", false},
+		{"", "pi.local:8080", false},
+		{"ftp://pi.local:8080", "pi.local:8080", false},
+		{"http://pi.local:8080/path", "pi.local:8080", true},
 	}
 	for _, testCase := range cases {
-		if got := sameOrigin(testCase.origin, testCase.host, testCase.tls); got != testCase.want {
-			t.Errorf("sameOrigin(%q, %q, tls=%v) = %v, want %v", testCase.origin, testCase.host, testCase.tls, got, testCase.want)
+		if got := sameOrigin(testCase.origin, testCase.host); got != testCase.want {
+			t.Errorf("sameOrigin(%q, %q) = %v, want %v", testCase.origin, testCase.host, got, testCase.want)
+		}
+	}
+}
+
+func TestCanonicalHost(t *testing.T) {
+	cases := map[string]string{
+		"pi.local":        "pi.local",
+		" PI.local:80 ":   "pi.local",
+		"pi.local:443":    "pi.local",
+		"pi.local:8080":   "pi.local:8080",
+		"[::1]":           "::1",
+		"[::1]:80":        "::1",
+		"[::1]:8080":      "[::1]:8080",
+		"192.168.1.5:443": "192.168.1.5",
+		"":                "",
+	}
+	for host, want := range cases {
+		if got := canonicalHost(host); got != want {
+			t.Errorf("canonicalHost(%q) = %q, want %q", host, got, want)
 		}
 	}
 }

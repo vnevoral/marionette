@@ -156,6 +156,8 @@ describe("fieldErrorsFromServer", () => {
 			"status.env.HOME": "environment variable name is too long",
 			"status.env.PATH": "second env message",
 			"status.args": "must have at most 64 items",
+			"primary.args[2]": "must be at most 1024 characters",
+			"primary.args[5]": "second argument message",
 			"status.dir": "too long",
 			fastPollingIntervalSeconds: "fast polling interval must be less than polling interval",
 			id: "must contain only letters, digits, '-' and '_'",
@@ -168,6 +170,7 @@ describe("fieldErrorsFromServer", () => {
 			primaryPattern: "output rule pattern is required",
 			statusEnv: "environment variable name is too long",
 			statusArgs: "must have at most 64 items",
+			primaryArgs: "must be at most 1024 characters",
 			statusDir: "too long",
 			fastPollingIntervalSeconds: "fast polling interval must be less than polling interval",
 		});

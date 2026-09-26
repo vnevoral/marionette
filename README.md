@@ -69,7 +69,7 @@ service. Runtime settings are read from `/etc/default/marionette`:
 | `MARIONETTE_CONFIG`           | `./marionette.json` | Path of the configuration file (cards, settings, saved history).                                          |
 | `MARIONETTE_ADDR`             | `:8080`             | HTTP listen address.                                                                                      |
 | `MARIONETTE_SHUTDOWN_TIMEOUT` | `20s`               | Total budget for a graceful stop (Go duration). Keep it below the unit's `TimeoutStopSec` (90 s default). |
-| `MARIONETTE_ALLOWED_HOSTS`    | empty               | Comma-separated `host:port` values accepted for mutating API requests; empty accepts any host.            |
+| `MARIONETTE_ALLOWED_HOSTS`    | empty               | Comma-separated hosts (optionally `host:port`; 80/443 equal no port) accepted for mutating API requests; empty accepts any host. |
 | `MARIONETTE_LOG_FORMAT`       | `text`              | `text` (journald friendly) or `json` structured logs.                                                     |
 | `MARIONETTE_LOG_LEVEL`        | `info`              | Minimum log level: `debug`, `info`, `warn` or `error`.                                                    |
 
@@ -92,9 +92,10 @@ Mutating API requests (creating, editing, deleting or running cards) are
 protected against cross-site requests from other websites open in the
 operator's browser: they must use `Content-Type: application/json`, and a
 browser-supplied `Origin` or `Sec-Fetch-Site: cross-site` that does not match
-the server is rejected with 403. Plain `curl -X POST` without those headers
-keeps working. There is no authentication; keep the service on a trusted
-network.
+the server is rejected with 403. Hosts are compared without regard to the
+default ports 80 and 443, so the check also works behind a TLS-terminating
+reverse proxy. Plain `curl -X POST` without those headers keeps working. There
+is no authentication; keep the service on a trusted network.
 
 If the configuration file cannot be parsed at startup, Marionette moves it to
 `marionette.json.corrupt-<timestamp>` (logged as a warning), starts with an

@@ -1,6 +1,7 @@
 import { ref, toValue, type MaybeRefOrGetter, type Ref } from "vue";
-import { getStatus, type StatusSnapshot } from "@/api";
+import { getStatus, type ActionCard, type StatusSnapshot } from "@/api";
 import { useStatusEvents } from "@/composables/useStatusEvents";
+import type { ActionKind } from "@/types";
 
 export type WaitResult = "updated" | "timeout" | "aborted";
 
@@ -21,6 +22,42 @@ export const defaultPollIntervalMs = 2000;
 export function isNewerCheck(snapshot: StatusSnapshot, previousCheckedAt: string | undefined) {
 	if (!snapshot.checkedAt) return false;
 	return snapshot.checkedAt !== previousCheckedAt;
+}
+
+/**
+ * True when `next` may replace `current` in a view: an unchecked snapshot never
+ * replaces a checked one, and a check is never replaced by an older one, so a
+ * slow REST refresh cannot undo a snapshot that arrived through the stream in
+ * the meantime.
+ */
+export function supersedes(next: StatusSnapshot, current: StatusSnapshot | undefined): boolean {
+	if (!current?.checkedAt) return true;
+	if (!next.checkedAt) return false;
+	return Date.parse(next.checkedAt) >= Date.parse(current.checkedAt);
+}
+
+/**
+ * Whether the server will run a status check after `action` is accepted, i.e.
+ * whether a view should wait for a newer check. A status action always
+ * schedules one; a primary action only activates fast polling, which the
+ * scheduler does for cards with a status action and all three polling values
+ * set (`Scheduler.NotifyPrimaryAction`). Otherwise the outcome is reported as
+ * accepted right away.
+ */
+export function expectsFollowUpCheck(card: ActionCard, action: ActionKind): boolean {
+	if (!card.status) return false;
+	if (action === "status") return true;
+	return (
+		(card.pollingIntervalSeconds ?? 0) > 0 &&
+		(card.fastPollingIntervalSeconds ?? 0) > 0 &&
+		(card.fastPollingWindowSeconds ?? 0) > 0
+	);
+}
+
+/** How long a view waits for the follow-up check: the card's fast polling
+ * window, or `defaultMaxWaitMs` when the card has none. */
+export function waitBudgetMs(card: ActionCard): number {
+	return card.fastPollingWindowSeconds ? card.fastPollingWindowSeconds * 1000 : defaultMaxWaitMs;
 }
 
 interface WaitCallbacks {

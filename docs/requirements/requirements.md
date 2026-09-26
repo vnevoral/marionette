@@ -240,7 +240,9 @@ args...)` se strukturovanými argumenty, nikdy skládáním shell příkazu ze
   požadavek označený prohlížečem jako `Sec-Fetch-Site: cross-site` nebo s
   hlavičkou `Origin` neshodnou s hostem serveru je odmítnut (403/415).
   Volitelně lze omezit přijímané hodnoty `Host` proměnnou
-  `MARIONETTE_ALLOWED_HOSTS`. Read-only endpointy a SSE stream zůstávají bez
+  `MARIONETTE_ALLOWED_HOSTS`. Porovnání hostů nezávisí na schématu ani na
+  výchozích portech 80/443, takže ochrana funguje i za TLS-terminující
+  reverse proxy (blok 0036). Read-only endpointy a SSE stream zůstávají bez
   omezení. Důvod: NFR-01 předpokládá důvěryhodnou síť, ne důvěryhodný
   prohlížeč — cizí webová stránka otevřená operátorem by jinak mohla spustit
   libovolnou nakonfigurovanou akci na hostu. Neřeší autentizaci (ta zůstává

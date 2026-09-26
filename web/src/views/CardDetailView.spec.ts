@@ -9,6 +9,7 @@ import {
 	enqueuePrimary,
 	getCard,
 	getRuns,
+	getStatus,
 	getStatusHistory,
 	type ActionCard,
 	type StatusSnapshot,
@@ -54,6 +55,16 @@ const cards: Record<string, ActionCard> = {
 	printer: {
 		id: "printer",
 		name: "Printer",
+		primary: { command: "true", timeoutSec: 5, rule: { type: "exit_code" } },
+		status: { command: "true", timeoutSec: 5, rule: { type: "exit_code" } },
+		pollingIntervalSeconds: 60,
+		fastPollingIntervalSeconds: 10,
+		fastPollingWindowSeconds: 120,
+		currentStatus: snapshot(before),
+	},
+	sensor: {
+		id: "sensor",
+		name: "Sensor",
 		primary: { command: "true", timeoutSec: 5, rule: { type: "exit_code" } },
 		status: { command: "true", timeoutSec: 5, rule: { type: "exit_code" } },
 		currentStatus: snapshot(before),
@@ -185,6 +196,23 @@ describe("CardDetailView", () => {
 		expect(wrapper.find(".request-feedback").text()).toBe("Action accepted");
 		expect(buttonByLabel(wrapper, "Run action").attributes("disabled")).toBeUndefined();
 		expect(getRuns).toHaveBeenCalledTimes(2);
+		wrapper.unmount();
+	});
+
+	it("reports acceptance without waiting when no automatic check follows the primary action", async () => {
+		vi.mocked(enqueuePrimary).mockResolvedValue({
+			cardId: "sensor",
+			actionKind: "primary",
+			status: "accepted",
+		});
+		vi.mocked(getStatus).mockReset();
+		const { wrapper } = await mountDetail("sensor");
+		await buttonByLabel(wrapper, "Run action").trigger("click");
+		await flushPromises();
+		expect(wrapper.find(".request-feedback").text()).toBe("Action accepted");
+		expect(buttonByLabel(wrapper, "Run action").attributes("disabled")).toBeUndefined();
+		expect(buttonByLabel(wrapper, "Check status").attributes("disabled")).toBeUndefined();
+		expect(getStatus).not.toHaveBeenCalled();
 		wrapper.unmount();
 	});
 

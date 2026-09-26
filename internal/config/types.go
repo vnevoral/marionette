@@ -87,7 +87,7 @@ func (fields fieldErrors) merge(prefix string, err error) {
 		return
 	}
 	var validation *ValidationError
-	if !errorsAs(err, &validation) {
+	if !errors.As(err, &validation) {
 		fields.add(prefix, err.Error())
 		return
 	}
@@ -101,10 +101,6 @@ func (fields fieldErrors) err() error {
 		return nil
 	}
 	return &ValidationError{Fields: map[string]string(fields)}
-}
-
-func errorsAs(err error, target **ValidationError) bool {
-	return errors.As(err, target)
 }
 
 func lengthReason(limit int) string {

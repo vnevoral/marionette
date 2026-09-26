@@ -22,7 +22,7 @@ import StatusBadge from "@/components/StatusBadge.vue";
 import StatusSummary from "@/components/StatusSummary.vue";
 import StatusTimeline from "@/components/StatusTimeline.vue";
 import { useCardActivity } from "@/composables/useCardActivity";
-import { useCardStatus } from "@/composables/useCardStatus";
+import { expectsFollowUpCheck, useCardStatus, waitBudgetMs } from "@/composables/useCardStatus";
 import { useTransientMessage } from "@/composables/useTransientMessage";
 import { singleParam } from "@/router/params";
 import type { ActionKind, PendingRequest } from "@/types";
@@ -48,7 +48,6 @@ const { feedback, show: showMessage, clear: clearMessage } = useTransientMessage
 const pending = ref<PendingRequest | null>(null);
 const deleting = ref(false);
 
-const defaultFastPollingWindowSeconds = 120;
 const cardID = computed(() => singleParam(route.params.id));
 const cardStatus = useCardStatus(cardID, () => Boolean(card.value?.status));
 const status = cardStatus.snapshot;
@@ -107,7 +106,7 @@ async function runAction(action: ActionKind) {
 		if (action === "primary") await enqueuePrimary(current.id);
 		else await enqueueStatus(current.id);
 		if (generation !== loadGeneration) return;
-		if (!current.status) {
+		if (!expectsFollowUpCheck(current, action)) {
 			showMessage(FEEDBACK.actionAccepted, "success");
 			void activity.load();
 			return;
@@ -116,7 +115,7 @@ async function runAction(action: ActionKind) {
 		showMessage(FEEDBACK.actionQueued, "info", false);
 		const result = await cardStatus.waitForNewer(previousCheckedAt, {
 			signal: controller.signal,
-			maxWaitMs: (current.fastPollingWindowSeconds || defaultFastPollingWindowSeconds) * 1000,
+			maxWaitMs: waitBudgetMs(current),
 		});
 		if (result === "aborted" || generation !== loadGeneration) return;
 		if (result === "updated") showMessage(FEEDBACK.statusUpdated, "success");

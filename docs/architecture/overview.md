@@ -56,24 +56,28 @@ pořadí:
    `application/json` (jinak `415`) — HTML formulář tento typ nedokáže
    poslat;
 2. `Sec-Fetch-Site: cross-site` → `403`;
-3. je-li přítomna hlavička `Origin`, její host (včetně portu, bez ohledu na
-   velikost písmen, chybějící port = výchozí port schématu) se musí shodovat
-   s `Host` požadavku, jinak `403`; `Origin: null` je odmítnut; požadavek bez
+3. je-li přítomna hlavička `Origin`, její host se musí shodovat s `Host`
+   požadavku, jinak `403`; `Origin: null` je odmítnut; požadavek bez
    `Origin` i bez `Sec-Fetch-Site` projde, aby fungovali non-browser klienti
    (`curl`);
-4. je-li nastaven `MARIONETTE_ALLOWED_HOSTS` (čárkou oddělený seznam hostů
-   včetně portu), musí být `Host` v seznamu, jinak `403`; prázdná proměnná
-   (výchozí) kontrolu vypíná.
+4. je-li nastaven `MARIONETTE_ALLOWED_HOSTS` (čárkou oddělený seznam hostů,
+   volitelně s portem), musí být `Host` v seznamu, jinak `403`; prázdná
+   proměnná (výchozí) kontrolu vypíná.
+
+Hosty v krocích 3 a 4 se porovnávají kanonicky (`canonicalHost`): bez ohledu
+na velikost písmen a výchozí porty `80`, `443` a chybějící port jsou
+rovnocenné, jiný explicitní port se musí shodovat přesně. Server totiž
+nezná schéma spolehlivě — za TLS-terminující proxy prohlížeč posílá
+`Origin: https://pi.local`, zatímco služba dostane `Host: pi.local` po
+plain HTTP; obě hodnoty jsou operátorův host. Jiná služba na stejném
+hostname s vlastním portem (`pi.local:9000`) zůstává cizím originem
+(blok 0036).
 
 Read-only routy, `GET /api/events` (SSE) a SPA fallback zůstávají bez
 omezení. Chyby mají stejnou JSON obálku `{"error": "..."}` jako ostatní
 odpovědi API. SPA proto posílá `Content-Type: application/json` u všech
 mutujících volání včetně těch bez těla. Žádné CORS hlavičky se nevydávají
-(jiné originy se záměrně nepovolují). Schéma požadavku server zná jen z
-TLS stavu spojení; za TLS-terminující proxy se `Origin` porovnává jako
-`http`, což u výchozích portů (`443` vs `80`) vede k odmítnutí — v takovém
-nasazení je třeba proxy nastavit tak, aby `Host` obsahoval port, nebo
-nasadit TLS přímo (mimo rozsah MVP).
+(jiné originy se záměrně nepovolují).
 
 ## Ochrana konfiguračního souboru
 

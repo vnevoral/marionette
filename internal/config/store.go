@@ -142,7 +142,7 @@ func (store *Store) CreateCard(card ActionCard) (ActionCard, error) {
 	if err := store.notifyChange(); err != nil {
 		store.mu.Lock()
 		delete(store.cards, card.ID)
-		store.changes++
+		store.changes--
 		store.mu.Unlock()
 		return ActionCard{}, &PersistenceError{Operation: "card creation", Err: err}
 	}
@@ -175,7 +175,7 @@ func (store *Store) UpdateCard(id string, card ActionCard) (ActionCard, error) {
 	if err := store.notifyChange(); err != nil {
 		store.mu.Lock()
 		store.cards[id] = previous
-		store.changes++
+		store.changes--
 		store.mu.Unlock()
 		return ActionCard{}, &PersistenceError{Operation: "card update", Err: err}
 	}
@@ -205,7 +205,7 @@ func (store *Store) DeleteCard(id string) error {
 	if err := store.notifyChange(); err != nil {
 		store.mu.Lock()
 		store.cards[id] = previousCard
-		store.changes++
+		store.changes--
 		if hadHistory {
 			store.history[id] = previousHistory
 		}

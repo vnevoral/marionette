@@ -519,3 +519,33 @@ func TestStoreDirtyTracksChangesSinceHistorySave(t *testing.T) {
 		t.Fatal("freshly loaded store must not be dirty")
 	}
 }
+
+func TestStoreRollbackKeepsDirtyHonest(t *testing.T) {
+	store := NewStore(Settings{HistorySize: 5, MaxConcurrentActions: 1})
+	card := validCard()
+	card.ID = "kept"
+	if _, err := store.CreateCard(card); err != nil {
+		t.Fatalf("CreateCard() error = %v", err)
+	}
+	if err := store.SaveFileWithHistory(filepath.Join(t.TempDir(), "marionette.json")); err != nil {
+		t.Fatalf("SaveFileWithHistory() error = %v", err)
+	}
+	store.OnChange = func(*Store) error { return errors.New("disk full") }
+
+	extra := validCard()
+	extra.ID = "extra"
+	if _, err := store.CreateCard(extra); err == nil {
+		t.Fatal("CreateCard() succeeded despite failing OnChange")
+	}
+	renamed := card
+	renamed.Name = "renamed"
+	if _, err := store.UpdateCard(card.ID, renamed); err == nil {
+		t.Fatal("UpdateCard() succeeded despite failing OnChange")
+	}
+	if err := store.DeleteCard(card.ID); err == nil {
+		t.Fatal("DeleteCard() succeeded despite failing OnChange")
+	}
+	if store.Dirty() {
+		t.Fatal("store reports unsaved changes although every mutation was rolled back")
+	}
+}

@@ -118,30 +118,34 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
 	const forwardAbort = () => controller.abort(signal?.reason);
 	if (signal?.aborted) forwardAbort();
 	else signal?.addEventListener("abort", forwardAbort, { once: true });
-	let response: Response;
+	const timedOut = () => controller.signal.aborted && controller.signal.reason === "timeout";
+	// The timer runs until the body has been read: a server that answers with
+	// headers and then stalls is covered by the same budget.
 	try {
-		response = await fetch(path, {
-			...rest,
-			headers: { Accept: "application/json", ...headers },
-			signal: controller.signal,
-		});
-	} catch (failure) {
-		if (controller.signal.aborted && controller.signal.reason === "timeout") {
-			throw new ApiError("Request timed out", 0);
+		let response: Response;
+		try {
+			response = await fetch(path, {
+				...rest,
+				headers: { Accept: "application/json", ...headers },
+				signal: controller.signal,
+			});
+		} catch (failure) {
+			if (timedOut()) throw new ApiError("Request timed out", 0);
+			if (failure instanceof DOMException && failure.name === "AbortError") throw failure;
+			throw new ApiError("Server unreachable", 0);
 		}
-		if (failure instanceof DOMException && failure.name === "AbortError") throw failure;
-		throw new ApiError("Server unreachable", 0);
+		if (!response.ok) throw await errorFromResponse(response);
+		if (response.status === 204) return undefined as T;
+		if (!isJSON(response)) throw new ApiError("Unexpected response from server", response.status);
+		try {
+			return (await response.json()) as T;
+		} catch {
+			if (timedOut()) throw new ApiError("Request timed out", 0);
+			throw new ApiError("Unexpected response from server", response.status);
+		}
 	} finally {
 		clearTimeout(timer);
 		signal?.removeEventListener("abort", forwardAbort);
-	}
-	if (!response.ok) throw await errorFromResponse(response);
-	if (response.status === 204) return undefined as T;
-	if (!isJSON(response)) throw new ApiError("Unexpected response from server", response.status);
-	try {
-		return (await response.json()) as T;
-	} catch {
-		throw new ApiError("Unexpected response from server", response.status);
 	}
 }
 

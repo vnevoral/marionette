@@ -86,13 +86,20 @@ Rules:
   shows **Running**.
 - After acceptance, the card waits for a check newer than the last one: a
   `status.changed` event from the shared stream or a REST read every 2 s,
-  until the configured fast-polling window expires. The stream is shared by
-  all views; while it is down, monitored cards are refreshed over REST every
-  5 s.
+  until the configured fast-polling window expires. The wait happens only
+  when the server will actually run a check: always after **Check status**,
+  and after **Run action** only for a card with a status check and all three
+  automatic-check values set (standard interval, fast interval, fast window),
+  because that is when the server activates fast polling. The stream is
+  shared by all views; while it is down, the card list is re-read over REST
+  every 5 s and the statuses it carries are applied to the dashboard.
 - When the wait ends, the controls are released immediately and the outcome
   (**Updated**, **Result not available yet**, or the enqueue error) stays
-  visible for about 4 s. A card without a status action shows **Accepted**
-  right after the request is queued.
+  visible for about 4 s. A card without a status action, or a primary action
+  that no check follows, shows **Accepted** right after the request is
+  queued.
+- A snapshot never replaces a newer one: a slow REST read cannot undo a
+  transition that arrived through the stream in the meantime.
 - An enqueue failure is an operation error, not automatically a device
   failure.
 - A status read failure keeps the card visible and marks its data as unknown;
@@ -150,7 +157,8 @@ The body contains:
 - **Actions**: run primary action and manually check status; both buttons
   are blocked while a check is pending, the **Action queued** note is
   replaced by the outcome, and recent runs and status history are refetched
-  once a newer check is visible;
+  once a newer check is visible; when no check follows (§4) the view shows
+  **Action accepted** and refetches the runs right away;
 - **Recent runs**: time, outcome, duration, and expandable output;
 - **Status history**: chronological transition timeline with duration;
 - **Configuration**: link to edit, not inline configuration in diagnostics.

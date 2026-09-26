@@ -30,13 +30,15 @@ var (
 //     is accepted so that non-browser clients such as curl keep working;
 //  4. when allowedHosts is non-empty the request Host must be listed (403).
 //
-// Hosts are compared case-insensitively including the port; a missing port
-// counts as the scheme default so that "http://pi.local" matches
-// "pi.local:80".
+// Hosts (Origin, request Host and the allowlist) are compared through
+// canonicalHost: case-insensitively, and the default ports 80 and 443 count
+// the same as no port, so "https://pi.local" behind a TLS-terminating proxy
+// still matches a request Host of "pi.local" or "pi.local:80". Any other
+// explicit port must match exactly.
 func requireSameOrigin(allowedHosts []string, next http.Handler) http.Handler {
 	allowed := make(map[string]struct{}, len(allowedHosts))
 	for _, host := range allowedHosts {
-		if host = strings.ToLower(strings.TrimSpace(host)); host != "" {
+		if host = canonicalHost(host); host != "" {
 			allowed[host] = struct{}{}
 		}
 	}
@@ -54,7 +56,7 @@ func requireSameOrigin(allowedHosts []string, next http.Handler) http.Handler {
 			return
 		}
 		if len(allowed) > 0 {
-			if _, ok := allowed[strings.ToLower(request.Host)]; !ok {
+			if _, ok := allowed[canonicalHost(request.Host)]; !ok {
 				writeError(w, http.StatusForbidden, ErrHostNotAllowed)
 				return
 			}
@@ -94,36 +96,37 @@ func checkOrigin(request *http.Request) error {
 	if !present {
 		return nil
 	}
-	if len(origin) != 1 || !sameOrigin(origin[0], request.Host, request.TLS != nil) {
+	if len(origin) != 1 || !sameOrigin(origin[0], request.Host) {
 		return ErrCrossSiteRequest
 	}
 	return nil
 }
 
 // sameOrigin reports whether the Origin header value points at the host that
-// received the request. The request scheme is only known from the TLS state,
-// so a request behind a TLS-terminating proxy compares as plain HTTP; both
-// hosts are normalised with the default port of their scheme.
-func sameOrigin(origin, requestHost string, tls bool) bool {
+// received the request. The request scheme is not known reliably (a
+// TLS-terminating proxy forwards plain HTTP), so the scheme only has to be
+// http or https and the hosts are compared with canonicalHost, which treats
+// the default ports of both schemes alike.
+func sameOrigin(origin, requestHost string) bool {
 	parsed, err := url.Parse(origin)
 	if err != nil || parsed.Host == "" || (parsed.Scheme != "http" && parsed.Scheme != "https") {
 		return false
 	}
-	requestScheme := "http"
-	if tls {
-		requestScheme = "https"
-	}
-	return normaliseHost(parsed.Host, parsed.Scheme) == normaliseHost(requestHost, requestScheme)
+	return canonicalHost(parsed.Host) == canonicalHost(requestHost)
 }
 
-func normaliseHost(host, scheme string) string {
+// canonicalHost lower-cases a host and drops a default port (80 or 443), so
+// "PI.LOCAL:443", "pi.local:80" and "pi.local" all become "pi.local" while
+// "pi.local:8080" keeps its port. IPv6 literals lose their brackets when the
+// port is dropped ("[::1]" and "[::1]:80" become "::1").
+func canonicalHost(host string) string {
 	host = strings.ToLower(strings.TrimSpace(host))
-	if _, _, err := net.SplitHostPort(host); err == nil {
-		return host
+	name, port, err := net.SplitHostPort(host)
+	if err != nil {
+		return strings.Trim(host, "[]")
 	}
-	port := "80"
-	if scheme == "https" {
-		port = "443"
+	if port == "80" || port == "443" {
+		return name
 	}
-	return net.JoinHostPort(strings.Trim(host, "[]"), port)
+	return net.JoinHostPort(name, port)
 }

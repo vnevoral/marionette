@@ -157,6 +157,16 @@ const editorFieldKeys: Record<keyof ActionFieldErrors, string> = {
  * `statusEnv`, `name`, …). Paths without an input of their own are returned
  * separately so the summary can still show them.
  */
+// `env.NAME` and `args[N]` messages belong to the Environment and Arguments
+// blocks, which have no per-item error slot.
+function actionFieldKey(rest: string[]): keyof ActionFieldErrors | undefined {
+	const known = actionFieldKeys[rest.join(".")];
+	if (known) return known;
+	if (rest[0] === "env") return "env";
+	if (rest[0]?.startsWith("args[")) return "args";
+	return undefined;
+}
+
 export function fieldErrorsFromServer(fields: Record<string, string>): {
 	fieldErrors: Record<string, string>;
 	unmapped: string[];
@@ -166,7 +176,7 @@ export function fieldErrorsFromServer(fields: Record<string, string>): {
 	for (const [path, message] of Object.entries(fields)) {
 		const [scope, ...rest] = path.split(".");
 		if (scope === "primary" || scope === "status") {
-			const key = actionFieldKeys[rest.join(".")] ?? (rest[0] === "env" ? "env" : undefined);
+			const key = actionFieldKey(rest);
 			if (key) {
 				const editorKey = `${scope}${editorFieldKeys[key]}`;
 				if (!fieldErrors[editorKey]) fieldErrors[editorKey] = message;

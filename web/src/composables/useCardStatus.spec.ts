@@ -1,7 +1,15 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { effectScope, ref } from "vue";
-import { getStatus, type StatusSnapshot } from "@/api";
-import { isNewerCheck, useCardStatus, waitForNewerStatus } from "@/composables/useCardStatus";
+import { getStatus, type ActionCard, type StatusSnapshot } from "@/api";
+import {
+	defaultMaxWaitMs,
+	expectsFollowUpCheck,
+	isNewerCheck,
+	supersedes,
+	useCardStatus,
+	waitBudgetMs,
+	waitForNewerStatus,
+} from "@/composables/useCardStatus";
 import { FakeEventSource } from "@/test/fakeEventSource";
 
 vi.mock("@/api", async (importOriginal) => {
@@ -37,6 +45,52 @@ describe("isNewerCheck", () => {
 		expect(isNewerCheck(snapshot(before), before)).toBe(false);
 		expect(isNewerCheck({ state: "unknown" }, before)).toBe(false);
 		expect(isNewerCheck({ state: "unknown" }, undefined)).toBe(false);
+	});
+});
+
+describe("supersedes", () => {
+	it("lets a newer or equal check replace the current one, never an older or unchecked one", () => {
+		expect(supersedes(snapshot(after), snapshot(before))).toBe(true);
+		expect(supersedes(snapshot(after), snapshot(after))).toBe(true);
+		expect(supersedes(snapshot(before), snapshot(after))).toBe(false);
+		expect(supersedes({ state: "unknown" }, snapshot(before))).toBe(false);
+		expect(supersedes(snapshot(before), undefined)).toBe(true);
+		expect(supersedes(snapshot(before), { state: "unknown" })).toBe(true);
+		expect(supersedes({ state: "unknown" }, undefined)).toBe(true);
+	});
+});
+
+describe("expectsFollowUpCheck", () => {
+	const action = { command: "true", timeoutSec: 5, rule: { type: "exit_code" as const } };
+	const polled: ActionCard = {
+		id: "polled",
+		name: "Polled",
+		primary: action,
+		status: action,
+		pollingIntervalSeconds: 60,
+		fastPollingIntervalSeconds: 10,
+		fastPollingWindowSeconds: 120,
+	};
+
+	it("mirrors the scheduler: a primary action is followed by a check only with full polling", () => {
+		expect(expectsFollowUpCheck(polled, "primary")).toBe(true);
+		expect(expectsFollowUpCheck({ ...polled, pollingIntervalSeconds: 0 }, "primary")).toBe(false);
+		expect(
+			expectsFollowUpCheck({ ...polled, fastPollingIntervalSeconds: undefined }, "primary"),
+		).toBe(false);
+		expect(expectsFollowUpCheck({ ...polled, fastPollingWindowSeconds: 0 }, "primary")).toBe(false);
+		expect(expectsFollowUpCheck({ ...polled, status: undefined }, "primary")).toBe(false);
+	});
+
+	it("always expects a check after a status action on a card that has one", () => {
+		expect(expectsFollowUpCheck({ ...polled, pollingIntervalSeconds: 0 }, "status")).toBe(true);
+		expect(expectsFollowUpCheck({ ...polled, status: undefined }, "status")).toBe(false);
+	});
+
+	it("waits for the fast polling window, or the default budget without one", () => {
+		expect(waitBudgetMs(polled)).toBe(120_000);
+		expect(waitBudgetMs({ ...polled, fastPollingWindowSeconds: 30 })).toBe(30_000);
+		expect(waitBudgetMs({ ...polled, fastPollingWindowSeconds: undefined })).toBe(defaultMaxWaitMs);
 	});
 });
 

@@ -7,7 +7,6 @@ import ProgressSpinner from "primevue/progressspinner";
 import {
 	enqueuePrimary,
 	enqueueStatus,
-	getStatus,
 	listCards,
 	type ActionCard as Card,
 	type StatusEvent,
@@ -16,14 +15,19 @@ import {
 import ActionCard from "@/components/ActionCard.vue";
 import EmptyState from "@/components/EmptyState.vue";
 import PageHeader from "@/components/PageHeader.vue";
-import { waitForNewerStatus } from "@/composables/useCardStatus";
+import {
+	expectsFollowUpCheck,
+	supersedes,
+	waitBudgetMs,
+	waitForNewerStatus,
+} from "@/composables/useCardStatus";
 import { useStatusEvents } from "@/composables/useStatusEvents";
+import { messageVisibleMs } from "@/composables/useTransientMessage";
 import type { ActionKind, PendingRequest, RequestResult } from "@/types";
 import { ACTIONS, EMPTY, FEEDBACK, LOADING } from "@/ui/vocabulary";
 
 const cards = ref<Card[]>([]);
 const statuses = ref<Record<string, StatusSnapshot>>({});
-const statusErrors = ref<Record<string, boolean>>({});
 // Only queued/running requests live here; a finished request is removed so the
 // card's buttons are released, and its outcome is shown briefly via lastResult.
 const requests = ref<Record<string, PendingRequest>>({});
@@ -31,9 +35,6 @@ const lastResult = ref<Record<string, RequestResult>>({});
 const loading = ref(true);
 const error = ref("");
 
-const defaultFastPollingWindowSeconds = 120;
-const resultVisibleMs = 4000;
-let statusRefreshGeneration = 0;
 const resultTimers = new Map<string, ReturnType<typeof setTimeout>>();
 const pendingWaits = new Map<string, AbortController>();
 
@@ -46,6 +47,14 @@ const lede = computed(() => {
 	return count ? `${count} ${noun} · ${healthyCount.value} healthy` : `${count} ${noun}`;
 });
 
+// Snapshots arrive from three sources (the initial list, the stream and REST
+// reads while a request waits or the stream is down); each one is applied
+// only when it is not older than what the card already shows.
+function applySnapshot(cardID: string, snapshot: StatusSnapshot | undefined) {
+	if (!snapshot || !cards.value.some((card) => card.id === cardID)) return;
+	if (supersedes(snapshot, statuses.value[cardID])) statuses.value[cardID] = snapshot;
+}
+
 async function loadDashboard() {
 	loading.value = true;
 	error.value = "";
@@ -57,9 +66,6 @@ async function loadDashboard() {
 			if (card.currentStatus) nextStatuses[card.id] = card.currentStatus;
 		}
 		statuses.value = nextStatuses;
-		statusErrors.value = {};
-		loading.value = false;
-		void refreshStatuses(loadedCards);
 	} catch (loadError) {
 		error.value = loadError instanceof Error ? loadError.message : FEEDBACK.unableToLoadCards;
 	} finally {
@@ -67,37 +73,24 @@ async function loadDashboard() {
 	}
 }
 
-async function refreshStatuses(cardsToRefresh: Card[]) {
-	const generation = ++statusRefreshGeneration;
-	const statusResults = await Promise.all(
-		cardsToRefresh
-			.filter((card) => card.status)
-			.map(async (card) => {
-				try {
-					return [card.id, await getStatus(card.id), false] as const;
-				} catch {
-					return [card.id, undefined, true] as const;
-				}
-			}),
-	);
-	if (generation !== statusRefreshGeneration) return;
-	for (const [cardID, snapshot, failed] of statusResults) {
-		if (snapshot) statuses.value[cardID] = snapshot;
-		statusErrors.value[cardID] = failed;
+// While the stream is down the list is re-read as a whole: it already carries
+// the current status of every card, so one request replaces N status reads.
+async function refreshStatuses() {
+	try {
+		for (const card of await listCards()) applySnapshot(card.id, card.currentStatus);
+	} catch {
+		// The next tick retries; the cards keep showing their last known status.
 	}
 }
 
 function applyStatusEvent(event: StatusEvent) {
-	if (!cards.value.some((card) => card.id === event.cardId)) return;
-	statusRefreshGeneration++;
-	statuses.value[event.cardId] = event.snapshot;
-	statusErrors.value[event.cardId] = false;
+	applySnapshot(event.cardId, event.snapshot);
 }
 
 useStatusEvents().subscribe({
 	onStatus: applyStatusEvent,
 	onRefresh() {
-		if (cards.value.length) void refreshStatuses(cards.value);
+		if (cards.value.length) void refreshStatuses();
 	},
 });
 
@@ -115,7 +108,7 @@ function showResult(cardID: string, result: RequestResult) {
 		setTimeout(() => {
 			resultTimers.delete(cardID);
 			lastResult.value = withoutKey(lastResult.value, cardID);
-		}, resultVisibleMs),
+		}, messageVisibleMs),
 	);
 }
 
@@ -133,22 +126,15 @@ async function runAction(card: Card, action: ActionKind) {
 	try {
 		if (action === "primary") await enqueuePrimary(card.id);
 		else await enqueueStatus(card.id);
-		if (!card.status) {
+		if (!expectsFollowUpCheck(card, action)) {
 			showResult(card.id, { tone: "success", message: FEEDBACK.accepted });
 			return;
 		}
 		setPending(card.id, { action, phase: "running" });
 		const result = await waitForNewerStatus(card.id, previousCheckedAt, {
 			signal: controller.signal,
-			maxWaitMs: (card.fastPollingWindowSeconds || defaultFastPollingWindowSeconds) * 1000,
-			onSnapshot(snapshot) {
-				statusRefreshGeneration++;
-				statuses.value[card.id] = snapshot;
-				statusErrors.value[card.id] = false;
-			},
-			onError() {
-				statusErrors.value[card.id] = true;
-			},
+			maxWaitMs: waitBudgetMs(card),
+			onSnapshot: (snapshot) => applySnapshot(card.id, snapshot),
 		});
 		if (result === "aborted") return;
 		showResult(
