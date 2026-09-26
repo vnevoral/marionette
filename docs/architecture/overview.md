@@ -155,6 +155,12 @@ Každá chybová odpověď na `/api/*` má JSON obálku `{"error": "…"}`
 `GET /api/health` vrací `{"status":"ok","version":"<git describe>","uptimeSec":n}`;
 verze se vkládá při buildu (`-ldflags -X main.version`, `make build`).
 
+Tvar stavových dat: `StatusSnapshot` karty, která ještě nebyla kontrolována,
+je jen `{"state":"unknown"}` — `checkedAt` a `lastCheck` se vynechávají
+(`StatusSnapshot.MarshalJSON`, blok 0032), klient tedy nerozpoznává nulový
+čas Go. Pole `duration` u běhů a přechodů stavu je v **nanosekundách**
+(Go `time.Duration`); frontend je převádí při zobrazení.
+
 Limity hodnot karty (konstanty `config.Max*`, ADR-0004 „Limity hodnot“):
 
 | Pole                                  | Limit                                                              |

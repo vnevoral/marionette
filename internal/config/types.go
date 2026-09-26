@@ -2,6 +2,7 @@
 package config
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"regexp"
@@ -329,10 +330,25 @@ type StatusChange struct {
 }
 
 // StatusSnapshot contains the latest status check and its interpreted state.
+// A card that has never been checked has a zero CheckedAt; its JSON form
+// carries only "state" (see MarshalJSON).
 type StatusSnapshot struct {
 	State     StatusState `json:"state"`
 	CheckedAt time.Time   `json:"checkedAt"`
 	LastCheck Run         `json:"lastCheck"`
+}
+
+// MarshalJSON omits checkedAt and lastCheck while the card has never been
+// checked, so clients do not have to recognise Go's zero time. Unmarshalling
+// stays the default: a missing checkedAt reads back as the zero time.
+func (snapshot StatusSnapshot) MarshalJSON() ([]byte, error) {
+	type plain StatusSnapshot
+	if snapshot.CheckedAt.IsZero() {
+		return json.Marshal(struct {
+			State StatusState `json:"state"`
+		}{State: snapshot.State})
+	}
+	return json.Marshal(plain(snapshot))
 }
 
 // Settings contains global configuration for history and action concurrency.

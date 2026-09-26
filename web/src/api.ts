@@ -1,18 +1,5 @@
 export type StatusState = "unknown" | "ok" | "fail";
 
-export const CARD_ICON_OPTIONS = [
-	{ label: "Desktop", value: "pi pi-desktop" },
-	{ label: "Home", value: "pi pi-home" },
-	{ label: "Server", value: "pi pi-server" },
-	{ label: "Cloud", value: "pi pi-cloud" },
-	{ label: "Database", value: "pi pi-database" },
-	{ label: "Globe", value: "pi pi-globe" },
-	{ label: "Bolt", value: "pi pi-bolt" },
-	{ label: "Cog", value: "pi pi-cog" },
-	{ label: "Shield", value: "pi pi-shield" },
-	{ label: "Heart", value: "pi pi-heart" },
-] as const;
-
 export interface Action {
 	command: string;
 	args?: string[];
@@ -38,6 +25,7 @@ export interface ActionCard {
 export interface Run {
 	actionKind: string;
 	startedAt: string;
+	/** Nanoseconds (Go `time.Duration`); see the API contract in the architecture overview. */
 	duration: number;
 	exitCode: number;
 	output: string;
@@ -47,8 +35,10 @@ export interface Run {
 
 export interface StatusSnapshot {
 	state: StatusState;
-	checkedAt: string;
-	lastCheck: Run;
+	/** Absent until the card has been checked at least once. */
+	checkedAt?: string;
+	/** Absent until the card has been checked at least once. */
+	lastCheck?: Run;
 }
 
 export interface StatusEvent {
@@ -63,27 +53,96 @@ export interface AcceptedAction {
 	status: "accepted";
 }
 
-async function request<T>(path: string, options?: RequestInit): Promise<T> {
-	// Spread options first: a later spread would replace the merged headers and
-	// drop Accept on every call that sets its own Content-Type.
-	const response = await fetch(path, {
-		...options,
-		headers: { Accept: "application/json", ...options?.headers },
-	});
-	if (!response.ok) {
-		let detail = `Request failed (${response.status})`;
-		try {
-			const error = (await response.json()) as { error?: string };
-			detail = error.error ?? detail;
-		} catch {
-			// Keep the HTTP status when the server response is not JSON.
+/** Request budget; a slow or hung server surfaces as a timeout, not a spinner. */
+export const REQUEST_TIMEOUT_MS = 15_000;
+
+/**
+ * Error thrown by every API call. `status` is the HTTP status, or 0 when no
+ * response arrived (network failure, timeout). `fields` carries the server's
+ * per-field validation messages from a 422 response.
+ */
+export class ApiError extends Error {
+	readonly status: number;
+	readonly fields?: Record<string, string>;
+
+	constructor(message: string, status: number, fields?: Record<string, string>) {
+		super(message);
+		this.name = "ApiError";
+		this.status = status;
+		this.fields = fields;
+	}
+
+	get isNotFound() {
+		return this.status === 404;
+	}
+
+	get isUnreachable() {
+		return this.status === 0;
+	}
+}
+
+interface ErrorEnvelope {
+	error?: unknown;
+	fields?: unknown;
+}
+
+function isJSON(response: Response) {
+	return (response.headers.get("content-type") ?? "").toLowerCase().includes("application/json");
+}
+
+function fieldMessages(value: unknown): Record<string, string> | undefined {
+	if (!value || typeof value !== "object") return undefined;
+	const fields: Record<string, string> = {};
+	for (const [key, message] of Object.entries(value)) {
+		if (typeof message === "string") fields[key] = message;
+	}
+	return Object.keys(fields).length ? fields : undefined;
+}
+
+async function errorFromResponse(response: Response): Promise<ApiError> {
+	const fallback = `Request failed (${response.status})`;
+	if (!isJSON(response)) return new ApiError(fallback, response.status);
+	try {
+		const envelope = (await response.json()) as ErrorEnvelope;
+		const message = typeof envelope.error === "string" ? envelope.error : fallback;
+		return new ApiError(message, response.status, fieldMessages(envelope.fields));
+	} catch {
+		return new ApiError(fallback, response.status);
+	}
+}
+
+async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
+	const { headers, signal, ...rest } = options;
+	const controller = new AbortController();
+	const timer = setTimeout(() => controller.abort("timeout"), REQUEST_TIMEOUT_MS);
+	const forwardAbort = () => controller.abort(signal?.reason);
+	if (signal?.aborted) forwardAbort();
+	else signal?.addEventListener("abort", forwardAbort, { once: true });
+	let response: Response;
+	try {
+		response = await fetch(path, {
+			...rest,
+			headers: { Accept: "application/json", ...headers },
+			signal: controller.signal,
+		});
+	} catch (failure) {
+		if (controller.signal.aborted && controller.signal.reason === "timeout") {
+			throw new ApiError("Request timed out", 0);
 		}
-		throw new Error(detail);
+		if (failure instanceof DOMException && failure.name === "AbortError") throw failure;
+		throw new ApiError("Server unreachable", 0);
+	} finally {
+		clearTimeout(timer);
+		signal?.removeEventListener("abort", forwardAbort);
 	}
-	if (response.status === 204) {
-		return undefined as T;
+	if (!response.ok) throw await errorFromResponse(response);
+	if (response.status === 204) return undefined as T;
+	if (!isJSON(response)) throw new ApiError("Unexpected response from server", response.status);
+	try {
+		return (await response.json()) as T;
+	} catch {
+		throw new ApiError("Unexpected response from server", response.status);
 	}
-	return (await response.json()) as T;
 }
 
 function withoutRuntimeStatus(card: ActionCard): Omit<ActionCard, "currentStatus"> {
@@ -135,6 +194,7 @@ export interface StatusChange {
 	state: StatusState;
 	startedAt: string;
 	endedAt?: string;
+	/** Nanoseconds (Go `time.Duration`). */
 	duration: number;
 }
 

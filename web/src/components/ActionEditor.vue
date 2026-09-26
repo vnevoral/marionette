@@ -1,65 +1,89 @@
 <script setup lang="ts">
+import { computed, useId } from "vue";
+import Button from "primevue/button";
 import InputNumber from "primevue/inputnumber";
 import InputText from "primevue/inputtext";
 import Select from "primevue/select";
 import type { Action } from "@/api";
+import {
+	newRowId,
+	type ActionFieldErrors,
+	type ArgumentRow,
+	type EnvironmentRow,
+} from "@/views/cardEditModel";
 
-type EnvironmentRow = { key: string; value: string };
 type RuleType = Action["rule"]["type"];
 
 const props = defineProps<{
-	modelValue: Action;
-	args: string[];
-	environment: EnvironmentRow[];
 	title: string;
-	errors?: {
-		command?: string;
-		timeoutSec?: string;
-	};
+	errors?: ActionFieldErrors;
 }>();
 
-const emit = defineEmits<{
-	(e: "update:modelValue", value: Action): void;
-	(e: "update:args", value: string[]): void;
-	(e: "update:environment", value: EnvironmentRow[]): void;
-	(e: "add-argument"): void;
-	(e: "add-environment"): void;
-}>();
+// The editor owns the repeatable rows: adding and removing happens here and
+// the parent only receives the new arrays.
+const action = defineModel<Action>({ required: true });
+const args = defineModel<ArgumentRow[]>("args", { required: true });
+const environment = defineModel<EnvironmentRow[]>("environment", { required: true });
 
-function updateAction(key: keyof Action, value: unknown) {
-	emit("update:modelValue", { ...props.modelValue, [key]: value });
+const RULE_OPTIONS: { label: string; value: RuleType }[] = [
+	{ label: "Exit code is zero", value: "exit_code" },
+	{ label: "Output matches pattern", value: "match" },
+	{ label: "Output does not match pattern", value: "not_match" },
+];
+
+const ids = useId();
+const ruleLabelId = computed(() => `${ids}-rule`);
+
+function updateAction(patch: Partial<Action>) {
+	action.value = { ...action.value, ...patch };
 }
 
 function updateCommand(value: unknown) {
-	updateAction("command", String(value ?? ""));
+	updateAction({ command: String(value ?? "") });
 }
 
 function updateDirectory(value: unknown) {
-	updateAction("dir", String(value ?? ""));
+	updateAction({ dir: String(value ?? "") });
 }
 
 function updateTimeout(value: unknown) {
-	updateAction("timeoutSec", Number(value ?? 0));
+	updateAction({ timeoutSec: Number(value ?? 0) });
 }
 
 function updateRuleType(value: unknown) {
-	updateAction("rule", { ...props.modelValue.rule, type: value as RuleType });
+	updateAction({ rule: { ...action.value.rule, type: value as RuleType } });
 }
 
 function updatePattern(value: unknown) {
-	updateAction("rule", { ...props.modelValue.rule, pattern: String(value ?? "") });
+	updateAction({ rule: { ...action.value.rule, pattern: String(value ?? "") } });
 }
 
-function updateArgument(index: number, value: unknown) {
-	const args = [...props.args];
-	args[index] = String(value ?? "");
-	emit("update:args", args);
+function updateArgument(id: string, value: unknown) {
+	args.value = args.value.map((row) =>
+		row.id === id ? { ...row, value: String(value ?? "") } : row,
+	);
 }
 
-function updateEnvironment(index: number, key: "key" | "value", value: unknown) {
-	const environment = props.environment.map((row) => ({ ...row }));
-	environment[index][key] = String(value ?? "");
-	emit("update:environment", environment);
+function addArgument() {
+	args.value = [...args.value, { id: newRowId(), value: "" }];
+}
+
+function removeArgument(id: string) {
+	args.value = args.value.filter((row) => row.id !== id);
+}
+
+function updateEnvironment(id: string, key: "key" | "value", value: unknown) {
+	environment.value = environment.value.map((row) =>
+		row.id === id ? { ...row, [key]: String(value ?? "") } : row,
+	);
+}
+
+function addEnvironment() {
+	environment.value = [...environment.value, { id: newRowId(), key: "", value: "" }];
+}
+
+function removeEnvironment(id: string) {
+	environment.value = environment.value.filter((row) => row.id !== id);
 }
 </script>
 
@@ -70,7 +94,7 @@ function updateEnvironment(index: number, key: "key" | "value", value: unknown) 
 			<label class="col-12 md:col-6"
 				>Command
 				<InputText
-					:model-value="modelValue.command"
+					:model-value="action.command"
 					:invalid="Boolean(props.errors?.command)"
 					:aria-invalid="Boolean(props.errors?.command)"
 					@update:model-value="updateCommand"
@@ -79,12 +103,17 @@ function updateEnvironment(index: number, key: "key" | "value", value: unknown) 
 			</label>
 			<label class="col-12 md:col-6"
 				>Working directory
-				<InputText :model-value="modelValue.dir" @update:model-value="updateDirectory"
-			/></label>
+				<InputText
+					:model-value="action.dir"
+					:invalid="Boolean(props.errors?.dir)"
+					@update:model-value="updateDirectory"
+				/>
+				<small v-if="props.errors?.dir" class="field-error">{{ props.errors.dir }}</small>
+			</label>
 			<label class="col-12 md:col-6 lg:col-4"
 				>Timeout (seconds)
 				<InputNumber
-					:model-value="modelValue.timeoutSec"
+					:model-value="action.timeoutSec"
 					:min="1"
 					:invalid="Boolean(props.errors?.timeoutSec)"
 					:aria-invalid="Boolean(props.errors?.timeoutSec)"
@@ -94,45 +123,93 @@ function updateEnvironment(index: number, key: "key" | "value", value: unknown) 
 					props.errors.timeoutSec
 				}}</small>
 			</label>
-			<label class="col-12 md:col-6 lg:col-4"
-				>Output rule
+			<div class="col-12 md:col-6 lg:col-4 field">
+				<span :id="ruleLabelId" class="field-label">Output rule</span>
 				<Select
-					:model-value="modelValue.rule.type"
-					:options="['exit_code', 'match', 'not_match']"
+					:model-value="action.rule.type"
+					:options="RULE_OPTIONS"
+					option-label="label"
+					option-value="value"
+					:aria-labelledby="ruleLabelId"
 					@update:model-value="updateRuleType"
-			/></label>
-			<label v-if="modelValue.rule.type !== 'exit_code'" class="col-12 md:col-6 lg:col-4"
+				/>
+			</div>
+			<label v-if="action.rule.type !== 'exit_code'" class="col-12 md:col-6 lg:col-4"
 				>Regex pattern
-				<InputText :model-value="modelValue.rule.pattern" @update:model-value="updatePattern"
-			/></label>
+				<InputText
+					:model-value="action.rule.pattern"
+					:invalid="Boolean(props.errors?.pattern)"
+					@update:model-value="updatePattern"
+				/>
+				<small v-if="props.errors?.pattern" class="field-error">{{ props.errors.pattern }}</small>
+			</label>
 		</div>
 		<div class="dynamic-block flex flex-column gap-2 mt-4">
 			<strong>Arguments</strong>
-			<InputText
-				v-for="(argument, index) in args"
-				:key="index"
-				:model-value="argument"
-				@update:model-value="updateArgument(index, $event)"
+			<small v-if="props.errors?.args" class="field-error">{{ props.errors.args }}</small>
+			<div v-for="(row, index) in args" :key="row.id" class="row-line">
+				<InputText
+					:model-value="row.value"
+					:aria-label="`Argument ${index + 1}`"
+					@update:model-value="updateArgument(row.id, $event)"
+				/>
+				<Button
+					type="button"
+					icon="pi pi-times"
+					text
+					rounded
+					severity="secondary"
+					:aria-label="`Remove argument ${index + 1}`"
+					@click="removeArgument(row.id)"
+				/>
+			</div>
+			<Button
+				type="button"
+				label="Add argument"
+				icon="pi pi-plus"
+				text
+				size="small"
+				class="add-row"
+				@click="addArgument"
 			/>
-			<button type="button" @click="emit('add-argument')">+ Add argument</button>
 		</div>
 		<div class="dynamic-block flex flex-column gap-2 mt-4">
 			<strong>Environment</strong>
-			<div v-for="(row, index) in environment" :key="index" class="env-row grid">
+			<small v-if="props.errors?.env" class="field-error">{{ props.errors.env }}</small>
+			<div v-for="(row, index) in environment" :key="row.id" class="row-line env-row">
 				<InputText
-					class="col-12 md:col-4"
+					class="env-key"
 					placeholder="KEY"
 					:model-value="row.key"
-					@update:model-value="updateEnvironment(index, 'key', $event)"
+					:aria-label="`Variable ${index + 1} name`"
+					@update:model-value="updateEnvironment(row.id, 'key', $event)"
 				/>
 				<InputText
-					class="col-12 md:col-8"
+					class="env-value"
 					placeholder="value"
 					:model-value="row.value"
-					@update:model-value="updateEnvironment(index, 'value', $event)"
+					:aria-label="`Variable ${index + 1} value`"
+					@update:model-value="updateEnvironment(row.id, 'value', $event)"
+				/>
+				<Button
+					type="button"
+					icon="pi pi-times"
+					text
+					rounded
+					severity="secondary"
+					:aria-label="`Remove variable ${index + 1}`"
+					@click="removeEnvironment(row.id)"
 				/>
 			</div>
-			<button type="button" @click="emit('add-environment')">+ Add variable</button>
+			<Button
+				type="button"
+				label="Add variable"
+				icon="pi pi-plus"
+				text
+				size="small"
+				class="add-row"
+				@click="addEnvironment"
+			/>
 		</div>
 	</section>
 </template>
@@ -148,7 +225,8 @@ function updateEnvironment(index: number, key: "key" | "value", value: unknown) 
 	font-size: 1.35rem;
 	font-weight: 500;
 }
-label {
+label,
+.field {
 	display: flex;
 	flex-direction: column;
 	gap: 0.4rem;
@@ -161,13 +239,31 @@ label {
 	color: var(--color-danger);
 	font-size: 0.78rem;
 }
-.dynamic-block button {
-	width: fit-content;
-	border: 0;
-	background: transparent;
-	color: var(--color-accent);
-	cursor: pointer;
-	font-family: var(--font-ui);
-	font-weight: var(--font-weight-medium);
+.row-line {
+	display: flex;
+	align-items: center;
+	gap: var(--space-2);
+}
+.row-line :deep(.p-inputtext) {
+	flex: 1 1 auto;
+	min-width: 0;
+}
+.env-row .env-key {
+	flex: 1 1 30%;
+}
+.env-row .env-value {
+	flex: 1 1 60%;
+}
+.add-row {
+	align-self: flex-start;
+}
+@media (max-width: 30rem) {
+	.env-row {
+		flex-wrap: wrap;
+	}
+	.env-row .env-key,
+	.env-row .env-value {
+		flex-basis: 100%;
+	}
 }
 </style>

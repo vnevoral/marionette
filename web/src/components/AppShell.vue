@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { RouterLink } from "vue-router";
+import ConnectionStatus from "@/components/ConnectionStatus.vue";
 
 const navigation = [{ label: "Overview", to: "/", icon: "pi pi-th-large" }];
 </script>
@@ -17,10 +18,7 @@ const navigation = [{ label: "Overview", to: "/", icon: "pi pi-th-large" }];
 					<span>{{ item.label }}</span>
 				</RouterLink>
 			</nav>
-			<div class="connection-state" role="status">
-				<span class="connection-dot" aria-hidden="true"></span>
-				<span>Local control</span>
-			</div>
+			<ConnectionStatus class="connection-slot" />
 		</header>
 		<div class="app-content">
 			<slot />
@@ -92,21 +90,8 @@ const navigation = [{ label: "Overview", to: "/", icon: "pi pi-th-large" }];
 	color: var(--color-ink);
 }
 
-.connection-state {
-	display: inline-flex;
-	align-items: center;
-	gap: var(--space-2);
+.connection-slot {
 	margin-left: auto;
-	color: var(--color-muted);
-	font-size: 0.8rem;
-}
-
-.connection-dot {
-	width: 8px;
-	height: 8px;
-	border-radius: 50%;
-	background: var(--color-success);
-	box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-success) 15%, transparent);
 }
 
 .app-content {
@@ -124,7 +109,7 @@ const navigation = [{ label: "Overview", to: "/", icon: "pi pi-th-large" }];
 		padding-bottom: var(--space-3);
 	}
 
-	.connection-state {
+	.connection-slot {
 		padding-bottom: var(--space-3);
 	}
 

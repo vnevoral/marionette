@@ -1,3 +1,12 @@
+<script lang="ts">
+import type { ActionCard as SavedCard } from "@/api";
+
+// The card created by the last save. After creating a card the view moves to
+// its edit route; the router may reuse or recreate this component, and either
+// way the form shows the saved card with "Card saved" without a reload.
+let justSaved: SavedCard | undefined;
+</script>
+
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from "vue";
 import { onBeforeRouteLeave, RouterLink, useRoute, useRouter } from "vue-router";
@@ -9,22 +18,28 @@ import Message from "primevue/message";
 import Select from "primevue/select";
 import Textarea from "primevue/textarea";
 import ToggleSwitch from "primevue/toggleswitch";
-import { CARD_ICON_OPTIONS, createCard, getCard, updateCard, type ActionCard } from "@/api";
+import { ApiError, createCard, getCard, updateCard, type ActionCard } from "@/api";
+import { useConfirm } from "primevue/useconfirm";
+import { CARD_ICON_OPTIONS } from "@/ui/icons";
 import ActionEditor from "@/components/ActionEditor.vue";
 import {
 	actionFrom,
+	argumentRows,
 	copyAction,
 	emptyAction,
 	emptyCard,
 	environmentRows,
+	fieldErrorsFromServer,
 	fingerprint,
 	validate as validateCard,
+	type ArgumentRow,
 	type EnvironmentRow,
 } from "@/views/cardEditModel";
 import { singleParam } from "@/router/params";
 
 const route = useRoute();
 const router = useRouter();
+const confirm = useConfirm();
 const isNew = () => route.name === "card-new";
 const cardID = () => singleParam(route.params.id);
 
@@ -37,8 +52,8 @@ const initialFingerprint = ref("");
 const fieldErrors = reactive<Record<string, string>>({});
 
 const form = reactive<ActionCard>(emptyCard());
-const primaryArgs = ref<string[]>([]);
-const statusArgs = ref<string[]>([]);
+const primaryArgs = ref<ArgumentRow[]>([]);
+const statusArgs = ref<ArgumentRow[]>([]);
 const primaryEnv = ref<EnvironmentRow[]>([]);
 const statusEnv = ref<EnvironmentRow[]>([]);
 // Bumped on every route change so a response for a previous card is ignored.
@@ -70,11 +85,22 @@ function applyCard(card: ActionCard) {
 		status: card.status ? copyAction(card.status) : undefined,
 	});
 	statusEnabled.value = Boolean(card.status);
-	primaryArgs.value = [...(card.primary.args ?? [])];
-	statusArgs.value = [...(card.status?.args ?? [])];
+	primaryArgs.value = argumentRows(card.primary.args);
+	statusArgs.value = argumentRows(card.status?.args);
 	primaryEnv.value = environmentRows(card.primary.env);
 	statusEnv.value = environmentRows(card.status?.env);
 	markClean();
+}
+
+function actionErrors(scope: "primary" | "status") {
+	return {
+		command: fieldErrors[`${scope}Command`],
+		dir: fieldErrors[`${scope}Dir`],
+		timeoutSec: fieldErrors[`${scope}Timeout`],
+		pattern: fieldErrors[`${scope}Pattern`],
+		args: fieldErrors[`${scope}Args`],
+		env: fieldErrors[`${scope}Env`],
+	};
 }
 
 function validate() {
@@ -82,6 +108,14 @@ function validate() {
 	const result = validateCard(form, statusEnabled.value);
 	Object.assign(fieldErrors, result.fieldErrors);
 	return result.firstError;
+}
+
+function applyServerErrors(saveError: ApiError) {
+	const { fieldErrors: serverErrors, unmapped } = fieldErrorsFromServer(saveError.fields ?? {});
+	Object.assign(fieldErrors, serverErrors);
+	error.value = unmapped.length
+		? `${saveError.message} (${unmapped.join("; ")})`
+		: saveError.message;
 }
 
 async function save() {
@@ -101,22 +135,20 @@ async function save() {
 	};
 	try {
 		const saved = isNew() ? await createCard(payload) : await updateCard(payload);
-		markClean();
+		applyCard(saved);
 		notice.value = "Card saved";
-		await router.push(`/cards/${encodeURIComponent(saved.id)}`);
+		// Stay in the edit context (UX spec §7.3); a new card moves to its own
+		// edit route so a reload or a second save addresses the stored card.
+		if (isNew()) {
+			justSaved = saved;
+			await router.replace(`/cards/${encodeURIComponent(saved.id)}/edit`);
+		}
 	} catch (saveError) {
-		error.value = saveError instanceof Error ? saveError.message : "Unable to save card";
+		if (saveError instanceof ApiError && saveError.fields) applyServerErrors(saveError);
+		else error.value = saveError instanceof Error ? saveError.message : "Unable to save card";
 	} finally {
 		saving.value = false;
 	}
-}
-
-function addArgument(target: "primary" | "status") {
-	(target === "primary" ? primaryArgs : statusArgs).value.push("");
-}
-
-function addEnvironment(target: "primary" | "status") {
-	(target === "primary" ? primaryEnv : statusEnv).value.push({ key: "", value: "" });
 }
 
 async function loadCard() {
@@ -125,6 +157,13 @@ async function loadCard() {
 	notice.value = "";
 	if (isNew()) {
 		applyCard(emptyCard());
+		loading.value = false;
+		return;
+	}
+	if (justSaved?.id === cardID()) {
+		applyCard(justSaved);
+		justSaved = undefined;
+		notice.value = "Card saved";
 		loading.value = false;
 		return;
 	}
@@ -162,9 +201,27 @@ function handleBeforeUnload(event: BeforeUnloadEvent) {
 	event.returnValue = "";
 }
 
-onBeforeRouteLeave(() => {
+function confirmDiscard(): Promise<boolean> {
+	return new Promise((resolve) => {
+		confirm.require({
+			header: "Discard unsaved changes?",
+			message: "Your edits to this card have not been saved.",
+			icon: "pi pi-exclamation-triangle",
+			acceptLabel: "Discard changes",
+			rejectLabel: "Keep editing",
+			acceptProps: { severity: "danger" },
+			rejectProps: { severity: "secondary", outlined: true },
+			defaultFocus: "reject",
+			accept: () => resolve(true),
+			reject: () => resolve(false),
+			onHide: () => resolve(false),
+		});
+	});
+}
+
+onBeforeRouteLeave(async () => {
 	if (!isDirty.value || saving.value) return true;
-	return window.confirm("You have unsaved changes. Leave without saving?");
+	return confirmDiscard();
 });
 
 onBeforeUnmount(() => {
@@ -209,8 +266,16 @@ onBeforeUnmount(() => {
 							<small v-if="fieldErrors.name" class="field-error">{{ fieldErrors.name }}</small>
 						</label>
 						<label class="col-12"
-							>Description <Textarea v-model="form.description" rows="2"
-						/></label>
+							>Description
+							<Textarea
+								v-model="form.description"
+								rows="2"
+								:invalid="Boolean(fieldErrors.description)"
+							/>
+							<small v-if="fieldErrors.description" class="field-error">{{
+								fieldErrors.description
+							}}</small>
+						</label>
 						<label class="col-12 md:col-6"
 							>Icon
 							<Select
@@ -240,14 +305,10 @@ onBeforeUnmount(() => {
 
 				<ActionEditor
 					v-model="form.primary"
-					:args="primaryArgs"
-					:environment="primaryEnv"
+					v-model:args="primaryArgs"
+					v-model:environment="primaryEnv"
 					title="Primary action"
-					:errors="{ command: fieldErrors.primaryCommand, timeoutSec: fieldErrors.primaryTimeout }"
-					@update:args="primaryArgs = $event"
-					@update:environment="primaryEnv = $event"
-					@add-argument="addArgument('primary')"
-					@add-environment="addEnvironment('primary')"
+					:errors="actionErrors('primary')"
 				/>
 
 				<div class="status-toggle">
@@ -257,16 +318,12 @@ onBeforeUnmount(() => {
 
 				<ActionEditor
 					v-if="statusEnabled"
+					v-model:args="statusArgs"
+					v-model:environment="statusEnv"
 					:model-value="form.status ?? emptyAction()"
-					:args="statusArgs"
-					:environment="statusEnv"
 					title="Status action"
-					:errors="{ command: fieldErrors.statusCommand, timeoutSec: fieldErrors.statusTimeout }"
+					:errors="actionErrors('status')"
 					@update:model-value="form.status = $event"
-					@update:args="statusArgs = $event"
-					@update:environment="statusEnv = $event"
-					@add-argument="addArgument('status')"
-					@add-environment="addEnvironment('status')"
 				/>
 
 				<section class="polling-section" aria-labelledby="polling-title">
@@ -397,6 +454,10 @@ label {
 	font-size: 0.85rem;
 	font-weight: var(--font-weight-medium);
 }
+.field-error {
+	color: var(--color-danger);
+	font-size: 0.78rem;
+}
 .status-toggle {
 	display: flex;
 	align-items: center;
@@ -411,7 +472,14 @@ label {
 	border-top: 1px solid var(--color-border);
 }
 .editor-actions {
-	padding-top: var(--space-2);
+	position: sticky;
+	bottom: 0;
+	z-index: 1;
+	margin: 0 calc(-1 * var(--space-4));
+	padding: var(--space-3) var(--space-4);
+	border-top: 1px solid var(--color-border);
+	background: color-mix(in srgb, var(--color-surface) 94%, transparent);
+	backdrop-filter: blur(4px);
 }
 .loading-state {
 	display: grid;

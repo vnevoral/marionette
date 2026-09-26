@@ -1,0 +1,150 @@
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { h } from "vue";
+import { flushPromises, mount, type VueWrapper } from "@vue/test-utils";
+import { createMemoryHistory, createRouter, RouterView, type Router } from "vue-router";
+import PrimeVue from "primevue/config";
+import { ApiError, createCard, getCard, updateCard, type ActionCard } from "@/api";
+import CardEditView from "@/views/CardEditView.vue";
+import { fakeConfirm } from "@/test/fakeConfirm";
+
+vi.mock("@/api", async (importOriginal) => {
+	const actual = await importOriginal<typeof import("@/api")>();
+	return { ...actual, getCard: vi.fn(), createCard: vi.fn(), updateCard: vi.fn() };
+});
+
+const printer: ActionCard = {
+	id: "printer",
+	name: "Printer",
+	description: "",
+	icon: "pi pi-desktop",
+	primary: {
+		command: "wake",
+		args: ["--now"],
+		env: { TZ: "UTC" },
+		timeoutSec: 5,
+		rule: { type: "exit_code" },
+	},
+};
+
+const Blank = { render: () => h("div") };
+
+function inputInLabel(wrapper: VueWrapper, label: string) {
+	const node = wrapper.findAll("label").find((candidate) => candidate.text().startsWith(label));
+	if (!node) throw new Error(`label ${label} not rendered`);
+	return node.find("input, textarea");
+}
+
+async function mountEdit(path: string) {
+	const router: Router = createRouter({
+		history: createMemoryHistory(),
+		routes: [
+			{ path: "/", component: Blank },
+			{ path: "/cards/new/edit", name: "card-new", component: CardEditView },
+			{ path: "/cards/:id", name: "card-detail", component: Blank },
+			{ path: "/cards/:id/edit", name: "card-edit", component: CardEditView },
+		],
+	});
+	await router.push(path);
+	await router.isReady();
+	const confirm = fakeConfirm();
+	// Rendered through RouterView so onBeforeRouteLeave is attached to the route.
+	const wrapper = mount(
+		{ render: () => h(RouterView) },
+		{ global: { plugins: [router, PrimeVue], provide: confirm.provide } },
+	);
+	await flushPromises();
+	return { wrapper, router, confirm };
+}
+
+describe("CardEditView", () => {
+	beforeEach(() => {
+		vi.mocked(getCard).mockReset().mockResolvedValue(printer);
+		vi.mocked(updateCard).mockReset();
+		vi.mocked(createCard).mockReset();
+	});
+
+	afterEach(() => {
+		vi.restoreAllMocks();
+	});
+
+	it("shows 422 field messages beside the inputs and keeps the values", async () => {
+		vi.mocked(updateCard).mockRejectedValue(
+			new ApiError("validation failed: name: too long; primary.command: bad", 422, {
+				name: "name is too long",
+				"primary.command": "action command is required",
+				"primary.env.TZ": "environment variable name is invalid",
+				id: "immutable",
+			}),
+		);
+		const { wrapper } = await mountEdit("/cards/printer/edit");
+		await inputInLabel(wrapper, "Name").setValue("Printer renamed");
+		await wrapper
+			.findAll("button")
+			.find((b) => b.text().includes("Save card"))!
+			.trigger("click");
+		await flushPromises();
+
+		const errors = wrapper.findAll(".field-error").map((node) => node.text());
+		expect(errors).toContain("name is too long");
+		expect(errors).toContain("action command is required");
+		expect(errors).toContain("environment variable name is invalid");
+		expect(wrapper.find(".p-message-error").text()).toContain("validation failed");
+		expect(wrapper.find(".p-message-error").text()).toContain("id: immutable");
+		expect((inputInLabel(wrapper, "Name").element as HTMLInputElement).value).toBe(
+			"Printer renamed",
+		);
+		expect((inputInLabel(wrapper, "Command").element as HTMLInputElement).value).toBe("wake");
+		wrapper.unmount();
+	});
+
+	it("asks before leaving a dirty form through the confirm dialog", async () => {
+		const { wrapper, router, confirm } = await mountEdit("/cards/printer/edit");
+		await inputInLabel(wrapper, "Name").setValue("Changed");
+
+		const blocked = router.push("/");
+		await flushPromises();
+		expect(confirm.require).toHaveBeenCalledTimes(1);
+		expect(confirm.last().header).toBe("Discard unsaved changes?");
+		confirm.last().reject?.();
+		await blocked;
+		expect(router.currentRoute.value.path).toBe("/cards/printer/edit");
+
+		const allowed = router.push("/");
+		await flushPromises();
+		confirm.last().accept?.();
+		await allowed;
+		expect(router.currentRoute.value.path).toBe("/");
+		wrapper.unmount();
+	});
+
+	it("does not ask when the form is clean", async () => {
+		const { wrapper, router, confirm } = await mountEdit("/cards/printer/edit");
+		await router.push("/");
+		expect(confirm.require).not.toHaveBeenCalled();
+		expect(router.currentRoute.value.path).toBe("/");
+		wrapper.unmount();
+	});
+
+	it("keeps a new card in the edit context after saving", async () => {
+		vi.mocked(createCard).mockImplementation(async (card) => ({ ...card, id: "card-1" }));
+		const { wrapper, router, confirm } = await mountEdit("/cards/new/edit");
+		expect(wrapper.find("h1").text()).toBe("New card");
+		await inputInLabel(wrapper, "Name").setValue("Lamp");
+		await inputInLabel(wrapper, "Command").setValue("switch");
+		await wrapper
+			.findAll("button")
+			.find((b) => b.text().includes("Save card"))!
+			.trigger("click");
+		await flushPromises();
+
+		expect(createCard).toHaveBeenCalledTimes(1);
+		expect(vi.mocked(createCard).mock.calls[0][0]).toMatchObject({ id: "", name: "Lamp" });
+		expect(router.currentRoute.value.path).toBe("/cards/card-1/edit");
+		expect(getCard).not.toHaveBeenCalled();
+		expect((inputInLabel(wrapper, "Name").element as HTMLInputElement).value).toBe("Lamp");
+		expect(wrapper.text()).toContain("Card saved");
+		expect(wrapper.find("h1").text()).toBe("Edit card");
+		expect(confirm.require).not.toHaveBeenCalled();
+		wrapper.unmount();
+	});
+});

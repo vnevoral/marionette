@@ -1,5 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
+	ApiError,
+	REQUEST_TIMEOUT_MS,
 	connectStatusEvents,
 	createCard,
 	deleteCard,
@@ -104,11 +106,63 @@ describe("api request helper", () => {
 		}
 	});
 
-	it("throws the server's error message for 4xx JSON envelopes", async () => {
+	it("throws an ApiError with status and fields for 4xx JSON envelopes", async () => {
 		fetchMock.mockImplementation(async () =>
-			jsonResponse(422, { error: "validation failed: name: required" }),
+			jsonResponse(422, {
+				error: "validation failed: name: required",
+				fields: { name: "required", "primary.command": "required", ignored: 1 },
+			}),
 		);
-		await expect(getCard("card-1")).rejects.toThrow("validation failed: name: required");
+		const failure = await getCard("card-1").catch((error: unknown) => error);
+		expect(failure).toBeInstanceOf(ApiError);
+		const apiError = failure as ApiError;
+		expect(apiError.message).toBe("validation failed: name: required");
+		expect(apiError.status).toBe(422);
+		expect(apiError.fields).toEqual({ name: "required", "primary.command": "required" });
+		expect(apiError.isNotFound).toBe(false);
+	});
+
+	it("flags 404 responses", async () => {
+		fetchMock.mockImplementation(async () => jsonResponse(404, { error: "card not found" }));
+		const failure = (await getCard("missing").catch((error: unknown) => error)) as ApiError;
+		expect(failure.isNotFound).toBe(true);
+		expect(failure.fields).toBeUndefined();
+	});
+
+	it("rejects a 2xx response that is not JSON", async () => {
+		fetchMock.mockImplementation(async () => new Response("<html>login</html>", { status: 200 }));
+		await expect(listCards()).rejects.toThrow("Unexpected response from server");
+	});
+
+	it("maps network failures to Server unreachable with status 0", async () => {
+		fetchMock.mockRejectedValue(new TypeError("Failed to fetch"));
+		const failure = (await listCards().catch((error: unknown) => error)) as ApiError;
+		expect(failure).toBeInstanceOf(ApiError);
+		expect(failure.message).toBe("Server unreachable");
+		expect(failure.isUnreachable).toBe(true);
+	});
+
+	it("aborts a request that exceeds the timeout budget", async () => {
+		vi.useFakeTimers();
+		try {
+			fetchMock.mockImplementation(
+				(_url, init) =>
+					new Promise<Response>((_resolve, reject) => {
+						init?.signal?.addEventListener("abort", () =>
+							reject(new DOMException("aborted", "AbortError")),
+						);
+					}),
+			);
+			const pending = listCards();
+			const outcome = pending.catch((error: unknown) => error);
+			await vi.advanceTimersByTimeAsync(REQUEST_TIMEOUT_MS);
+			const failure = (await outcome) as ApiError;
+			expect(failure).toBeInstanceOf(ApiError);
+			expect(failure.message).toBe("Request timed out");
+			expect(failure.status).toBe(0);
+		} finally {
+			vi.useRealTimers();
+		}
 	});
 
 	it("falls back to the HTTP status when a 5xx body is not JSON", async () => {
@@ -121,11 +175,6 @@ describe("api request helper", () => {
 	it("falls back to the HTTP status when the envelope has no error field", async () => {
 		fetchMock.mockImplementation(async () => jsonResponse(500, { message: "boom" }));
 		await expect(listCards()).rejects.toThrow("Request failed (500)");
-	});
-
-	it("propagates network failures", async () => {
-		fetchMock.mockRejectedValue(new TypeError("Failed to fetch"));
-		await expect(listCards()).rejects.toThrow("Failed to fetch");
 	});
 });
 

@@ -16,11 +16,10 @@ export interface WaitOptions {
 export const defaultMaxWaitMs = 120_000;
 export const defaultPollIntervalMs = 2000;
 
-const zeroTimePrefix = "0001-01-01";
-
-/** A snapshot counts as a new check when it carries a real, different checkedAt. */
+/** A snapshot counts as a new check when it carries a checkedAt that differs
+ * from the previous one; an unchecked card has none. */
 export function isNewerCheck(snapshot: StatusSnapshot, previousCheckedAt: string | undefined) {
-	if (!snapshot.checkedAt || snapshot.checkedAt.startsWith(zeroTimePrefix)) return false;
+	if (!snapshot.checkedAt) return false;
 	return snapshot.checkedAt !== previousCheckedAt;
 }
 

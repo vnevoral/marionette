@@ -437,7 +437,7 @@ h1 {
 }
 
 .dashboard-grid {
-	margin: -var(--space-2);
+	margin: calc(-1 * var(--space-2));
 }
 
 .action-card :deep(.p-card-body) {

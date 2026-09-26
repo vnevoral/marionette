@@ -26,8 +26,11 @@ and safe feedback over decoration.
 Every primary screen uses the same shell:
 
 - brand and current section in the top-left;
-- primary navigation: **Overview**, **Manage cards**;
-- right-side connection state, refresh, and contextual action;
+- primary navigation: **Overview** (the card list is the dashboard; cards are
+  managed from their detail, see §7.1);
+- right-side connection state: **Live** while the status stream is open,
+  **Reconnecting** while REST polling covers for it; refresh and contextual
+  actions live in the page header;
 - centered content with a maximum width of 1200 px;
 - mobile navigation collapses into a compact top bar without hiding the
   current section or the main action.

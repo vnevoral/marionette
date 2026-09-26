@@ -25,10 +25,14 @@
   `api.ts` přes mock `fetch`, model formuláře `cardEditModel.ts`),
   composables (`useStatusEvents` přes injektovaný konektor,
   `useCardStatus` s falešnými časovači) a chování view i vlastních komponent
-  (`HomeView`, `CardDetailView` s pamětovým routerem, `StatusBadge`) —
-  netestuje se vzhled PrimeVue komponent samotných. REST funkce se mockují
-  přes `vi.mock("@/api")` s částečným přepisem, SSE přes sdílený
-  `src/test/fakeEventSource.ts` (`vi.stubGlobal("EventSource", …)`).
+  (`HomeView`, `CardDetailView`, `CardEditView` s pamětovým routerem —
+  `CardEditView` přes `RouterView`, aby platil `onBeforeRouteLeave`;
+  `ActionEditor` včetně přístupných názvů, `ConnectionStatus`,
+  `StatusBadge`) — netestuje se vzhled PrimeVue komponent samotných. REST
+  funkce se mockují přes `vi.mock("@/api")` s částečným přepisem, SSE přes
+  sdílený `src/test/fakeEventSource.ts` (`vi.stubGlobal("EventSource", …)`),
+  potvrzovací dialog přes `src/test/fakeConfirm.ts` (provide místo
+  `ConfirmationService`, test volá `accept`/`reject`).
   Pokrytí: `npm run test:coverage` (v8); cíl pro `api.ts` a čisté moduly
   ~80 %+, zbylé view se pokrývají v blocích 0032 a 0033. E2E/browser testy
   nejsou zavedené (samostatný blok po fázi 8).

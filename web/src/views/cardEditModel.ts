@@ -1,9 +1,23 @@
 // Pure helpers behind CardEditView: form defaults, payload normalisation and
 // client-side validation. They have no Vue or router dependencies so they can
 // be unit-tested directly (block 0030).
-import { CARD_ICON_OPTIONS, type Action, type ActionCard } from "@/api";
+import type { Action, ActionCard } from "@/api";
+import { DEFAULT_CARD_ICON } from "@/ui/icons";
 
-export type EnvironmentRow = { key: string; value: string };
+/** Repeatable editor rows carry a stable id so Vue keys survive removal. */
+export type ArgumentRow = { id: string; value: string };
+export type EnvironmentRow = { id: string; key: string; value: string };
+
+let rowSequence = 0;
+
+export function newRowId(): string {
+	rowSequence += 1;
+	return `row-${rowSequence}`;
+}
+
+export function argumentRows(args: string[] | undefined): ArgumentRow[] {
+	return (args ?? []).map((value) => ({ id: newRowId(), value }));
+}
 
 export function emptyAction(): Action {
 	return { command: "", args: [], dir: "", env: {}, timeoutSec: 30, rule: { type: "exit_code" } };
@@ -14,7 +28,7 @@ export function emptyCard(): ActionCard {
 		id: "",
 		name: "",
 		description: "",
-		icon: CARD_ICON_OPTIONS[0].value,
+		icon: DEFAULT_CARD_ICON,
 		primary: emptyAction(),
 	};
 }
@@ -29,19 +43,23 @@ export function copyAction(action: Action): Action {
 }
 
 export function environmentRows(env: Record<string, string> | undefined): EnvironmentRow[] {
-	return Object.entries(env ?? {}).map(([key, value]) => ({ key, value }));
+	return Object.entries(env ?? {}).map(([key, value]) => ({ id: newRowId(), key, value }));
 }
 
 /** Builds the action payload sent to the API from the editor state: blank
  * arguments and environment rows are dropped, strings are trimmed and the
  * rule pattern is cleared for exit-code rules. */
-export function actionFrom(action: Action, args: string[], environment: EnvironmentRow[]): Action {
+export function actionFrom(
+	action: Action,
+	args: ArgumentRow[],
+	environment: EnvironmentRow[],
+): Action {
 	const env = Object.fromEntries(
 		environment.filter((row) => row.key.trim()).map((row) => [row.key.trim(), row.value]),
 	);
 	return {
 		...action,
-		args: args.map((arg) => arg.trim()).filter(Boolean),
+		args: args.map((row) => row.value.trim()).filter(Boolean),
 		env,
 		dir: action.dir?.trim(),
 		rule: {
@@ -54,8 +72,8 @@ export function actionFrom(action: Action, args: string[], environment: Environm
 export interface EditorState {
 	form: ActionCard;
 	statusEnabled: boolean;
-	primaryArgs: string[];
-	statusArgs: string[];
+	primaryArgs: ArgumentRow[];
+	statusArgs: ArgumentRow[];
 	primaryEnv: EnvironmentRow[];
 	statusEnv: EnvironmentRow[];
 }
@@ -102,4 +120,72 @@ export function validate(form: ActionCard, statusEnabled: boolean): ValidationRe
 			addError("statusTimeout", "Status timeout must be positive");
 	}
 	return { fieldErrors, firstError };
+}
+
+/** Editor error keys of one action editor (primary or status). */
+export interface ActionFieldErrors {
+	command?: string;
+	dir?: string;
+	timeoutSec?: string;
+	pattern?: string;
+	args?: string;
+	env?: string;
+}
+
+const actionFieldKeys: Record<string, keyof ActionFieldErrors> = {
+	command: "command",
+	dir: "dir",
+	timeoutSec: "timeoutSec",
+	"rule.pattern": "pattern",
+	"rule.type": "pattern",
+	args: "args",
+	env: "env",
+};
+
+const editorFieldKeys: Record<keyof ActionFieldErrors, string> = {
+	command: "Command",
+	dir: "Dir",
+	timeoutSec: "Timeout",
+	pattern: "Pattern",
+	args: "Args",
+	env: "Env",
+};
+
+/**
+ * Maps the `fields` of a 422 response (JSON paths such as `primary.command`
+ * or `status.env.HOME`) onto the editor's error keys (`primaryCommand`,
+ * `statusEnv`, `name`, …). Paths without an input of their own are returned
+ * separately so the summary can still show them.
+ */
+export function fieldErrorsFromServer(fields: Record<string, string>): {
+	fieldErrors: Record<string, string>;
+	unmapped: string[];
+} {
+	const fieldErrors: Record<string, string> = {};
+	const unmapped: string[] = [];
+	for (const [path, message] of Object.entries(fields)) {
+		const [scope, ...rest] = path.split(".");
+		if (scope === "primary" || scope === "status") {
+			const key = actionFieldKeys[rest.join(".")] ?? (rest[0] === "env" ? "env" : undefined);
+			if (key) {
+				const editorKey = `${scope}${editorFieldKeys[key]}`;
+				if (!fieldErrors[editorKey]) fieldErrors[editorKey] = message;
+				continue;
+			}
+		} else if (
+			[
+				"name",
+				"description",
+				"icon",
+				"pollingIntervalSeconds",
+				"fastPollingIntervalSeconds",
+				"fastPollingWindowSeconds",
+			].includes(path)
+		) {
+			fieldErrors[path] = message;
+			continue;
+		}
+		unmapped.push(`${path}: ${message}`);
+	}
+	return { fieldErrors, unmapped };
 }

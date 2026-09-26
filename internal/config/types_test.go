@@ -1,10 +1,12 @@
 package config
 
 import (
+	"encoding/json"
 	"errors"
 	"strconv"
 	"strings"
 	"testing"
+	"time"
 )
 
 func validAction() Action {
@@ -291,5 +293,40 @@ func TestValidateLimits(t *testing.T) {
 				t.Fatalf("fields = %v, want only %q", validation.Fields, testCase.field)
 			}
 		})
+	}
+}
+
+func TestStatusSnapshotJSONOmitsCheckForUncheckedCard(t *testing.T) {
+	unchecked, err := json.Marshal(StatusSnapshot{State: StatusStateUnknown})
+	if err != nil {
+		t.Fatalf("marshal unchecked: %v", err)
+	}
+	if string(unchecked) != `{"state":"unknown"}` {
+		t.Fatalf("unchecked snapshot = %s, want only state", unchecked)
+	}
+
+	checkedAt := time.Date(2026, time.September, 26, 10, 0, 0, 0, time.UTC)
+	checked := StatusSnapshot{
+		State:     StatusStateOK,
+		CheckedAt: checkedAt,
+		LastCheck: Run{ActionKind: "status", StartedAt: checkedAt, Duration: time.Second, Outcome: RunOutcomeOK},
+	}
+	encoded, err := json.Marshal(checked)
+	if err != nil {
+		t.Fatalf("marshal checked: %v", err)
+	}
+	var decoded StatusSnapshot
+	if err := json.Unmarshal(encoded, &decoded); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+	if !decoded.CheckedAt.Equal(checkedAt) || decoded.LastCheck.Outcome != RunOutcomeOK || decoded.LastCheck.Duration != time.Second {
+		t.Fatalf("round trip lost data: %+v", decoded)
+	}
+	var fresh StatusSnapshot
+	if err := json.Unmarshal(unchecked, &fresh); err != nil {
+		t.Fatalf("unmarshal unchecked: %v", err)
+	}
+	if !fresh.CheckedAt.IsZero() || fresh.State != StatusStateUnknown {
+		t.Fatalf("unchecked round trip = %+v", fresh)
 	}
 }

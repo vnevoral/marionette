@@ -35,8 +35,8 @@ describe("isNewerCheck", () => {
 		expect(isNewerCheck(snapshot(after), before)).toBe(true);
 		expect(isNewerCheck(snapshot(after), undefined)).toBe(true);
 		expect(isNewerCheck(snapshot(before), before)).toBe(false);
-		expect(isNewerCheck(snapshot("0001-01-01T00:00:00Z"), before)).toBe(false);
-		expect(isNewerCheck(snapshot(""), before)).toBe(false);
+		expect(isNewerCheck({ state: "unknown" }, before)).toBe(false);
+		expect(isNewerCheck({ state: "unknown" }, undefined)).toBe(false);
 	});
 });
 

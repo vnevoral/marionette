@@ -4,7 +4,9 @@ import { RouterLink, useRoute, useRouter } from "vue-router";
 import Button from "primevue/button";
 import Message from "primevue/message";
 import ProgressSpinner from "primevue/progressspinner";
+import { useConfirm } from "primevue/useconfirm";
 import {
+	ApiError,
 	enqueuePrimary,
 	enqueueStatus,
 	deleteCard,
@@ -21,6 +23,7 @@ import { singleParam } from "@/router/params";
 
 const route = useRoute();
 const router = useRouter();
+const confirm = useConfirm();
 const card = ref<ActionCard>();
 const runs = ref<Run[]>([]);
 const history = ref<StatusChange[]>([]);
@@ -32,6 +35,9 @@ const error = ref("");
 const sectionErrors = ref<Record<string, string>>({});
 const requestMessage = ref("");
 const actionLoading = ref<"primary" | "status" | "">("");
+const deleting = ref(false);
+const messageVisibleMs = 4000;
+let messageTimer: ReturnType<typeof setTimeout> | undefined;
 type StatusTone = "healthy" | "problem" | "unknown" | "info" | "warning";
 
 const defaultFastPollingWindowSeconds = 120;
@@ -49,8 +55,20 @@ function formatDuration(durationNanoseconds: number) {
 }
 
 function formatDate(value?: string) {
-	if (!value || value.startsWith("0001-01-01")) return "Not available";
+	if (!value) return "Not available";
 	return new Date(value).toLocaleString();
+}
+
+// Terminal outcomes stay visible briefly; pending notes are replaced by the
+// outcome and never expire on their own.
+function showMessage(message: string, { transient = true } = {}) {
+	clearTimeout(messageTimer);
+	messageTimer = undefined;
+	requestMessage.value = message;
+	if (!transient) return;
+	messageTimer = setTimeout(() => {
+		if (requestMessage.value === message) requestMessage.value = "";
+	}, messageVisibleMs);
 }
 
 function stateView(state = "unknown"): {
@@ -145,7 +163,7 @@ async function loadDetail() {
 	pendingWait?.abort();
 	pendingWait = undefined;
 	actionLoading.value = "";
-	requestMessage.value = "";
+	showMessage("", { transient: false });
 	loading.value = true;
 	runsLoading.value = true;
 	historyLoading.value = true;
@@ -163,7 +181,7 @@ async function loadDetail() {
 		cardStatus.set(loaded.currentStatus);
 	} catch (loadError) {
 		if (generation !== loadGeneration) return;
-		notFound.value = true;
+		notFound.value = loadError instanceof ApiError && loadError.isNotFound;
 		error.value = loadError instanceof Error ? loadError.message : "Unable to load card";
 		loading.value = false;
 		return;
@@ -179,7 +197,7 @@ async function runAction(action: "primary" | "status") {
 	const generation = loadGeneration;
 	const previousCheckedAt = status.value?.checkedAt;
 	actionLoading.value = action;
-	requestMessage.value = "Queued";
+	showMessage("Queued", { transient: false });
 	const controller = new AbortController();
 	pendingWait = controller;
 	try {
@@ -187,37 +205,53 @@ async function runAction(action: "primary" | "status") {
 		else await enqueueStatus(current.id);
 		if (generation !== loadGeneration) return;
 		if (!current.status) {
-			requestMessage.value = "Action accepted";
+			showMessage("Action accepted");
 			void loadActivity(generation);
 			return;
 		}
-		requestMessage.value = "Action queued";
+		showMessage("Action queued", { transient: false });
 		const result = await cardStatus.waitForNewer(previousCheckedAt, {
 			signal: controller.signal,
 			maxWaitMs: (current.fastPollingWindowSeconds || defaultFastPollingWindowSeconds) * 1000,
 		});
 		if (result === "aborted" || generation !== loadGeneration) return;
-		requestMessage.value = result === "updated" ? "Status updated" : "Result not available yet";
+		showMessage(result === "updated" ? "Status updated" : "Result not available yet");
 		void loadActivity(generation);
 	} catch (actionError) {
 		if (generation !== loadGeneration) return;
-		requestMessage.value =
-			actionError instanceof Error ? actionError.message : "Unable to queue action";
+		showMessage(actionError instanceof Error ? actionError.message : "Unable to queue action");
 	} finally {
 		if (pendingWait === controller) pendingWait = undefined;
 		if (generation === loadGeneration) actionLoading.value = "";
 	}
 }
 
-async function removeCard() {
-	if (!card.value || !window.confirm(`Delete ${card.value.name}?`)) return;
-	requestMessage.value = "Deleting card...";
+function removeCard() {
+	const current = card.value;
+	if (!current || deleting.value) return;
+	confirm.require({
+		header: "Delete card",
+		message: `Delete "${current.name}"? Its runs and status history are removed as well.`,
+		icon: "pi pi-exclamation-triangle",
+		acceptLabel: "Delete card",
+		rejectLabel: "Cancel",
+		acceptProps: { severity: "danger" },
+		rejectProps: { severity: "secondary", outlined: true },
+		defaultFocus: "reject",
+		accept: () => void performDelete(current.id),
+	});
+}
+
+async function performDelete(id: string) {
+	deleting.value = true;
+	showMessage("Deleting card...", { transient: false });
 	try {
-		await deleteCard(cardID.value);
+		await deleteCard(id);
 		await router.push("/");
 	} catch (deleteError) {
-		requestMessage.value =
-			deleteError instanceof Error ? deleteError.message : "Unable to delete card";
+		showMessage(deleteError instanceof Error ? deleteError.message : "Unable to delete card");
+	} finally {
+		deleting.value = false;
 	}
 }
 
@@ -226,6 +260,7 @@ watch(cardID, () => void loadDetail(), { immediate: true });
 onBeforeUnmount(() => {
 	pendingWait?.abort();
 	pendingWait = undefined;
+	clearTimeout(messageTimer);
 });
 </script>
 
@@ -244,9 +279,18 @@ onBeforeUnmount(() => {
 		</div>
 
 		<Message v-else-if="notFound" severity="error" :closable="false">
+			<h1>Card not found</h1>
+			<p>There is no card with the id "{{ cardID }}". It may have been deleted.</p>
+			<RouterLink to="/">Return to overview</RouterLink>
+		</Message>
+
+		<Message v-else-if="error" severity="error" :closable="false">
 			<h1>Card unavailable</h1>
 			<p>{{ error }}</p>
-			<RouterLink to="/">Return to overview</RouterLink>
+			<div class="flex align-items-center gap-3">
+				<Button label="Try again" text size="small" @click="loadDetail" />
+				<RouterLink to="/">Return to overview</RouterLink>
+			</div>
 		</Message>
 
 		<template v-else-if="card">
@@ -276,6 +320,8 @@ onBeforeUnmount(() => {
 						icon="pi pi-trash"
 						severity="danger"
 						text
+						:loading="deleting"
+						:disabled="deleting || Boolean(actionLoading)"
 						@click="removeCard"
 					/>
 				</div>
@@ -315,7 +361,6 @@ onBeforeUnmount(() => {
 						<p v-else class="status-empty-copy">
 							Status monitoring is not configured for this card.
 						</p>
-						<p v-if="sectionErrors.status" class="section-error">{{ sectionErrors.status }}</p>
 					</div>
 				</div>
 
