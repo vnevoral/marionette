@@ -35,3 +35,6 @@ před mergem do hlavní větve.
   Před přijetím nové major verze jakékoli klíčové závislosti (Vite, Vue,
   PrimeVue, TypeScript) ověřit changelog a napsat/aktualizovat ADR, pokud
   přináší breaking changes.
+- PrimeFlex je připnutý na `4.0.0` jako zamrzlá layout vrstva pro MVP (viz
+  [ADR-0009](../architecture/decisions/0009-primeflex-frozen-layout-layer.md));
+  Dependabot ho neaktualizuje a migrace na Tailwind se zváží až po fázi 8.

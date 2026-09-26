@@ -21,7 +21,7 @@ uloží do `docs/plans/blocks/NNNN-nazev.md`. Blok se implementuje promptem
 | 5    | REST API (CRUD karet/akcí, spuštění, čtení stavu)                                            | **Hotovo**                                       | FR-40, FR-41                   |
 | 6    | Dashboard UI (karty, stavové indikátory, formuláře správy)                                   | **Hotovo**                                       | FR-20..23                      |
 | 7    | Balíčkování a nasazení (systemd unit, install skript, arm64 release)                         | **Probíhá** (0023)                               | FR-01..04, NFR-02              |
-| 8    | Zpevnění (auth/access control, logování, chybové stavy, testy, dokumentace)                  | Plánováno                                        | NFR-01, NFR-04..06             |
+| 8    | Zpevnění (auth/access control, logování, chybové stavy, testy, dokumentace)                  | **Schváleno** (bloky 0024–0034, 2026-09-26)      | NFR-01, NFR-04..06, NFR-12     |
 | 9    | UX redesign a sdílený design systém                                                          | **Hotovo**                                       | FR-24..29, NFR-08..10          |
 | 10   | Realtime doručování statusů přes SSE                                                         | **Hotovo**                                       | FR-42, NFR-11                  |
 
@@ -88,6 +88,50 @@ uloží do `docs/plans/blocks/NNNN-nazev.md`. Blok se implementuje promptem
   artefakt](blocks/0023-deployment-systemd-release.md) pro obecný Linux se
   systemd; Ubuntu 24.x na Raspberry Pi ARM64 slouží jako referenční validační
   prostředí.
+  Blok zůstává `Probíhá`: chybí ověření `systemd-analyze verify`,
+  start/stop/restart, health endpointu a rollbacku na referenčním hostu.
+
+- Fáze 8 byla 2026-09-26 rozpracována na základě revize projektu a kódu do
+  bloků 0024–0034 a téhož dne **schválena** vlastníkem. Jde převážně o opravy
+  chyb a narovnání stavu vůči requirements/ADR, ne o novou funkčnost;
+  přesto každý blok prochází standardním `/implement-block` a DoD. Bloky jsou
+  rozdělené do tří proudů, které lze implementovat souběžně; uvnitř proudu
+  platí uvedené pořadí:
+
+  **Proud A — backend zpevnění (kritické opravy první):**
+  1. [0024 — Execution engine: terminace procesní skupiny a propagace kontextu](blocks/0024-exec-process-group-termination.md)
+     — timeout dnes nezabíjí potomky procesu a blokuje slot.
+  2. [0025 — Ochrana konfigurace při poškozeném souboru a konzistence persistence](blocks/0025-config-corruption-safety-and-persistence.md)
+     — poškozený config je dnes při první změně přepsán.
+  3. [0026 — Ochrana mutujících endpointů před cross-site požadavky](blocks/0026-csrf-origin-protection.md)
+     — NFR-12 přijat 2026-09-26.
+  4. [0027 — Řízené ukončení: pořadí kroků, SSE a fronta akcí](blocks/0027-shutdown-lifecycle-hardening.md)
+     (závisí na 0024).
+  5. [0028 — Validace vstupů a konzistence chybových odpovědí API](blocks/0028-input-validation-and-api-errors.md)
+     (závisí na 0025).
+  6. [0034 — Vrstvení backendu, strukturované logování a drobné čistky](blocks/0034-backend-layering-and-logging.md)
+     (refaktor až po 0024, 0025, 0027).
+
+  **Proud B — tooling a testy (odblokuje frontend):**
+  1. [0031 — Hygiena repozitáře, lint a CI](blocks/0031-repo-tooling-and-ci-hygiene.md)
+     — bez závislostí, doporučeno implementovat jako úplně první.
+  2. [0030 — Frontend testovací infrastruktura (Vitest)](blocks/0030-frontend-test-infrastructure.md).
+
+  **Proud C — frontend (po 0030):**
+  1. [0029 — Stav akcí na dashboardu a sdílené sledování statusu](blocks/0029-dashboard-action-state-and-shared-status.md)
+     — tlačítka karty dnes po první akci zůstanou disabled.
+  2. [0032 — API vrstva frontendu a shoda s UX specifikací](blocks/0032-frontend-api-layer-and-ux-conformance.md)
+     (závisí na 0028 kvůli kontraktu `fields`).
+  3. [0033 — Sdílený slovník stavů, komponenty a theme preset](blocks/0033-frontend-vocabulary-and-shared-components.md)
+     (refaktor až po 0029 a 0032).
+
+  Otevřené otázky revize jsou rozhodnuté v
+  [requirements.md, sekce 13](../requirements/requirements.md#13-rozhodnutí-revize-projektu-2026-09-26)
+  (FR-18 upřesněno, NFR-01 c, NFR-12 přijato, `settings` endpoint se
+  nezavádí, PrimeFlex ponechán dle
+  [ADR-0009](../architecture/decisions/0009-primeflex-frozen-layout-layer.md),
+  licence MIT). Položka „auth/access control“ z názvu fáze 8 zůstává
+  nerozpracovaná — čeká na samostatný requirement (viz NFR-01 a sekce 6).
 
 - Bloky uvnitř fáze by měly být dost malé na jednu implementační relaci s AI
   agentem (řádově hodiny práce, ne dny) a musí mít jasné kritérium hotovosti

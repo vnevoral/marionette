@@ -42,3 +42,6 @@ ověření changelogu/migrace a aktualizaci tohoto ADR.
 - Upgrade na PrimeVue v5 (nebo jinou budoucí major verzi) vyžaduje nové ADR,
   které zhodnotí breaking changes a licenční/balíčkové změny (v5 mění
   strukturu závislostí na `@primeuix/*` balíčky).
+
+> Doplněno 2026-09-26: rozhodnutí o ponechání PrimeFlex jako zamrzlé layout
+> vrstvy pro MVP je v [ADR-0009](0009-primeflex-frozen-layout-layer.md).

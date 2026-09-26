@@ -1,11 +1,13 @@
-# Požadavky na Marionette (SRS) — v0.6
+# Požadavky na Marionette (SRS) — v0.7
 
 > Stav: **zpřesněno** (fáze 1 a UX specifikace, 2026-09-25; doplněno o SSE stream
 > pro živé změny statusů, 2026-09-25; doplněno o dva polling intervaly a
 > vynucenou terminaci akcí, 2026-09-25; doplněno o perzistenci historie běhů
 > při řízeném ukončení, 2026-09-25; řízení status akcí interním schedulerem,
 > 2026-09-25; doplněno o UX požadavky FR-24 až FR-29 a NFR-08 až NFR-10,
-> 2026-09-25). Otevřené otázky z v0.1 byly rozhodnuty
+> 2026-09-25; revize projektu a kódu 2026-09-26: NFR-12, upřesnění FR-18 a
+> NFR-01, viz [Rozhodnutí — revize 2026-09-26](#13-rozhodnutí-revize-projektu-2026-09-26)).
+> Otevřené otázky z v0.1 byly rozhodnuty
 > s vlastníkem projektu, viz [Rozhodnutí fáze 1](#7-rozhodnutí-fáze-1),
 > [Rozhodnutí — polling a terminace](#9-rozhodnutí-polling-a-terminace-2026-09-25)
 > a [Rozhodnutí — perzistence historie při vypnutí](#11-rozhodnutí-perzistence-historie-při-vypnutí-2026-09-25).
@@ -95,9 +97,15 @@ spustitelný soubor.
   přechodů stavů. Každý přechod obsahuje nový stav, začátek a konec nebo dobu
   trvání; opakované kontroly se stejným stavem nový historický záznam
   nevytvářejí. UI zobrazuje aktuální stav, dobu jeho trvání a historii změn.
-- **FR-18**: Počet akcí spuštěných současně v rámci celé aplikace (ruční
-  spuštění i polling dohromady) je omezen konfigurovatelným limitem, výchozí
-  **4**; akce nad limit čekají ve frontě, žádná se neztrácí.
+- **FR-18** _(aktualizováno 2026-09-26)_: Počet akcí spuštěných současně v
+  rámci celé aplikace (ruční spuštění i polling dohromady) je omezen
+  konfigurovatelným limitem, výchozí **4**; akce nad limit čekají ve frontě.
+  Fronta je omezená (kapacita `4 × limit`); požadavek na spuštění při plné
+  frontě API odmítne stavem 503 s hlavičkou `Retry-After`, takže klient je
+  vždy informován a žádná přijatá (202) akce se neztrácí. Požadavek na
+  akci, která už pro stejnou kartu a stejný druh (primární/status) ve
+  frontě čeká, se nezařazuje znovu a API vrací 202 idempotentně. Původní
+  znění „žádná se neztrácí“ bez omezení fronty nahrazeno tímto upřesněním.
 
 ### 3.3 Dashboard a UI
 
@@ -186,7 +194,10 @@ spustitelný soubor.
 args...)` se strukturovanými argumenty, nikdy skládáním shell příkazu ze
   stringu/uživatelského vstupu (žádný shell interpolation), (b) rozhraní config
   store/API se navrhuje tak, aby šlo auth vrstvu doplnit později bez zásadní
-  přestavby (viz roadmapa fáze 8).
+  přestavby (viz roadmapa fáze 8), (c) _(doplněno 2026-09-26)_ spouštěná
+  akce nedědí celé prostředí procesu služby; dostane minimální základ
+  (`PATH`, `HOME`, `LANG`, `TZ`) a proměnné definované v akci (`Env`), aby se
+  případné citlivé proměnné služby nedostaly do uživatelských příkazů.
 - **NFR-02 Provozní jednoduchost**: Instalace na nový host = zkopírovat jeden
   binární soubor (+ volitelně systemd unit) a spustit. Žádné externí závislosti
   (DB server, runtime).
@@ -216,6 +227,19 @@ args...)` se strukturovanými argumenty, nikdy skládáním shell příkazu ze
   neomezenou práci ani růst paměti na serveru; připojení má být možné bezpečně
   ukončit při zavření stránky nebo aplikace.
 
+- **NFR-12 Ochrana před cross-site požadavky** _(přijato 2026-09-26)_:
+  Mutující API endpointy (vytvoření/změna/smazání karty,
+  spuštění akce) odmítnou požadavek, který pochází z jiného původu než
+  vlastní UI: požadavek s tělem musí mít `Content-Type: application/json`,
+  požadavek označený prohlížečem jako `Sec-Fetch-Site: cross-site` nebo s
+  hlavičkou `Origin` neshodnou s hostem serveru je odmítnut (403/415).
+  Volitelně lze omezit přijímané hodnoty `Host` proměnnou
+  `MARIONETTE_ALLOWED_HOSTS`. Read-only endpointy a SSE stream zůstávají bez
+  omezení. Důvod: NFR-01 předpokládá důvěryhodnou síť, ne důvěryhodný
+  prohlížeč — cizí webová stránka otevřená operátorem by jinak mohla spustit
+  libovolnou nakonfigurovanou akci na hostu. Neřeší autentizaci (ta zůstává
+  mimo MVP). Implementace: blok 0026.
+
 ## 5. Omezení a předpoklady
 
 - Cílové prostředí: Linux se systemd; Ubuntu 24.x je referenční prostředí pro
@@ -233,6 +257,9 @@ args...)` se strukturovanými argumenty, nikdy skládáním shell příkazu ze
 rozhodnutí o pollingu/terminaci). Budoucí otázky (auth pro víceuživatelský
 provoz, škálování historie běhů nad rámec N záznamů) se řeší až s konkrétní
 potřebou, samostatným requirementem.
+
+Otázky otevřené revizí 2026-09-26 byly rozhodnuty vlastníkem téhož dne,
+viz [sekce 13](#13-rozhodnutí-revize-projektu-2026-09-26).
 
 ## 7. Rozhodnutí fáze 1 (2026-09-25)
 
@@ -265,6 +292,22 @@ promítnuty do FR/NFR výše:
 | Otázka                            | Rozhodnutí                                                                                                                                                                                                                                                                                                                              |
 | --------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Ztráta historie běhů při restartu | Historie se navíc uloží na disk při **řízeném** ukončení aplikace (graceful shutdown) a načte zpět při startu spolu s konfigurací (FR-35). Za běhu (mezi jednotlivými běhy akcí) se nadále nepersistuje kvůli opotřebení SD karty (ADR-0004). Při neřízeném pádu/výpadku se historie od posledního uložení ztrácí — akceptované riziko. |
+
+## 13. Rozhodnutí — revize projektu (2026-09-26)
+
+Revize struktury, procesu a kódu (2026-09-26) otevřela následující otázky.
+Vlastník projektu potvrdil navržená řešení; jde převážně o opravy a narovnání
+stavu, ne o novou funkčnost. Implementace je v blocích 0024–0034 (roadmapa,
+fáze 8).
+
+| Otázka                         | Rozhodnutí                                                                                                                                                  |
+| ------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Omezená fronta akcí vs. FR-18  | Fronta je omezená, plná fronta vrací 503 + `Retry-After`; stejná karta + druh akce ve frontě → idempotentní 202 (FR-18 upřesněno, blok 0027).               |
+| Prostředí spouštěných akcí     | Minimální základ `PATH`, `HOME`, `LANG`, `TZ` + `Env` akce; nedědí se `os.Environ()` služby (NFR-01 c, blok 0034).                                          |
+| Endpoint pro globální nastavení | `Store.UpdateSettings` se z veřejného API store odstraní (YAGNI); limit souběžnosti se mění v souboru a projeví se po restartu (blok 0034).                 |
+| Budoucnost PrimeFlex           | Zůstává jako zamrzlá, připnutá layout vrstva pro MVP; migrace na Tailwind se zváží až po fázi 8 ([ADR-0009](../architecture/decisions/0009-primeflex-frozen-layout-layer.md)). |
+| Cross-site ochrana API         | NFR-12 přijat; implementace v bloku 0026.                                                                                                                   |
+| Licence repozitáře             | MIT (blok 0031 přidá `LICENSE`).                                                                                                                            |
 
 ## 12. Sledovatelnost
 

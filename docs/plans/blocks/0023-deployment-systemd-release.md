@@ -79,7 +79,7 @@ Mimo rozsah:
 
 ## Kritérium hotovosti
 
-Viz [Definition of Done](../devops/definition-of-done.md) +:
+Viz [Definition of Done](../../devops/definition-of-done.md) +:
 
 - `deploy/marionette.service` projde `systemd-analyze verify`;
 - instalační skript je idempotentní a nepřepisuje existující konfiguraci;
