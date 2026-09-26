@@ -20,7 +20,7 @@
 	},
 	"dependencies": {
 		"@primevue/themes": "^4.5.4",
-		"primeflex": "^4.0.0",
+		"primeflex": "4.0.0",
 		"primeicons": "^8.0.2",
 		"primevue": "^4.5.5",
 		"vue": "^3.5.43",

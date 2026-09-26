@@ -9,6 +9,7 @@
 	--color-accent: #4b8969;
 	--color-accent-strong: #397254;
 	--color-accent-soft: #e6f1e8;
+	--color-accent-soft-hover: #d8ebdc;
 	--color-success: #4f8c68;
 	--color-success-strong: #397254;
 	--color-info: #557f8a;
@@ -38,55 +39,25 @@
 	--font-weight-regular: 400;
 	--font-weight-medium: 500;
 	--font-weight-semibold: 600;
-
-	--p-primary-color: var(--color-accent);
-	--p-primary-contrast-color: #ffffff;
-	--p-content-background: var(--color-surface);
-	--p-content-border-color: var(--color-border);
-	--p-text-color: var(--color-ink);
-	--p-text-muted-color: var(--color-muted);
-	--p-form-field-background: var(--color-surface-raised);
-	--p-form-field-color: var(--color-ink);
-	--p-form-field-border-color: var(--color-border-strong);
-	--p-form-field-placeholder-color: var(--color-muted);
-	--p-select-overlay-background: var(--color-surface-raised);
-	--p-select-overlay-border-color: var(--color-border);
-	--p-select-option-color: var(--color-ink);
-	--p-select-option-focus-background: var(--color-accent-soft);
-	--p-select-option-focus-color: var(--color-ink);
-	--p-select-option-selected-background: var(--color-accent-soft);
-	--p-select-option-selected-color: var(--color-ink);
-	--p-focus-ring-width: 3px;
-	--p-focus-ring-style: solid;
-	--p-focus-ring-color: rgb(50 107 142 / 35%);
 }
 
-.primary-action-button.p-button {
-	border-color: var(--color-accent);
-	background: var(--color-accent-soft);
-	box-shadow: none;
-	color: var(--color-accent-strong);
-	font-weight: var(--font-weight-semibold);
-}
-
-.primary-action-button.p-button:hover {
-	border-color: var(--color-accent-strong);
-	background: #d8ebdc;
-	color: var(--color-accent-strong);
-}
+/* PrimeVue colours come from src/theme/preset.ts (definePreset); this file
+   only holds the app's own tokens, resets and shared layout classes. */
 
 * {
 	box-sizing: border-box;
 }
 
 :focus-visible {
-	outline: var(--p-focus-ring-width) var(--p-focus-ring-style) var(--color-focus);
+	outline: 3px solid var(--color-focus);
 	outline-offset: 3px;
 }
 
 html {
 	background: var(--color-canvas);
 	font-family: var(--font-ui);
+	scrollbar-color: #aab8b3 var(--color-canvas);
+	scrollbar-width: auto;
 }
 
 body {
@@ -96,11 +67,6 @@ body {
 	color: var(--color-ink);
 	font-family: var(--font-ui);
 	font-weight: var(--font-weight-regular);
-}
-
-html {
-	scrollbar-color: #aab8b3 var(--color-canvas);
-	scrollbar-width: auto;
 }
 
 ::-webkit-scrollbar {
@@ -122,45 +88,134 @@ html {
 	background: #899b94;
 }
 
-.p-inputtext,
-.p-textarea,
-.p-inputnumber-input,
-.p-select {
-	border-color: var(--color-border-strong) !important;
-	background: var(--color-surface-raised) !important;
-	color: var(--color-ink) !important;
+button,
+input,
+textarea,
+select {
+	font: inherit;
 }
 
-.p-inputtext::placeholder,
-.p-textarea::placeholder,
-.p-select-label.p-placeholder {
-	color: var(--color-muted) !important;
+/* Shared page skeleton (UX spec §8.3) */
+
+.page {
+	max-width: var(--page-max-width);
+	margin: 0 auto;
+	padding: var(--page-padding-y) var(--page-padding-x);
+	color: var(--color-ink);
 }
 
-.p-inputtext:enabled:focus,
-.p-textarea:enabled:focus,
-.p-inputnumber-input:enabled:focus,
-.p-select:not(.p-disabled).p-focus {
-	border-color: var(--color-focus);
-	box-shadow: 0 0 0 3px rgb(47 113 129 / 18%);
+.page h1,
+.page h2 {
+	margin: 0;
+	font-family: var(--font-display);
+	font-weight: 500;
 }
 
-.p-select-overlay {
-	border-color: var(--color-border) !important;
-	background: var(--color-surface-raised) !important;
-	color: var(--color-ink) !important;
+.page h1 {
+	font-size: clamp(2.25rem, 5vw, 4rem);
+	line-height: 1;
 }
 
-.p-select-overlay .p-select-option {
-	background: transparent !important;
-	color: var(--color-ink) !important;
+.page h2 {
+	font-size: 1.35rem;
 }
 
-.p-select-overlay .p-select-option:hover,
-.p-select-overlay .p-select-option.p-focus,
-.p-select-overlay .p-select-option[aria-selected="true"] {
-	background: var(--color-accent-soft) !important;
-	color: var(--color-ink) !important;
+.eyebrow {
+	margin: 0 0 var(--space-3);
+	color: var(--color-accent);
+	font-size: 0.75rem;
+	font-weight: var(--font-weight-semibold);
+	letter-spacing: 0.14em;
+	text-transform: uppercase;
+}
+
+.page-lede {
+	margin: var(--space-3) 0 0;
+	color: var(--color-muted);
+	font-size: 1rem;
+}
+
+.loading-state {
+	display: grid;
+	min-height: 320px;
+	place-items: center;
+	gap: var(--space-3);
+	color: var(--color-muted);
+}
+
+.panel {
+	border: 1px solid var(--color-border);
+	border-radius: var(--radius-md);
+	background: var(--color-surface);
+	box-shadow: var(--shadow-subtle);
+}
+
+.text-link {
+	display: inline-flex;
+	align-items: center;
+	gap: var(--space-2);
+	color: var(--color-accent-strong);
+	font-weight: var(--font-weight-medium);
+	text-decoration: none;
+}
+
+.text-link:hover {
+	color: var(--color-ink);
+	text-decoration: underline;
+}
+
+.primary-action-link {
+	display: inline-flex;
+	align-items: center;
+	gap: var(--space-2);
+	min-height: 42px;
+	padding: 0 var(--space-4);
+	border: 1px solid var(--color-accent);
+	border-radius: var(--radius-sm);
+	background: var(--color-accent-soft);
+	color: var(--color-accent-strong);
+	font-family: var(--font-ui);
+	font-weight: var(--font-weight-medium);
+	text-decoration: none;
+}
+
+.primary-action-link:hover {
+	border-color: var(--color-accent-strong);
+	background: var(--color-accent-soft-hover);
+	color: var(--color-accent-strong);
+}
+
+.primary-action-button.p-button {
+	border-color: var(--color-accent);
+	background: var(--color-accent-soft);
+	box-shadow: none;
+	color: var(--color-accent-strong);
+	font-weight: var(--font-weight-semibold);
+}
+
+.primary-action-button.p-button:hover {
+	border-color: var(--color-accent-strong);
+	background: var(--color-accent-soft-hover);
+	color: var(--color-accent-strong);
+}
+
+.field-error {
+	color: var(--color-danger);
+	font-size: 0.78rem;
+}
+
+.form-grid .p-inputtext,
+.form-grid .p-textarea,
+.form-grid .p-inputnumber,
+.form-grid .p-select {
+	width: 100%;
+}
+
+.form-grid .p-inputtext,
+.form-grid .p-textarea,
+.form-grid .p-inputnumber-input,
+.form-grid .p-select {
+	font-weight: var(--font-weight-regular);
 }
 
 .icon-option {
@@ -183,43 +238,15 @@ html {
 	display: flex;
 	align-items: center;
 	min-height: 2.5rem;
-	font-weight: 500;
 }
 
-button,
-input,
-textarea,
-select {
-	font: inherit;
-}
-
-.p-inputtext,
-.p-textarea,
-.p-inputnumber-input,
-.p-select,
-.p-select-label,
-.p-toggleswitch,
-.p-button,
-.p-message {
-	font-weight: var(--font-weight-regular) !important;
-}
-
-.p-toggleswitch {
-	width: 2.75rem;
-	height: 1.5rem;
-}
-
-.p-toggleswitch .p-toggleswitch-slider {
-	border: 1px solid var(--color-border-strong) !important;
-	background: #d7dfdc !important;
-}
-
-.p-toggleswitch .p-toggleswitch-handle {
-	background: #ffffff !important;
-	box-shadow: 0 1px 3px rgb(38 51 47 / 18%);
-}
-
-.p-toggleswitch.p-toggleswitch-checked .p-toggleswitch-slider {
-	border-color: var(--color-accent) !important;
-	background: var(--color-accent) !important;
+.sr-only {
+	position: absolute;
+	width: 1px;
+	height: 1px;
+	padding: 0;
+	overflow: hidden;
+	clip: rect(0, 0, 0, 0);
+	white-space: nowrap;
+	border: 0;
 }

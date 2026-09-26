@@ -1,7 +1,7 @@
 import { createApp } from "vue";
 import PrimeVue from "primevue/config";
 import ConfirmationService from "primevue/confirmationservice";
-import Aura from "@primevue/themes/aura";
+import MarionettePreset from "@/theme/preset";
 import App from "./App.vue";
 import router from "./router";
 
@@ -15,7 +15,9 @@ app.use(router);
 app.use(ConfirmationService);
 app.use(PrimeVue, {
 	theme: {
-		preset: Aura,
+		preset: MarionettePreset,
+		// The UI ships one light scheme; do not follow the OS dark mode.
+		options: { darkModeSelector: false },
 	},
 });
 

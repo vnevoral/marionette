@@ -3,7 +3,7 @@
 - **Fáze**: 8 — Zpevnění
 - **Vazba na požadavky**: FR-25, FR-26, NFR-06, NFR-08
 - **Vazba na ADR**: ADR-0003, ADR-0007, ADR-0009
-- **Stav**: Schváleno
+- **Stav**: Probíhá
 - **Závislosti**: Bloky 0029, 0032 (aby refaktor nekolidoval s opravami), 0030 (testy)
 
 ## Cíl bloku
