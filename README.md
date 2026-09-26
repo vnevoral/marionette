@@ -68,7 +68,8 @@ sudo ./install.sh ./marionette-linux-arm64
 
 The installer creates the `marionette` service account, preserves an existing
 `/var/lib/marionette/marionette.json`, installs the unit, and starts the
-service. Runtime settings are read from `/etc/default/marionette`:
+service. On a host without paired devices it ends with the command that shows
+the first pairing code (see [Pairing devices](#pairing-devices)). Runtime settings are read from `/etc/default/marionette`:
 
 | Variable                      | Default             | Meaning                                                                                                   |
 | ----------------------------- | ------------------- | --------------------------------------------------------------------------------------------------------- |

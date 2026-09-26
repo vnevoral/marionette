@@ -28,9 +28,15 @@ type accessFixture struct {
 
 func newAccessFixture(t *testing.T, secure CookieSecurity) accessFixture {
 	t.Helper()
+	return newAccessFixtureAt(t, secure, nil)
+}
+
+// newAccessFixtureAt uses now as the registry clock (nil: the real clock).
+func newAccessFixtureAt(t *testing.T, secure CookieSecurity, now func() time.Time) accessFixture {
+	t.Helper()
 	var logs bytes.Buffer
 	logger := slog.New(slog.NewTextHandler(&logs, nil))
-	registry, err := access.Open(filepath.Join(t.TempDir(), "devices.json"), access.Options{Logger: logger})
+	registry, err := access.Open(filepath.Join(t.TempDir(), "devices.json"), access.Options{Logger: logger, Now: now})
 	if err != nil {
 		t.Fatalf("access.Open() error = %v", err)
 	}
@@ -206,6 +212,28 @@ func TestPairingSetsAStrictHttpOnlyCookie(t *testing.T) {
 		if cookie.Secure != testCase.secure {
 			t.Fatalf("%s: Secure = %v, want %v", testCase.name, cookie.Secure, testCase.secure)
 		}
+	}
+}
+
+func TestSessionRenewsTheCookieOnceADay(t *testing.T) {
+	clock := time.Date(2026, 9, 1, 8, 0, 0, 0, time.UTC)
+	fixture := newAccessFixtureAt(t, CookieSecureAuto, func() time.Time { return clock })
+	cookie := fixture.pairDevice(t, "Phone")
+
+	clock = clock.Add(time.Hour)
+	if response := fixture.do(http.MethodGet, "/api/session", "", cookie); response.Code != http.StatusOK ||
+		len(response.Result().Cookies()) != 0 {
+		t.Fatalf("session within a day = %d, cookies %v", response.Code, response.Header().Values("Set-Cookie"))
+	}
+
+	clock = clock.Add(24 * time.Hour)
+	response := fixture.do(http.MethodGet, "/api/session", "", cookie)
+	if response.Code != http.StatusOK {
+		t.Fatalf("session after a day = %d %s", response.Code, response.Body.String())
+	}
+	renewed := deviceCookie(t, response)
+	if renewed.Value != cookie.Value || renewed.MaxAge != int(access.DefaultExpiry/time.Second) || !renewed.HttpOnly {
+		t.Fatalf("renewed cookie = %#v", renewed)
 	}
 }
 

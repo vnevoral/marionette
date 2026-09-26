@@ -158,9 +158,15 @@ func viewDevice(device access.Device, currentID string) deviceView {
 // session reports the paired device, or 401 with "bootstrap": true when no
 // device is paired yet. In that case a pairing code is written to the
 // service log whenever none is valid, so the first device can always pair
-// with the latest line of `journalctl -u marionette` (FR-53).
+// with the latest line of `journalctl -u marionette` (FR-53). Like
+// requireDevice, it renews the cookie when the registry asks for it: the SPA
+// loads the session first on every visit, so this is often the request that
+// uses up the daily renewal (FR-52).
 func (api *accessAPI) session(w http.ResponseWriter, request *http.Request) {
-	if session, _, ok := api.authenticate(request); ok {
+	if session, token, ok := api.authenticate(request); ok {
+		if session.Renew {
+			api.setCookie(w, request, token)
+		}
 		writeJSON(w, http.StatusOK, struct {
 			Device     deviceView `json:"device"`
 			ExpiryDays int        `json:"expiryDays"`

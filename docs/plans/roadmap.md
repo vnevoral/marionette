@@ -21,7 +21,7 @@ uloží do `docs/plans/blocks/NNNN-nazev.md`. Blok se implementuje promptem
 | 5    | REST API (CRUD karet/akcí, spuštění, čtení stavu)                                            | **Hotovo**                                       | FR-40, FR-41                   |
 | 6    | Dashboard UI (karty, stavové indikátory, formuláře správy)                                   | **Hotovo**                                       | FR-20..23                      |
 | 7    | Balíčkování a nasazení (systemd unit, install skript, arm64 release)                         | **Probíhá** (0023)                               | FR-01..04, NFR-02              |
-| 8    | Zpevnění (auth/access control, logování, chybové stavy, testy, dokumentace)                  | **Hotovo** (2026-09-26; bloky 0024–0044)         | NFR-01, NFR-04..06, NFR-12     |
+| 8    | Zpevnění (auth/access control, logování, chybové stavy, testy, dokumentace)                  | **Hotovo** (2026-09-26; bloky 0024–0045)         | NFR-01, NFR-04..06, NFR-12     |
 | 9    | UX redesign a sdílený design systém                                                          | **Hotovo**                                       | FR-24..29, NFR-08..10          |
 | 10   | Realtime doručování statusů přes SSE                                                         | **Hotovo**                                       | FR-42, NFR-11                  |
 
@@ -181,6 +181,9 @@ uloží do `docs/plans/blocks/NNNN-nazev.md`. Blok se implementuje promptem
   2. [0044 — Párování zařízení: UI a E2E](blocks/0044-device-pairing-ui.md)
      — **Hotovo** (2026-09-26); obrazovky Pair this device a Devices,
      E2E se zapnutým ověřováním.
+  3. [0045 — Návod na párování po instalaci](blocks/0045-install-pairing-hint.md)
+     — **Hotovo** (2026-09-26); `install.sh` vypíše, kde najít první
+     párovací kód, jen pokud ještě není spárované žádné zařízení.
 
   Otevřené otázky revize jsou rozhodnuté v
   [requirements.md, sekce 13](../requirements/requirements.md#13-rozhodnutí-revize-projektu-2026-09-26)
@@ -190,7 +193,7 @@ uloží do `docs/plans/blocks/NNNN-nazev.md`. Blok se implementuje promptem
   (blok 0035, původně ADR-0009),
   licence MIT). Položka „auth/access control“ z názvu fáze 8 je od
   2026-09-26 pokrytá párováním zařízení (FR-50..FR-56, ADR-0011, bloky
-  0043–0044).
+  0043–0045).
 
 - Bloky uvnitř fáze by měly být dost malé na jednu implementační relaci s AI
   agentem (řádově hodiny práce, ne dny) a musí mít jasné kritérium hotovosti

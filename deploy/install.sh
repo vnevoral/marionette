@@ -50,8 +50,40 @@ if [[ ! -e "$defaults_target" ]]; then
 fi
 install -D -m 0644 "$script_dir/marionette.service" "$unit_target"
 
+# default_value prints the last KEY=value line of the defaults file without
+# sourcing it (the file is operator input, not a script to run).
+default_value() {
+	local value
+	value=$(sed -n "s/^$1=//p" "$defaults_target" | tail -n 1)
+	value=${value%\"}
+	value=${value#\"}
+	printf '%s' "$value"
+}
+
+# print_pairing_hint tells the operator how to pair the first device
+# (FR-53): with access control on and no devices file yet, the UI is locked
+# until the code from the service log is entered.
+print_pairing_hint() {
+	local config devices addr
+	[[ $(default_value MARIONETTE_AUTH) == off ]] && return 0
+	config=$(default_value MARIONETTE_CONFIG)
+	devices=$(default_value MARIONETTE_DEVICES)
+	if [[ -z "$devices" ]]; then
+		devices="$(dirname -- "${config:-$data_dir/marionette.json}")/devices.json"
+	fi
+	[[ -e $(rooted_path "$devices") ]] && return 0
+	addr=$(default_value MARIONETTE_ADDR)
+	addr=${addr:-:8080}
+	echo
+	echo "No device is paired yet. Open http://<host>:${addr##*:}/ in a browser"
+	echo "and enter the pairing code from the service log:"
+	echo
+	echo '  journalctl -u marionette | grep "pairing code"'
+}
+
 if [[ -n "$destdir" ]]; then
 	echo "staged Marionette installation under $destdir"
+	print_pairing_hint
 	exit 0
 fi
 
@@ -75,3 +107,4 @@ else
 fi
 
 echo "Marionette installed and started"
+print_pairing_hint
