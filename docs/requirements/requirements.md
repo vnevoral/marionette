@@ -159,7 +159,9 @@ spustitelný soubor.
   (výchozí `:8080`) pro HTTP adresu/port. Celkový limit řízeného ukončení
   (FR-35) je nastavitelný proměnnou `MARIONETTE_SHUTDOWN_TIMEOUT` (formát Go
   `time.Duration`, výchozí `20s`; musí být kratší než `TimeoutStopSec`
-  systemd jednotky, výchozí 90 s).
+  systemd jednotky, výchozí 90 s). Logování řídí `MARIONETTE_LOG_FORMAT`
+  (`text`/`json`, výchozí `text`) a `MARIONETTE_LOG_LEVEL` (`debug`, `info`,
+  `warn`, `error`; výchozí `info`) — blok 0034.
 - **FR-35**: Při **řízeném ukončení aplikace** (přijetí SIGINT/SIGTERM a
   doběhnutí graceful shutdown) se historie primárních běhů a historie změn
   statusu (FR-17) uloží na

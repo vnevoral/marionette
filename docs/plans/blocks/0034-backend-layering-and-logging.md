@@ -3,7 +3,7 @@
 - **Fáze**: 8 — Zpevnění
 - **Vazba na požadavky**: NFR-03, NFR-05, NFR-06
 - **Vazba na ADR**: ADR-0005, ADR-0008
-- **Stav**: Schváleno
+- **Stav**: Hotovo
 - **Závislosti**: Bloky 0024, 0025, 0027 (aby se refaktor dělal nad opraveným kódem)
 
 ## Cíl bloku
@@ -81,6 +81,43 @@ Viz [Definition of Done](../../devops/definition-of-done.md) +:
 
 ## Uzavření
 
-- **Stav po implementaci**: čeká
-- **Ověření**: čeká
-- **Dokumentace aktualizována**: čeká
+- **Stav po implementaci**: Hotovo (2026-09-26)
+- **Ověření**: `make verify` prošel (golangci-lint, eslint, vue-tsc, prettier,
+  `go test -race -count=1 ./...`, build, vet). Stávající testy fronty a
+  brokeru přesunuty beze změny chování do `internal/actions/queue_test.go`
+  a `internal/events/broker_test.go` (jen importy a názvy). Nové testy:
+  `TestNewRouterDoesNotMutateStoreAndStreamsBrokerEvents` (router
+  `Store.OnStatusChange` nenastaví; po napojení v kompozici SSE událost
+  dorazí), `TestSchedulerDesiredCardsRequireStatusActionAndPolling`,
+  `TestSchedulerStopsWhenParentContextIsCanceled` (po zrušení rodiče
+  `Reconcile`/`Stop` vrací `ErrSchedulerStopped`, `Start` lze zopakovat),
+  `TestActionEnvironmentIsMinimalAndOverridable`,
+  `TestExecutorRunsActionWithMinimalEnvironment` (skutečný `env`: jen
+  `PATH`/`HOME`/`LANG`/`TZ` + `Action.Env`, proměnná služby neunikne),
+  `TestBrokerCloseIsIdempotentAndDropsSubscribers`, rozšířený
+  `TestLoadEnvironmentDefaultsAndShutdownTimeout` (`MARIONETTE_LOG_FORMAT`,
+  `MARIONETTE_LOG_LEVEL`, JSON výstup s atributy). Kritéria: `internal/server`
+  neimportuje `sync` a nespouští goroutiny (ověřeno grepem), `log.Printf`
+  se v `cmd`/`internal` nevyskytuje, `git grep internal/exec"` prázdný.
+- **Odchylky od návrhu**: (1) fronta si ponechala `EnqueuePrimary`/
+  `EnqueueStatus` místo generického `Enqueue(ctx, job)` — deduplikace
+  potřebuje kartu a druh a stávající testy tak zůstaly beze změny;
+  (2) `config.LoadFile(path, logger)` přijímá logger explicitně (nil =
+  zahodit) místo návratu varování jako dat; (3) scheduler po zrušení
+  rodičovského kontextu přechází do `running=false` přes sledovací
+  goroutinu (`watchParent`), `Stop()` pak vrací `ErrSchedulerStopped`, což
+  shutdown už toleruje; (4) `cloneStatusSnapshot` a nepoužívaný
+  `cloneHistory` odstraněny (`StatusSnapshot` je hodnotový typ bez
+  referencí, zdokumentováno u `OnStatusChange`); (5) `Dependencies.Logger`
+  je volitelný (nil = zahodit), aby testy handlerů nemusely logger
+  předávat; (6) `slog.DiscardHandler` není v Go 1.23, používá se
+  `TextHandler` nad `io.Discard`; (7) `main` při chybě loguje přes `slog`
+  a volá `os.Exit(1)` místo `log.Fatalf`; (8) `MARIONETTE_LOG_LEVEL` se
+  parsuje přes `slog.Level.UnmarshalText`, takže přijímá i tvary
+  `INFO+2`.
+- **Dokumentace aktualizována**: ano — AGENTS.md a README (rozložení
+  balíčků, proměnné logování, změna `settings` jen v souboru + restart,
+  minimální prostředí akcí), `docs/architecture/overview.md` (tabulka
+  komponent, sekce „Kompozice a logování“), ADR-0005 (přejmenování
+  adresáře, minimální prostředí), ADR-0008 (balíček `events`), requirements
+  FR-34 (proměnné logování), `deploy/marionette.default`, roadmapa.

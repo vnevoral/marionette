@@ -2,7 +2,6 @@ package server
 
 import (
 	"bytes"
-	"context"
 	"encoding/json"
 	"errors"
 	"net/http"
@@ -10,8 +9,8 @@ import (
 	"testing"
 	"time"
 
+	"marionette/internal/actions"
 	"marionette/internal/config"
-	execengine "marionette/internal/exec"
 )
 
 func validServerCard(id string) config.ActionCard {
@@ -47,7 +46,7 @@ func requestJSON(t *testing.T, handler http.Handler, method, path string, body a
 
 func TestRouterHealthAndCardCRUD(t *testing.T) {
 	store := config.NewStore(config.Settings{HistorySize: 5, MaxConcurrentActions: 1})
-	handler := NewRouter(store)
+	handler := NewRouter(Dependencies{Store: store})
 
 	health := httptest.NewRecorder()
 	handler.ServeHTTP(health, httptest.NewRequest(http.MethodGet, "/api/health", nil))
@@ -105,7 +104,7 @@ func TestRouterHealthAndCardCRUD(t *testing.T) {
 
 func TestRouterRejectsInvalidJSONAndDuplicateCard(t *testing.T) {
 	store := config.NewStore(config.Settings{HistorySize: 5, MaxConcurrentActions: 1})
-	handler := NewRouter(store)
+	handler := NewRouter(Dependencies{Store: store})
 	createServerCard(t, store, "duplicate")
 
 	duplicate := requestJSON(t, handler, http.MethodPost, "/api/cards", validServerCard("duplicate"))
@@ -142,7 +141,7 @@ func TestRouterReadsRunsAndStatusProjectionWithoutExecutingStatus(t *testing.T) 
 	}); err != nil {
 		t.Fatalf("UpdateStatus() error = %v", err)
 	}
-	handler := NewRouter(store)
+	handler := NewRouter(Dependencies{Store: store})
 
 	listResponse := httptest.NewRecorder()
 	handler.ServeHTTP(listResponse, httptest.NewRequest(http.MethodGet, "/api/cards", nil))
@@ -190,7 +189,7 @@ func TestRouterReadsRunsAndStatusProjectionWithoutExecutingStatus(t *testing.T) 
 func TestRouterReturnsUnknownStatusBeforeFirstCheck(t *testing.T) {
 	store := config.NewStore(config.Settings{HistorySize: 5, MaxConcurrentActions: 1})
 	createServerCard(t, store, "unknown")
-	handler := NewRouter(store)
+	handler := NewRouter(Dependencies{Store: store})
 	response := httptest.NewRecorder()
 	handler.ServeHTTP(response, httptest.NewRequest(http.MethodGet, "/api/cards/unknown/status", nil))
 	if response.Code != http.StatusOK {
@@ -206,7 +205,7 @@ func TestRouterReturnsUnknownStatusBeforeFirstCheck(t *testing.T) {
 }
 
 func TestRouterWithoutStoreKeepsHealthAvailable(t *testing.T) {
-	handler := NewRouter()
+	handler := NewRouter(Dependencies{})
 	response := httptest.NewRecorder()
 	handler.ServeHTTP(response, httptest.NewRequest(http.MethodGet, "/api/health", nil))
 	if response.Code != http.StatusOK {
@@ -249,7 +248,7 @@ func TestRouterEnqueuesActionsWithoutWaiting(t *testing.T) {
 	createServerCard(t, store, "enqueue")
 	queue := &fakeActionQueue{primaryCalls: make(chan string, 1), statusCalls: make(chan string, 1)}
 	notifier := &fakePrimaryNotifier{calls: make(chan string, 1)}
-	handler := NewRouterWithDependencies(RouterDependencies{Store: store, Actions: queue, Notifier: notifier})
+	handler := NewRouter(Dependencies{Store: store, Actions: queue, Notifier: notifier})
 
 	primary := httptest.NewRecorder()
 	handler.ServeHTTP(primary, httptest.NewRequest(http.MethodPost, "/api/cards/enqueue/actions/primary", nil))
@@ -281,7 +280,7 @@ func TestRouterRejectsStatusEnqueueWithoutStatusAction(t *testing.T) {
 		t.Fatalf("CreateCard() error = %v", err)
 	}
 	queue := &fakeActionQueue{primaryCalls: make(chan string, 1), statusCalls: make(chan string, 1)}
-	handler := NewRouterWithDependencies(RouterDependencies{Store: store, Actions: queue})
+	handler := NewRouter(Dependencies{Store: store, Actions: queue})
 	response := httptest.NewRecorder()
 	handler.ServeHTTP(response, httptest.NewRequest(http.MethodPost, "/api/cards/without-status/actions/status/check", nil))
 	if response.Code != http.StatusUnprocessableEntity {
@@ -293,7 +292,7 @@ func TestRouterKeepsAcceptedPrimaryActionWhenFastPollingNotificationFails(t *tes
 	store := config.NewStore(config.Settings{HistorySize: 5, MaxConcurrentActions: 1})
 	createServerCard(t, store, "notify-failure")
 	queue := &fakeActionQueue{primaryCalls: make(chan string, 1), statusCalls: make(chan string, 1)}
-	handler := NewRouterWithDependencies(RouterDependencies{
+	handler := NewRouter(Dependencies{
 		Store:    store,
 		Actions:  queue,
 		Notifier: failingPrimaryNotifier{},
@@ -309,7 +308,7 @@ func TestRouterKeepsAcceptedPrimaryActionWhenFastPollingNotificationFails(t *tes
 }
 
 func TestRouterReturnsJSONNotFoundForUnknownAPIPath(t *testing.T) {
-	handler := NewRouter(config.NewStore(config.Settings{HistorySize: 5, MaxConcurrentActions: 1}))
+	handler := NewRouter(Dependencies{Store: config.NewStore(config.Settings{HistorySize: 5, MaxConcurrentActions: 1})})
 	response := httptest.NewRecorder()
 	handler.ServeHTTP(response, httptest.NewRequest(http.MethodGet, "/api/not-a-route", nil))
 	if response.Code != http.StatusNotFound || response.Header().Get("Content-Type") != "application/json" {
@@ -322,7 +321,7 @@ func TestRouterMapsPersistenceFailureToInternalServerError(t *testing.T) {
 	store.OnChange = func(*config.Store) error {
 		return errors.New("disk full")
 	}
-	handler := NewRouter(store)
+	handler := NewRouter(Dependencies{Store: store})
 	response := requestJSON(t, handler, http.MethodPost, "/api/cards", validServerCard("persist-failure"))
 	if response.Code != http.StatusInternalServerError {
 		t.Fatalf("persistence failure response = %d", response.Code)
@@ -334,290 +333,6 @@ func TestRouterMapsPersistenceFailureToInternalServerError(t *testing.T) {
 	handler.ServeHTTP(getResponse, httptest.NewRequest(http.MethodGet, "/api/cards/persist-failure", nil))
 	if getResponse.Code != http.StatusNotFound {
 		t.Fatalf("GET after failed create = %d, want 404", getResponse.Code)
-	}
-}
-
-type fakeBackgroundRunner struct {
-	called chan config.Action
-	result execengine.Result
-}
-
-func (runner *fakeBackgroundRunner) Run(_ context.Context, action config.Action) (execengine.Result, error) {
-	runner.called <- action
-	return runner.result, nil
-}
-
-type fakeStatusChecker struct {
-	called chan string
-}
-
-func (checker *fakeStatusChecker) CheckNow(_ context.Context, cardID string) (config.StatusSnapshot, error) {
-	checker.called <- cardID
-	return config.StatusSnapshot{State: config.StatusStateOK}, nil
-}
-
-func TestBackgroundActionsRunAndDrainAcceptedWork(t *testing.T) {
-	store := config.NewStore(config.Settings{HistorySize: 5, MaxConcurrentActions: 1})
-	card := createServerCard(t, store, "background")
-	runner := &fakeBackgroundRunner{
-		called: make(chan config.Action, 1),
-		result: execengine.Result{Outcome: config.RunOutcomeOK},
-	}
-	checker := &fakeStatusChecker{called: make(chan string, 1)}
-	actions, err := NewBackgroundActions(store, runner, checker)
-	if err != nil {
-		t.Fatalf("NewBackgroundActions() error = %v", err)
-	}
-	if err := actions.EnqueuePrimary(card.ID, card.Primary); err != nil {
-		t.Fatalf("EnqueuePrimary() error = %v", err)
-	}
-	if err := actions.EnqueueStatus(card.ID); err != nil {
-		t.Fatalf("EnqueueStatus() error = %v", err)
-	}
-	actions.Wait()
-
-	select {
-	case <-runner.called:
-	default:
-		t.Fatal("primary action was not executed")
-	}
-	select {
-	case cardID := <-checker.called:
-		if cardID != card.ID {
-			t.Fatalf("status card ID = %q", cardID)
-		}
-	default:
-		t.Fatal("status action was not executed")
-	}
-	runs, err := store.GetRuns(card.ID, "primary")
-	if err != nil || len(runs) != 1 || runs[0].Outcome != config.RunOutcomeOK {
-		t.Fatalf("primary runs = %#v, error = %v", runs, err)
-	}
-	if _, err := actions.Close(context.Background()); err != nil {
-		t.Fatalf("Close() error = %v", err)
-	}
-	if err := actions.EnqueuePrimary(card.ID, card.Primary); !errors.Is(err, ErrActionQueueClosed) {
-		t.Fatalf("enqueue after close error = %v", err)
-	}
-}
-
-type blockingBackgroundRunner struct {
-	started chan struct{}
-}
-
-func (runner *blockingBackgroundRunner) Run(ctx context.Context, _ config.Action) (execengine.Result, error) {
-	close(runner.started)
-	<-ctx.Done()
-	return execengine.Result{Outcome: config.RunOutcomeCanceled}, nil
-}
-
-func TestBackgroundActionsCloseCancelsRunningJob(t *testing.T) {
-	store := config.NewStore(config.Settings{HistorySize: 5, MaxConcurrentActions: 1})
-	card := createServerCard(t, store, "cancel-on-close")
-	runner := &blockingBackgroundRunner{started: make(chan struct{})}
-	actions, err := NewBackgroundActions(store, runner, &fakeStatusChecker{called: make(chan string, 1)})
-	if err != nil {
-		t.Fatalf("NewBackgroundActions() error = %v", err)
-	}
-	if err := actions.EnqueuePrimary(card.ID, card.Primary); err != nil {
-		t.Fatalf("EnqueuePrimary() error = %v", err)
-	}
-	<-runner.started
-
-	closed := make(chan error, 1)
-	go func() {
-		graceContext, cancel := context.WithTimeout(context.Background(), 50*time.Millisecond)
-		defer cancel()
-		_, err := actions.Close(graceContext)
-		closed <- err
-	}()
-	select {
-	case err := <-closed:
-		if !errors.Is(err, context.DeadlineExceeded) {
-			t.Fatalf("Close() error = %v, want deadline exceeded because the running job was cancelled", err)
-		}
-	case <-time.After(time.Second):
-		t.Fatal("Close() did not cancel the running job")
-	}
-	runs, err := store.GetRuns(card.ID, "primary")
-	if err != nil || len(runs) != 1 || runs[0].Outcome != config.RunOutcomeCanceled {
-		t.Fatalf("primary runs after cancel = %#v, error = %v", runs, err)
-	}
-}
-
-func TestBackgroundActionsCloseIdempotent(t *testing.T) {
-	store := config.NewStore(config.Settings{HistorySize: 5, MaxConcurrentActions: 1})
-	actions, err := NewBackgroundActions(store, &fakeBackgroundRunner{called: make(chan config.Action, 1)}, &fakeStatusChecker{called: make(chan string, 1)})
-	if err != nil {
-		t.Fatalf("NewBackgroundActions() error = %v", err)
-	}
-	for range 3 {
-		dropped, err := actions.Close(context.Background())
-		if dropped != 0 || err != nil {
-			t.Fatalf("Close() = %d, %v", dropped, err)
-		}
-	}
-}
-
-// releasingRunner blocks every run until release is closed or the context is
-// cancelled, and reports each start so tests can observe queue progress.
-type releasingRunner struct {
-	started chan config.Action
-	release chan struct{}
-}
-
-func (runner *releasingRunner) Run(ctx context.Context, action config.Action) (execengine.Result, error) {
-	runner.started <- action
-	select {
-	case <-runner.release:
-		return execengine.Result{Outcome: config.RunOutcomeOK}, nil
-	case <-ctx.Done():
-		return execengine.Result{Outcome: config.RunOutcomeCanceled}, nil
-	}
-}
-
-func TestBackgroundActionsCloseDropsQueued(t *testing.T) {
-	store := config.NewStore(config.Settings{HistorySize: 5, MaxConcurrentActions: 1})
-	runner := &releasingRunner{started: make(chan config.Action, 16), release: make(chan struct{})}
-	actions, err := NewBackgroundActions(store, runner, &fakeStatusChecker{called: make(chan string, 16)})
-	if err != nil {
-		t.Fatalf("NewBackgroundActions() error = %v", err)
-	}
-	running := createServerCard(t, store, "running")
-	if err := actions.EnqueuePrimary(running.ID, running.Primary); err != nil {
-		t.Fatalf("EnqueuePrimary() error = %v", err)
-	}
-	<-runner.started
-	for index := range 4 {
-		card := createServerCard(t, store, "queued-"+string(rune('a'+index)))
-		if err := actions.EnqueuePrimary(card.ID, card.Primary); err != nil {
-			t.Fatalf("EnqueuePrimary(%s) error = %v", card.ID, err)
-		}
-	}
-	if queued := actions.Queued(); queued != 4 {
-		t.Fatalf("Queued() = %d, want 4", queued)
-	}
-
-	graceContext, cancel := context.WithTimeout(context.Background(), 50*time.Millisecond)
-	defer cancel()
-	started := time.Now()
-	dropped, err := actions.Close(graceContext)
-	if elapsed := time.Since(started); elapsed > time.Second {
-		t.Fatalf("Close() took %s", elapsed)
-	}
-	if dropped != 4 || !errors.Is(err, context.DeadlineExceeded) {
-		t.Fatalf("Close() = %d, %v; want 4 dropped and deadline exceeded", dropped, err)
-	}
-	if len(runner.started) != 0 {
-		t.Fatalf("%d queued job(s) were started after Close()", len(runner.started))
-	}
-	actions.Wait() // dropped and cancelled jobs are all accounted for
-	for _, id := range []string{"queued-a", "queued-b", "queued-c", "queued-d"} {
-		if runs, err := store.GetRuns(id, "primary"); err != nil || len(runs) != 0 {
-			t.Fatalf("dropped job %s left runs %#v, error = %v", id, runs, err)
-		}
-	}
-}
-
-func TestBackgroundActionsCloseLetsRunningJobFinishWithinGrace(t *testing.T) {
-	store := config.NewStore(config.Settings{HistorySize: 5, MaxConcurrentActions: 1})
-	runner := &releasingRunner{started: make(chan config.Action, 1), release: make(chan struct{})}
-	actions, err := NewBackgroundActions(store, runner, &fakeStatusChecker{called: make(chan string, 1)})
-	if err != nil {
-		t.Fatalf("NewBackgroundActions() error = %v", err)
-	}
-	card := createServerCard(t, store, "finishing")
-	if err := actions.EnqueuePrimary(card.ID, card.Primary); err != nil {
-		t.Fatalf("EnqueuePrimary() error = %v", err)
-	}
-	<-runner.started
-	go func() {
-		time.Sleep(20 * time.Millisecond)
-		close(runner.release)
-	}()
-	graceContext, cancel := context.WithTimeout(context.Background(), 2*time.Second)
-	defer cancel()
-	if dropped, err := actions.Close(graceContext); dropped != 0 || err != nil {
-		t.Fatalf("Close() = %d, %v", dropped, err)
-	}
-	runs, err := store.GetRuns(card.ID, "primary")
-	if err != nil || len(runs) != 1 || runs[0].Outcome != config.RunOutcomeOK {
-		t.Fatalf("primary runs after graceful close = %#v, error = %v", runs, err)
-	}
-}
-
-func TestEnqueueDeduplicatesWaitingJob(t *testing.T) {
-	store := config.NewStore(config.Settings{HistorySize: 5, MaxConcurrentActions: 1})
-	runner := &releasingRunner{started: make(chan config.Action, 8), release: make(chan struct{})}
-	actions, err := NewBackgroundActions(store, runner, &fakeStatusChecker{called: make(chan string, 8)})
-	if err != nil {
-		t.Fatalf("NewBackgroundActions() error = %v", err)
-	}
-	defer func() {
-		close(runner.release)
-		_, _ = actions.Close(context.Background())
-	}()
-	blocker := createServerCard(t, store, "blocker")
-	if err := actions.EnqueuePrimary(blocker.ID, blocker.Primary); err != nil {
-		t.Fatalf("EnqueuePrimary(blocker) error = %v", err)
-	}
-	<-runner.started
-
-	card := createServerCard(t, store, "dedup")
-	if err := actions.EnqueuePrimary(card.ID, card.Primary); err != nil {
-		t.Fatalf("first EnqueuePrimary() error = %v", err)
-	}
-	if err := actions.EnqueuePrimary(card.ID, card.Primary); !errors.Is(err, ErrActionAlreadyQueued) {
-		t.Fatalf("second EnqueuePrimary() error = %v, want ErrActionAlreadyQueued", err)
-	}
-	if err := actions.EnqueueStatus(card.ID); err != nil {
-		t.Fatalf("EnqueueStatus() for another kind error = %v", err)
-	}
-	if queued := actions.Queued(); queued != 2 {
-		t.Fatalf("Queued() = %d, want 2 (primary + status)", queued)
-	}
-
-	// Let the blocker finish; the deduplicated primary job starts and its key
-	// is released, so the same request is queued again while it runs.
-	runner.release <- struct{}{}
-	if started := <-runner.started; started.Command != card.Primary.Command {
-		t.Fatalf("started action = %#v, want the deduplicated primary", started)
-	}
-	if err := actions.EnqueuePrimary(card.ID, card.Primary); err != nil {
-		t.Fatalf("EnqueuePrimary() while running error = %v", err)
-	}
-}
-
-func TestEnqueueReportsFullQueueWithRetryAfter(t *testing.T) {
-	store := config.NewStore(config.Settings{HistorySize: 5, MaxConcurrentActions: 1})
-	runner := &releasingRunner{started: make(chan config.Action, 1), release: make(chan struct{})}
-	actions, err := NewBackgroundActions(store, runner, &fakeStatusChecker{called: make(chan string, 1)})
-	if err != nil {
-		t.Fatalf("NewBackgroundActions() error = %v", err)
-	}
-	defer func() {
-		close(runner.release)
-		_, _ = actions.Close(context.Background())
-	}()
-	blocker := createServerCard(t, store, "blocker")
-	if err := actions.EnqueuePrimary(blocker.ID, blocker.Primary); err != nil {
-		t.Fatalf("EnqueuePrimary(blocker) error = %v", err)
-	}
-	<-runner.started
-	for index := range 4 {
-		card := createServerCard(t, store, "fill-"+string(rune('a'+index)))
-		if err := actions.EnqueuePrimary(card.ID, card.Primary); err != nil {
-			t.Fatalf("EnqueuePrimary(%s) error = %v", card.ID, err)
-		}
-	}
-	overflow := createServerCard(t, store, "overflow")
-	err = actions.EnqueuePrimary(overflow.ID, overflow.Primary)
-	var full *QueueFullError
-	if !errors.As(err, &full) || !errors.Is(err, ErrActionQueueFull) {
-		t.Fatalf("EnqueuePrimary(overflow) error = %v, want QueueFullError", err)
-	}
-	if full.RetryAfter < time.Second {
-		t.Fatalf("RetryAfter = %s, want at least 1s", full.RetryAfter)
 	}
 }
 
@@ -637,14 +352,14 @@ func TestRouterMapsQueueErrorsToAcceptedOrServiceUnavailable(t *testing.T) {
 		wantStatus int
 		wantRetry  string
 	}{
-		{name: "already queued", err: ErrActionAlreadyQueued, wantStatus: http.StatusAccepted},
-		{name: "full", err: &QueueFullError{RetryAfter: 2500 * time.Millisecond}, wantStatus: http.StatusServiceUnavailable, wantRetry: "3"},
-		{name: "closed", err: ErrActionQueueClosed, wantStatus: http.StatusServiceUnavailable, wantRetry: "1"},
+		{name: "already queued", err: actions.ErrAlreadyQueued, wantStatus: http.StatusAccepted},
+		{name: "full", err: &actions.QueueFullError{RetryAfter: 2500 * time.Millisecond}, wantStatus: http.StatusServiceUnavailable, wantRetry: "3"},
+		{name: "closed", err: actions.ErrQueueClosed, wantStatus: http.StatusServiceUnavailable, wantRetry: "1"},
 		{name: "other", err: errors.New("boom"), wantStatus: http.StatusInternalServerError},
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			handler := NewRouterWithDependencies(RouterDependencies{Store: store, Actions: stubActionQueue{err: testCase.err}})
+			handler := NewRouter(Dependencies{Store: store, Actions: stubActionQueue{err: testCase.err}})
 			for _, path := range []string{"/api/cards/queue/actions/primary", "/api/cards/queue/actions/status/check"} {
 				response := requestJSON(t, handler, http.MethodPost, path, nil)
 				if response.Code != testCase.wantStatus {
@@ -660,7 +375,7 @@ func TestRouterMapsQueueErrorsToAcceptedOrServiceUnavailable(t *testing.T) {
 
 func TestRouterMapsValidationErrorsToUnprocessableEntity(t *testing.T) {
 	store := config.NewStore(config.Settings{HistorySize: 5, MaxConcurrentActions: 1})
-	handler := NewRouter(store)
+	handler := NewRouter(Dependencies{Store: store})
 	invalid := validServerCard("invalid")
 	invalid.Name = ""
 	response := requestJSON(t, handler, http.MethodPost, "/api/cards", invalid)

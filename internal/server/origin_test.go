@@ -29,7 +29,7 @@ func protectedRouter(t *testing.T, allowedHosts ...string) http.Handler {
 	store := config.NewStore(config.Settings{HistorySize: 5, MaxConcurrentActions: 1})
 	createServerCard(t, store, "protected")
 	queue := &fakeActionQueue{primaryCalls: make(chan string, 16), statusCalls: make(chan string, 16)}
-	return NewRouterWithDependencies(RouterDependencies{Store: store, Actions: queue, AllowedHosts: allowedHosts})
+	return NewRouter(Dependencies{Store: store, Actions: queue, AllowedHosts: allowedHosts})
 }
 
 func send(handler http.Handler, method, path, body string, headers map[string]string) *httptest.ResponseRecorder {

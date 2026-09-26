@@ -5,7 +5,8 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"log"
+	"io"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"time"
@@ -38,8 +39,12 @@ type persistedHistory struct {
 // returns an empty store and an error wrapping ErrConfigUnreadable; a file
 // that cannot be decoded or validated returns an empty store and an error
 // wrapping ErrConfigCorrupt. Invalid runtime state (status, history) is
-// ignored with a warning and never makes the file corrupt.
-func LoadFile(path string) (*Store, error) {
+// ignored with a warning (written to logger; nil discards) and never makes
+// the file corrupt.
+func LoadFile(path string, logger *slog.Logger) (*Store, error) {
+	if logger == nil {
+		logger = slog.New(slog.NewTextHandler(io.Discard, nil))
+	}
 	data, err := os.ReadFile(path)
 	if err != nil {
 		if os.IsNotExist(err) {
@@ -70,8 +75,8 @@ func LoadFile(path string) (*Store, error) {
 		store.cards[card.ID] = cloneCard(card)
 	}
 
-	loadStatus(store, file.Status, path)
-	loadHistory(store, file.History, path)
+	loadStatus(store, file.Status, path, logger)
+	loadHistory(store, file.History, path, logger)
 	return store, nil
 }
 
@@ -170,17 +175,17 @@ func marshalHistory(history map[string]map[string][]Run, statusHistory map[strin
 	return data
 }
 
-func loadStatus(store *Store, raw map[string]StatusSnapshot, path string) {
+func loadStatus(store *Store, raw map[string]StatusSnapshot, path string, logger *slog.Logger) {
 	for cardID, snapshot := range raw {
 		if _, exists := store.cards[cardID]; !exists {
-			log.Printf("warning: ignoring status for unknown card %q in config file %q", cardID, path)
+			logger.Warn("ignoring status for unknown card", "card", cardID, "file", path)
 			continue
 		}
 		if !validStatusState(snapshot.State) {
-			log.Printf("warning: ignoring status with unknown state %q for card %q in config file %q", snapshot.State, cardID, path)
+			logger.Warn("ignoring status with unknown state", "state", snapshot.State, "card", cardID, "file", path)
 			continue
 		}
-		store.statuses[cardID] = cloneStatusSnapshot(snapshot)
+		store.statuses[cardID] = snapshot
 	}
 }
 
@@ -190,24 +195,24 @@ func cloneStatuses(statuses map[string]StatusSnapshot) map[string]StatusSnapshot
 	}
 	cloned := make(map[string]StatusSnapshot, len(statuses))
 	for cardID, snapshot := range statuses {
-		cloned[cardID] = cloneStatusSnapshot(snapshot)
+		cloned[cardID] = snapshot
 	}
 	return cloned
 }
 
-func loadHistory(store *Store, raw json.RawMessage, path string) {
+func loadHistory(store *Store, raw json.RawMessage, path string, logger *slog.Logger) {
 	if len(bytes.TrimSpace(raw)) == 0 || bytes.Equal(bytes.TrimSpace(raw), []byte("null")) {
 		return
 	}
 
 	var history map[string]persistedHistory
 	if err := json.Unmarshal(raw, &history); err != nil {
-		log.Printf("warning: ignoring invalid history in config file %q: %v", path, err)
+		logger.Warn("ignoring invalid history", "file", path, "error", err)
 		return
 	}
 	for cardID, histories := range history {
 		if _, exists := store.cards[cardID]; !exists {
-			log.Printf("warning: ignoring history for unknown card %q in config file %q", cardID, path)
+			logger.Warn("ignoring history for unknown card", "card", cardID, "file", path)
 			continue
 		}
 		if len(histories.Primary) > 0 {

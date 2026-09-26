@@ -21,9 +21,11 @@ flowchart LR
 | Embed vestavěného UI   | `internal/webui`  | `go:embed` `web/dist`                                           | Implementováno                              |
 | SPA (Vue 3 + PrimeVue) | `web/src`         | Dashboard, správa karet                                         | Implementován skelet (health check demo)    |
 | Config store           | `internal/config` | In-memory karty, Settings, JSON perzistence a historie (viz [Ochrana konfiguračního souboru](#ochrana-konfiguračního-souboru)) | Implementováno — fáze 2                     |
-| Execution engine       | `internal/exec`   | Bezpečné spouštění akcí na hostu, capture výstupu               | Implementováno — fáze 3                     |
+| Execution engine       | `internal/execengine` | Bezpečné spouštění akcí na hostu (procesní skupina, timeout, minimální prostředí), capture výstupu, limit souběžnosti | Implementováno — fáze 3, zpevněno 0024/0034 |
 | Status/health engine   | `internal/status` | Vyhodnocení stavu karty, transition historie, volitelný polling | Implementováno — fáze 4                     |
-| REST API domény        | `internal/server` | CRUD karet/akcí, async enqueue, čtení stavu                     | Implementováno — fáze 5                     |
+| Fronta akcí            | `internal/actions` | Asynchronní běh přijatých akcí, omezená fronta, deduplikace, drain při shutdownu (FR-18, FR-35) | Implementováno — 0027, vyčleněno 0034      |
+| Broker událostí        | `internal/events` | Fan-out změn statusu pro SSE, uzavření při shutdownu (ADR-0008)  | Implementováno — 0022, vyčleněno 0034      |
+| REST API domény        | `internal/server` | CRUD karet/akcí, enqueue, čtení stavu, SSE zápis — čistě HTTP vrstva bez vlastních goroutin | Implementováno — fáze 5                     |
 
 ## Vztah k dokumentaci
 
@@ -173,3 +175,19 @@ Statické soubory SPA: `index.html` a klientské cesty se vydávají s
 `Cache-Control: no-cache`, hashované soubory pod `/assets/` s
 `public, max-age=31536000, immutable`; adresáře se nevypisují (vrací se
 `index.html`).
+
+## Kompozice a logování
+
+`cmd/marionette` je jediné místo, kde se služby skládají (blok 0034):
+`config.LoadFile` → `events.Broker` (`store.OnStatusChange = broker.Publish`)
+→ `execengine.Runner` → `status.StatusCheckService` a `status.Scheduler` →
+`actions.Queue` → `server.NewRouter(server.Dependencies{…})`. Router
+předaný store nemutuje a `internal/server` nedrží žádné goroutiny mimo
+HTTP handlery; rozhraní (`ActionQueue`, `EventSource`, …) definuje
+konzument.
+
+Logování používá `log/slog` bez globálního stavu: logger vzniká v `main`
+podle `MARIONETTE_LOG_FORMAT` (`text` pro journald, `json`) a
+`MARIONETTE_LOG_LEVEL` a předává se explicitně (`Dependencies.Logger`,
+`actions.New`, `config.LoadFile`). Záznamy o akcích nesou atributy `card`,
+`action`, `outcome`, `duration`; kroky shutdownu `step` a `duration`.

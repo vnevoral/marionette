@@ -6,7 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"log"
+	"log/slog"
 	"math"
 	"net/http"
 	"sort"
@@ -14,19 +14,48 @@ import (
 	"strings"
 	"time"
 
+	"marionette/internal/actions"
 	"marionette/internal/config"
+	"marionette/internal/events"
 	"marionette/internal/webui"
 )
 
 const maxJSONBodyBytes = 1 << 20
 
-// RouterDependencies contains application services used by API routes.
-type RouterDependencies struct {
-	Store        *config.Store
-	Actions      ActionQueue
-	Notifier     PrimaryActionNotifier
-	Reconciler   CardReconciler
-	StatusEvents *StatusEventBroker
+// ActionQueue accepts actions for background execution.
+type ActionQueue interface {
+	EnqueuePrimary(string, config.Action) error
+	EnqueueStatus(string) error
+}
+
+// PrimaryActionNotifier activates fast polling after a primary action is accepted.
+type PrimaryActionNotifier interface {
+	NotifyPrimaryAction(string) error
+}
+
+// CardReconciler updates background workers after card configuration changes.
+type CardReconciler interface {
+	Reconcile() error
+}
+
+// EventSource hands out subscriptions to status transitions for the SSE
+// endpoint and reports when no further events will ever be published.
+type EventSource interface {
+	Subscribe() (<-chan events.Event, func())
+	Done() <-chan struct{}
+}
+
+// Dependencies are the application services used by the API routes. Only
+// Store is required for the card API; without it the router serves the
+// health endpoint and the SPA only. The router never mutates the store; the
+// composition root wires Store.OnStatusChange to the event broker.
+type Dependencies struct {
+	Store      *config.Store
+	Actions    ActionQueue
+	Notifier   PrimaryActionNotifier
+	Reconciler CardReconciler
+	// Events feeds GET /api/events; nil serves heartbeats only.
+	Events EventSource
 	// AllowedHosts optionally restricts the Host header accepted by mutating
 	// API requests (NFR-12, MARIONETTE_ALLOWED_HOSTS). Empty disables the check.
 	AllowedHosts []string
@@ -34,43 +63,33 @@ type RouterDependencies struct {
 	Version string
 	// StartedAt is the process start used for the health uptime; zero means now.
 	StartedAt time.Time
+	// Logger receives handler warnings; nil discards them.
+	Logger *slog.Logger
 }
 
-// NewRouter builds the top-level HTTP handler for the application. A store
-// enables the card API; omitting it keeps the health endpoint and SPA fallback
-// available during application composition.
-func NewRouter(stores ...*config.Store) http.Handler {
-	if len(stores) > 0 {
-		return NewRouterWithDependencies(RouterDependencies{Store: stores[0]})
-	}
-	return NewRouterWithDependencies(RouterDependencies{})
-}
-
-// NewRouterWithDependencies builds the HTTP handler with application services.
-// Mutating API routes are wrapped by the cross-site protection (NFR-12).
-// Every API path also gets a fallback for unsupported methods that answers
-// 405 with an Allow header and the JSON error envelope.
-func NewRouterWithDependencies(dependencies RouterDependencies) http.Handler {
+// NewRouter builds the top-level HTTP handler. Mutating API routes are
+// wrapped by the cross-site protection (NFR-12) and every API path gets a
+// fallback for unsupported methods that answers 405 with an Allow header and
+// the JSON error envelope.
+func NewRouter(dependencies Dependencies) http.Handler {
 	routes := routeTable{}
 	routes.add(http.MethodGet, "/api/health", newHealthHandler(dependencies.Version, dependencies.StartedAt))
 	if dependencies.Store != nil {
-		statusEvents := dependencies.StatusEvents
-		if statusEvents == nil {
-			statusEvents = NewStatusEventBroker()
+		eventSource := dependencies.Events
+		if eventSource == nil {
+			eventSource = events.NewBroker()
 		}
-		existingStatusChange := dependencies.Store.OnStatusChange
-		dependencies.Store.OnStatusChange = func(cardID string, snapshot config.StatusSnapshot) {
-			if existingStatusChange != nil {
-				existingStatusChange(cardID, snapshot)
-			}
-			statusEvents.Publish(cardID, snapshot)
+		logger := dependencies.Logger
+		if logger == nil {
+			logger = slog.New(slog.NewTextHandler(io.Discard, nil))
 		}
 		handler := cardAPI{
-			store:        dependencies.Store,
-			actions:      dependencies.Actions,
-			notifier:     dependencies.Notifier,
-			reconciler:   dependencies.Reconciler,
-			statusEvents: statusEvents,
+			store:       dependencies.Store,
+			actions:     dependencies.Actions,
+			notifier:    dependencies.Notifier,
+			reconciler:  dependencies.Reconciler,
+			eventSource: eventSource,
+			logger:      logger,
 		}
 		routes.add(http.MethodGet, "/api/cards", handler.listCards)
 		routes.add(http.MethodPost, "/api/cards", handler.createCard)
@@ -128,11 +147,18 @@ func methodNotAllowed(allow string) http.HandlerFunc {
 }
 
 type cardAPI struct {
-	store        *config.Store
-	actions      ActionQueue
-	notifier     PrimaryActionNotifier
-	reconciler   CardReconciler
-	statusEvents *StatusEventBroker
+	store       *config.Store
+	actions     ActionQueue
+	notifier    PrimaryActionNotifier
+	reconciler  CardReconciler
+	eventSource EventSource
+	logger      *slog.Logger
+}
+
+type acceptedAction struct {
+	CardID     string `json:"cardId"`
+	ActionKind string `json:"actionKind"`
+	Status     string `json:"status"`
 }
 
 type cardView struct {
@@ -258,13 +284,13 @@ func (api cardAPI) enqueuePrimary(w http.ResponseWriter, request *http.Request) 
 		writeError(w, http.StatusNotFound, config.ErrNotFound)
 		return
 	}
-	if err := api.actions.EnqueuePrimary(cardID, card.Primary); err != nil && !errors.Is(err, ErrActionAlreadyQueued) {
+	if err := api.actions.EnqueuePrimary(cardID, card.Primary); err != nil && !errors.Is(err, actions.ErrAlreadyQueued) {
 		writeQueueError(w, err)
 		return
 	}
 	if api.notifier != nil {
 		if err := api.notifier.NotifyPrimaryAction(cardID); err != nil {
-			log.Printf("notify primary action %q for fast polling: %v", cardID, err)
+			api.logger.Warn("fast polling notification failed", "card", cardID, "error", err)
 		}
 	}
 	writeJSON(w, http.StatusAccepted, acceptedAction{CardID: cardID, ActionKind: "primary", Status: "accepted"})
@@ -281,7 +307,7 @@ func (api cardAPI) enqueueStatus(w http.ResponseWriter, request *http.Request) {
 		writeError(w, http.StatusUnprocessableEntity, errors.New("status action is not configured"))
 		return
 	}
-	if err := api.actions.EnqueueStatus(cardID); err != nil && !errors.Is(err, ErrActionAlreadyQueued) {
+	if err := api.actions.EnqueueStatus(cardID); err != nil && !errors.Is(err, actions.ErrAlreadyQueued) {
 		writeQueueError(w, err)
 		return
 	}
@@ -355,13 +381,13 @@ func writeError(w http.ResponseWriter, status int, err error) {
 // Retry-After hint (FR-18), a closed queue (shutdown in progress) → 503,
 // anything else → 500.
 func writeQueueError(w http.ResponseWriter, err error) {
-	var full *QueueFullError
+	var full *actions.QueueFullError
 	switch {
 	case errors.As(err, &full):
 		seconds := int(math.Ceil(full.RetryAfter.Seconds()))
 		w.Header().Set("Retry-After", strconv.Itoa(max(seconds, 1)))
 		writeError(w, http.StatusServiceUnavailable, err)
-	case errors.Is(err, ErrActionQueueFull), errors.Is(err, ErrActionQueueClosed):
+	case errors.Is(err, actions.ErrQueueFull), errors.Is(err, actions.ErrQueueClosed):
 		w.Header().Set("Retry-After", "1")
 		writeError(w, http.StatusServiceUnavailable, err)
 	default:

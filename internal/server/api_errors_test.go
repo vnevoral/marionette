@@ -30,7 +30,7 @@ func TestRouterAnswersMethodNotAllowedWithAllowAndJSON(t *testing.T) {
 	store := config.NewStore(config.Settings{HistorySize: 5, MaxConcurrentActions: 1})
 	createServerCard(t, store, "m")
 	queue := &fakeActionQueue{primaryCalls: make(chan string, 1), statusCalls: make(chan string, 1)}
-	handler := NewRouterWithDependencies(RouterDependencies{Store: store, Actions: queue})
+	handler := NewRouter(Dependencies{Store: store, Actions: queue})
 	cases := []struct {
 		method, path, allow string
 	}{
@@ -63,7 +63,7 @@ func TestRouterAnswersMethodNotAllowedWithAllowAndJSON(t *testing.T) {
 
 func TestRouterRejectsOversizedBodyWithJSON413(t *testing.T) {
 	store := config.NewStore(config.Settings{HistorySize: 5, MaxConcurrentActions: 1})
-	handler := NewRouter(store)
+	handler := NewRouter(Dependencies{Store: store})
 	body := bytes.NewReader(append([]byte(`{"name":"`), append(bytes.Repeat([]byte("x"), maxJSONBodyBytes+1), []byte(`"}`)...)...))
 	request := httptest.NewRequest(http.MethodPost, "/api/cards", body)
 	request.Header.Set("Content-Type", "application/json")
@@ -77,7 +77,7 @@ func TestRouterRejectsOversizedBodyWithJSON413(t *testing.T) {
 
 func TestRouterDecodeErrorsHideGoTypes(t *testing.T) {
 	store := config.NewStore(config.Settings{HistorySize: 5, MaxConcurrentActions: 1})
-	handler := NewRouter(store)
+	handler := NewRouter(Dependencies{Store: store})
 	cases := []struct {
 		name, body, want string
 	}{
@@ -113,7 +113,7 @@ func TestRouterDecodeErrorsHideGoTypes(t *testing.T) {
 
 func TestRouterReturnsValidationFields(t *testing.T) {
 	store := config.NewStore(config.Settings{HistorySize: 5, MaxConcurrentActions: 1})
-	handler := NewRouter(store)
+	handler := NewRouter(Dependencies{Store: store})
 	card := validServerCard("bad id")
 	card.Primary.TimeoutSec = config.MaxTimeoutSec + 1
 	response := requestJSON(t, handler, http.MethodPost, "/api/cards", card)
@@ -131,7 +131,7 @@ func TestRouterReturnsValidationFields(t *testing.T) {
 }
 
 func TestHealthReportsVersionAndUptime(t *testing.T) {
-	handler := NewRouterWithDependencies(RouterDependencies{Version: "v1.2.3", StartedAt: time.Now().Add(-90 * time.Second)})
+	handler := NewRouter(Dependencies{Version: "v1.2.3", StartedAt: time.Now().Add(-90 * time.Second)})
 	response := httptest.NewRecorder()
 	handler.ServeHTTP(response, httptest.NewRequest(http.MethodGet, "/api/health", nil))
 	var health healthResponse
@@ -142,14 +142,14 @@ func TestHealthReportsVersionAndUptime(t *testing.T) {
 		t.Fatalf("health = %#v", health)
 	}
 	defaults := httptest.NewRecorder()
-	NewRouter().ServeHTTP(defaults, httptest.NewRequest(http.MethodGet, "/api/health", nil))
+	NewRouter(Dependencies{}).ServeHTTP(defaults, httptest.NewRequest(http.MethodGet, "/api/health", nil))
 	if err := json.Unmarshal(defaults.Body.Bytes(), &health); err != nil || health.Version != "dev" || health.UptimeSec < 0 {
 		t.Fatalf("default health = %#v, %v", health, err)
 	}
 }
 
 func TestSPACacheHeadersAndDirectories(t *testing.T) {
-	handler := NewRouter()
+	handler := NewRouter(Dependencies{})
 	entries, err := fs.ReadDir(webui.Dist(), "assets")
 	if err != nil || len(entries) == 0 {
 		t.Skipf("embedded assets unavailable: %v", err)

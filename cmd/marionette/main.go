@@ -6,7 +6,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"log"
+	"io"
+	"log/slog"
 	"net"
 	"net/http"
 	"os"
@@ -15,8 +16,10 @@ import (
 	"syscall"
 	"time"
 
+	"marionette/internal/actions"
 	"marionette/internal/config"
-	execengine "marionette/internal/exec"
+	"marionette/internal/events"
+	"marionette/internal/execengine"
 	"marionette/internal/server"
 	"marionette/internal/status"
 )
@@ -48,15 +51,22 @@ type environment struct {
 	// AllowedHosts restricts the Host header of mutating API requests
 	// (NFR-12); empty keeps every host accepted.
 	AllowedHosts []string
+	// LogFormat is "text" (journald friendly, default) or "json".
+	LogFormat string
+	// LogLevel is the minimum level written to the log; default info.
+	LogLevel slog.Level
 }
 
 // loadEnvironment reads MARIONETTE_CONFIG, MARIONETTE_ADDR,
-// MARIONETTE_SHUTDOWN_TIMEOUT and MARIONETTE_ALLOWED_HOSTS with their defaults.
+// MARIONETTE_SHUTDOWN_TIMEOUT, MARIONETTE_ALLOWED_HOSTS, MARIONETTE_LOG_FORMAT
+// and MARIONETTE_LOG_LEVEL with their defaults.
 func loadEnvironment(getenv func(string) string) (environment, error) {
 	env := environment{
 		ConfigPath:      getenv("MARIONETTE_CONFIG"),
 		Addr:            getenv("MARIONETTE_ADDR"),
 		ShutdownTimeout: defaultShutdownTimeout,
+		LogFormat:       "text",
+		LogLevel:        slog.LevelInfo,
 	}
 	if env.ConfigPath == "" {
 		env.ConfigPath = defaultConfigPath
@@ -79,14 +89,37 @@ func loadEnvironment(getenv func(string) string) (environment, error) {
 			env.AllowedHosts = append(env.AllowedHosts, host)
 		}
 	}
+	switch format := strings.ToLower(strings.TrimSpace(getenv("MARIONETTE_LOG_FORMAT"))); format {
+	case "":
+	case "text", "json":
+		env.LogFormat = format
+	default:
+		return environment{}, fmt.Errorf("MARIONETTE_LOG_FORMAT %q: must be text or json", format)
+	}
+	if raw := strings.TrimSpace(getenv("MARIONETTE_LOG_LEVEL")); raw != "" {
+		if err := env.LogLevel.UnmarshalText([]byte(raw)); err != nil {
+			return environment{}, fmt.Errorf("MARIONETTE_LOG_LEVEL %q: must be debug, info, warn or error", raw)
+		}
+	}
 	return env, nil
+}
+
+// newLogger builds the process logger for the configured format and level.
+func newLogger(writer io.Writer, env environment) *slog.Logger {
+	options := &slog.HandlerOptions{Level: env.LogLevel}
+	if env.LogFormat == "json" {
+		return slog.New(slog.NewJSONHandler(writer, options))
+	}
+	return slog.New(slog.NewTextHandler(writer, options))
 }
 
 func main() {
 	env, err := loadEnvironment(os.Getenv)
 	if err != nil {
-		log.Fatalf("invalid environment: %v", err)
+		slog.New(slog.NewTextHandler(os.Stderr, nil)).Error("invalid environment", "error", err)
+		os.Exit(1)
 	}
+	logger := newLogger(os.Stderr, env)
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
 	go func() {
@@ -96,16 +129,17 @@ func main() {
 		stop()
 	}()
 
-	app := application{env: env, logger: log.Default()}
+	app := application{env: env, logger: logger}
 	if err := app.run(ctx); err != nil {
-		log.Fatalf("marionette: %v", err)
+		logger.Error("marionette exited with an error", "error", err)
+		os.Exit(1)
 	}
 }
 
 // application composes the service and runs it until the context is done.
 type application struct {
 	env    environment
-	logger *log.Logger
+	logger *slog.Logger
 	// onListening, when set, receives the bound address once the HTTP
 	// listener is ready. Tests use it to discover an ephemeral port.
 	onListening func(net.Addr)
@@ -114,11 +148,12 @@ type application struct {
 // run starts the service, blocks until ctx is done and then performs the
 // graceful shutdown sequence within env.ShutdownTimeout.
 func (app application) run(ctx context.Context) error {
-	store, readOnly, err := openStore(app.env.ConfigPath, time.Now)
+	store, readOnly, err := openStore(app.env.ConfigPath, time.Now, app.logger)
 	if err != nil {
 		return fmt.Errorf("open config store: %w", err)
 	}
-	statusEvents := server.NewStatusEventBroker()
+	broker := events.NewBroker()
+	store.OnStatusChange = broker.Publish
 
 	executor := execengine.NewExecutor()
 	runner, err := execengine.NewRunner(store.GetSettings(), executor)
@@ -133,7 +168,7 @@ func (app application) run(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("create status scheduler: %w", err)
 	}
-	backgroundActions, err := server.NewBackgroundActions(store, runner, statusService)
+	queue, err := actions.New(store, runner, statusService, app.logger)
 	if err != nil {
 		return fmt.Errorf("create background action queue: %w", err)
 	}
@@ -143,15 +178,16 @@ func (app application) run(ctx context.Context) error {
 		return fmt.Errorf("start status scheduler: %w", err)
 	}
 
-	handler := server.NewRouterWithDependencies(server.RouterDependencies{
+	handler := server.NewRouter(server.Dependencies{
 		Store:        store,
-		Actions:      backgroundActions,
+		Actions:      queue,
 		Notifier:     scheduler,
 		Reconciler:   scheduler,
-		StatusEvents: statusEvents,
+		Events:       broker,
 		AllowedHosts: app.env.AllowedHosts,
 		Version:      version,
 		StartedAt:    time.Now(),
+		Logger:       app.logger,
 	})
 	srv := &http.Server{
 		Handler:           handler,
@@ -162,7 +198,7 @@ func (app application) run(ctx context.Context) error {
 	// Shutdown closes the listeners first and then runs the registered
 	// hooks; closing the broker ends every SSE stream so Shutdown does not
 	// wait for those long-lived connections.
-	srv.RegisterOnShutdown(statusEvents.Close)
+	srv.RegisterOnShutdown(broker.Close)
 
 	listener, err := net.Listen("tcp", app.env.Addr)
 	if err != nil {
@@ -172,7 +208,7 @@ func (app application) run(ctx context.Context) error {
 	go func() {
 		serveErr <- srv.Serve(listener)
 	}()
-	app.logger.Printf("marionette listening on %s", listener.Addr())
+	app.logger.Info("marionette listening", "addr", listener.Addr().String(), "version", version)
 	if app.onListening != nil {
 		app.onListening(listener.Addr())
 	}
@@ -183,7 +219,7 @@ func (app application) run(ctx context.Context) error {
 	case <-ctx.Done():
 	}
 
-	app.logger.Printf("shutting down (timeout %s); send the signal again to force exit", app.env.ShutdownTimeout)
+	app.logger.Info("shutting down; send the signal again to force exit", "timeout", app.env.ShutdownTimeout)
 	shutdownContext, cancelShutdown := context.WithTimeout(context.Background(), app.env.ShutdownTimeout)
 	defer cancelShutdown()
 	steps := shutdownSteps{
@@ -194,7 +230,7 @@ func (app application) run(ctx context.Context) error {
 			}
 			return nil
 		},
-		closeActions:  backgroundActions.Close,
+		closeActions:  queue.Close,
 		stopScheduler: scheduler.Stop,
 		historyDirty:  store.Dirty,
 	}
@@ -222,23 +258,24 @@ type shutdownSteps struct {
 // period, stop the scheduler and save again only if the history changed in
 // the meantime. Each step is logged with its duration. Every step runs even
 // when an earlier one fails; the errors are joined in the result.
-func shutdown(ctx context.Context, steps shutdownSteps, logger *log.Logger) error {
+func shutdown(ctx context.Context, steps shutdownSteps, logger *slog.Logger) error {
 	var failures []error
 	step := func(name string, run func() error) {
 		started := time.Now()
 		err := run()
+		duration := time.Since(started).Round(time.Millisecond)
 		if err != nil {
 			failures = append(failures, fmt.Errorf("%s: %w", name, err))
-			logger.Printf("shutdown: %s failed after %s: %v", name, time.Since(started).Round(time.Millisecond), err)
+			logger.Error("shutdown step failed", "step", name, "duration", duration, "error", err)
 			return
 		}
-		logger.Printf("shutdown: %s done in %s", name, time.Since(started).Round(time.Millisecond))
+		logger.Info("shutdown step done", "step", name, "duration", duration)
 	}
 
 	step("stop HTTP server", func() error { return steps.stopHTTP(ctx) })
 
 	if steps.saveHistory == nil {
-		logger.Print("shutdown: history not saved, the configuration file is read-only")
+		logger.Warn("shutdown: history not saved, the configuration file is read-only")
 	} else {
 		step("save history", steps.saveHistory)
 	}
@@ -248,10 +285,10 @@ func shutdown(ctx context.Context, steps shutdownSteps, logger *log.Logger) erro
 		defer cancel()
 		dropped, err := steps.closeActions(graceContext)
 		if dropped > 0 {
-			logger.Printf("shutdown: discarded %d queued action(s)", dropped)
+			logger.Info("shutdown: discarded queued actions", "count", dropped)
 		}
 		if err != nil {
-			logger.Printf("shutdown: running actions cancelled after the grace period: %v", err)
+			logger.Warn("shutdown: running actions cancelled after the grace period", "error", err)
 		}
 		return nil
 	})
@@ -290,8 +327,11 @@ func graceDeadline(ctx context.Context) time.Time {
 // disabled (readOnly = true): every mutation fails and is rolled back, and the
 // shutdown history save is skipped, until the operator fixes the file and
 // restarts the service.
-func openStore(configPath string, now func() time.Time) (store *config.Store, readOnly bool, err error) {
-	store, err = config.LoadFile(configPath)
+func openStore(configPath string, now func() time.Time, logger *slog.Logger) (store *config.Store, readOnly bool, err error) {
+	if logger == nil {
+		logger = slog.New(slog.NewTextHandler(io.Discard, nil))
+	}
+	store, err = config.LoadFile(configPath, logger)
 	switch {
 	case err == nil:
 	case errors.Is(err, config.ErrConfigCorrupt):
@@ -299,10 +339,10 @@ func openStore(configPath string, now func() time.Time) (store *config.Store, re
 		if quarantineErr != nil {
 			return nil, false, fmt.Errorf("config load failed (%v) and the file could not be quarantined: %w", err, quarantineErr)
 		}
-		log.Printf("warning: config load failed: %v; original file moved to %q, starting with an empty store", err, quarantined)
+		logger.Warn("config load failed; original file quarantined, starting with an empty store", "error", err, "quarantined", quarantined)
 		store = emptyStore()
 	case errors.Is(err, config.ErrConfigUnreadable):
-		log.Printf("warning: config load failed: %v; starting read-only with an empty store, configuration changes will be rejected until the file is readable", err)
+		logger.Warn("config load failed; starting read-only with an empty store, configuration changes will be rejected until the file is readable", "error", err)
 		store = emptyStore()
 		store.OnChange = func(*config.Store) error {
 			return fmt.Errorf("configuration file %q is not readable; fix its permissions and restart the service", configPath)

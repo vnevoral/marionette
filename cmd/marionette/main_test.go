@@ -5,7 +5,7 @@ import (
 	"context"
 	"errors"
 	"io"
-	"log"
+	"log/slog"
 	"net"
 	"net/http"
 	"os"
@@ -32,14 +32,14 @@ func testCard(id string) config.ActionCard {
 
 func TestOpenStoreMissingFileStartsEmptyAndPersists(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "marionette.json")
-	store, _, err := openStore(path, fixedNow)
+	store, _, err := openStore(path, fixedNow, nil)
 	if err != nil {
 		t.Fatalf("openStore() error = %v", err)
 	}
 	if _, err := store.CreateCard(testCard("first")); err != nil {
 		t.Fatalf("CreateCard() error = %v", err)
 	}
-	loaded, err := config.LoadFile(path)
+	loaded, err := config.LoadFile(path, nil)
 	if err != nil || len(loaded.ListCards()) != 1 {
 		t.Fatalf("persisted config = %v cards, error = %v", len(loaded.ListCards()), err)
 	}
@@ -53,7 +53,7 @@ func TestOpenStoreQuarantinesCorruptFile(t *testing.T) {
 		t.Fatalf("WriteFile() error = %v", err)
 	}
 
-	store, readOnly, err := openStore(path, fixedNow)
+	store, readOnly, err := openStore(path, fixedNow, nil)
 	if err != nil {
 		t.Fatalf("openStore() error = %v", err)
 	}
@@ -77,7 +77,7 @@ func TestOpenStoreQuarantinesCorruptFile(t *testing.T) {
 	if content, err := os.ReadFile(quarantined); err != nil || string(content) != string(original) {
 		t.Fatalf("quarantined file changed after a save: %q, %v", content, err)
 	}
-	if loaded, err := config.LoadFile(path); err != nil || len(loaded.ListCards()) != 1 {
+	if loaded, err := config.LoadFile(path, nil); err != nil || len(loaded.ListCards()) != 1 {
 		t.Fatalf("fresh config = %v, error = %v", loaded, err)
 	}
 }
@@ -90,7 +90,7 @@ func TestOpenStoreUnreadableFileRejectsChanges(t *testing.T) {
 	if err := os.WriteFile(path, []byte(`{"settings":{"historySize":5,"maxConcurrentActions":1},"cards":[]}`), 0o000); err != nil {
 		t.Fatalf("WriteFile() error = %v", err)
 	}
-	store, readOnly, err := openStore(path, fixedNow)
+	store, readOnly, err := openStore(path, fixedNow, nil)
 	if err != nil {
 		t.Fatalf("openStore() error = %v", err)
 	}
@@ -137,6 +137,30 @@ func TestLoadEnvironmentDefaultsAndShutdownTimeout(t *testing.T) {
 	}
 	if strings.Join(env.AllowedHosts, "|") != "pi.local:8080|192.168.1.10:8080" {
 		t.Fatalf("AllowedHosts = %v", env.AllowedHosts)
+	}
+	if env.LogFormat != "text" || env.LogLevel != slog.LevelInfo {
+		t.Fatalf("default logging = %q %v", env.LogFormat, env.LogLevel)
+	}
+	values["MARIONETTE_LOG_FORMAT"] = "JSON"
+	values["MARIONETTE_LOG_LEVEL"] = "debug"
+	env, err = loadEnvironment(func(key string) string { return values[key] })
+	if err != nil || env.LogFormat != "json" || env.LogLevel != slog.LevelDebug {
+		t.Fatalf("logging environment = %q %v, %v", env.LogFormat, env.LogLevel, err)
+	}
+	for key, invalid := range map[string]string{"MARIONETTE_LOG_FORMAT": "xml", "MARIONETTE_LOG_LEVEL": "loud"} {
+		if _, err := loadEnvironment(func(k string) string {
+			if k == key {
+				return invalid
+			}
+			return ""
+		}); err == nil {
+			t.Fatalf("%s=%q was accepted", key, invalid)
+		}
+	}
+	var buffer strings.Builder
+	newLogger(&buffer, env).Debug("hello", "card", "x")
+	if !strings.Contains(buffer.String(), `"card":"x"`) || !strings.Contains(buffer.String(), `"level":"DEBUG"`) {
+		t.Fatalf("JSON debug log = %q", buffer.String())
 	}
 
 	for _, invalid := range []string{"soon", "0s", "-5s"} {
@@ -185,7 +209,7 @@ func TestShutdownSavesHistoryBeforeQueueDrain(t *testing.T) {
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
 	defer cancel()
-	if err := shutdown(ctx, steps, log.New(io.Discard, "", 0)); err != nil {
+	if err := shutdown(ctx, steps, slog.New(slog.NewTextHandler(io.Discard, nil))); err != nil {
 		t.Fatalf("shutdown() error = %v", err)
 	}
 	want := []string{"http", "save", "actions", "scheduler", "save"}
@@ -203,7 +227,7 @@ func TestShutdownSkipsSecondSaveWhenCleanAndSaveWhenReadOnly(t *testing.T) {
 		stopScheduler: func() error { recorded.add("scheduler"); return nil },
 		historyDirty:  func() bool { return false },
 	}
-	err := shutdown(context.Background(), steps, log.New(io.Discard, "", 0))
+	err := shutdown(context.Background(), steps, slog.New(slog.NewTextHandler(io.Discard, nil)))
 	if err == nil || !strings.Contains(err.Error(), "listener gone") {
 		t.Fatalf("shutdown() error = %v, want the HTTP failure reported", err)
 	}
@@ -215,7 +239,7 @@ func TestShutdownSkipsSecondSaveWhenCleanAndSaveWhenReadOnly(t *testing.T) {
 	steps.saveHistory = nil
 	steps.stopHTTP = func(context.Context) error { recorded.add("http"); return nil }
 	steps.historyDirty = func() bool { return true }
-	if err := shutdown(context.Background(), steps, log.New(io.Discard, "", 0)); err != nil {
+	if err := shutdown(context.Background(), steps, slog.New(slog.NewTextHandler(io.Discard, nil))); err != nil {
 		t.Fatalf("shutdown() read-only error = %v", err)
 	}
 	if got := strings.Join(recorded.calls, ","); got != "http,actions,scheduler" {
@@ -264,7 +288,7 @@ func TestRunShutsDownQuicklyWithOpenSSEClientAndSavesHistory(t *testing.T) {
 	listening := make(chan net.Addr, 1)
 	app := application{
 		env:         environment{ConfigPath: configPath, Addr: "127.0.0.1:0", ShutdownTimeout: 2 * time.Second},
-		logger:      log.New(io.Discard, "", 0),
+		logger:      slog.New(slog.NewTextHandler(io.Discard, nil)),
 		onListening: func(addr net.Addr) { listening <- addr },
 	}
 	ctx, cancel := context.WithCancel(context.Background())
@@ -326,9 +350,9 @@ func TestRunShutsDownQuicklyWithOpenSSEClientAndSavesHistory(t *testing.T) {
 		t.Fatal("SSE stream is still open after shutdown")
 	}
 
-	loaded, err := config.LoadFile(configPath)
+	loaded, err := config.LoadFile(configPath, nil)
 	if err != nil {
-		t.Fatalf("LoadFile() after shutdown error = %v", err)
+		t.Fatalf("LoadFile(, nil) after shutdown error = %v", err)
 	}
 	runs, err := loaded.GetRuns("long", "primary")
 	if err != nil || len(runs) != 1 || runs[0].Outcome != config.RunOutcomeCanceled {

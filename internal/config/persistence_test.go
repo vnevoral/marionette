@@ -11,16 +11,16 @@ import (
 )
 
 func TestLoadFileMissingReturnsDefaultStore(t *testing.T) {
-	store, err := LoadFile(filepath.Join(t.TempDir(), "missing.json"))
+	store, err := LoadFile(filepath.Join(t.TempDir(), "missing.json"), nil)
 	if err != nil {
-		t.Fatalf("LoadFile() error = %v", err)
+		t.Fatalf("LoadFile(, nil) error = %v", err)
 	}
 	if len(store.ListCards()) != 0 {
-		t.Fatal("LoadFile() returned cards for a missing file")
+		t.Fatal("LoadFile(, nil) returned cards for a missing file")
 	}
 	want := Settings{HistorySize: DefaultHistorySize, MaxConcurrentActions: DefaultMaxConcurrentActions}
 	if got := store.GetSettings(); got != want {
-		t.Fatalf("LoadFile() settings = %#v, want %#v", got, want)
+		t.Fatalf("LoadFile(, nil) settings = %#v, want %#v", got, want)
 	}
 }
 
@@ -30,12 +30,12 @@ func TestLoadFileCorruptJSONReturnsEmptyStoreAndError(t *testing.T) {
 		t.Fatalf("WriteFile() error = %v", err)
 	}
 
-	store, err := LoadFile(path)
+	store, err := LoadFile(path, nil)
 	if !errors.Is(err, ErrConfigCorrupt) {
-		t.Fatalf("LoadFile() error = %v, want ErrConfigCorrupt", err)
+		t.Fatalf("LoadFile(, nil) error = %v, want ErrConfigCorrupt", err)
 	}
 	if store == nil || len(store.ListCards()) != 0 {
-		t.Fatal("LoadFile() did not return an empty store for corrupt JSON")
+		t.Fatal("LoadFile(, nil) did not return an empty store for corrupt JSON")
 	}
 }
 
@@ -47,9 +47,9 @@ func TestLoadFileUnreadableReturnsUnreadableError(t *testing.T) {
 	if err := os.WriteFile(path, []byte("{}"), 0o000); err != nil {
 		t.Fatalf("WriteFile() error = %v", err)
 	}
-	_, err := LoadFile(path)
+	_, err := LoadFile(path, nil)
 	if !errors.Is(err, ErrConfigUnreadable) {
-		t.Fatalf("LoadFile() error = %v, want ErrConfigUnreadable", err)
+		t.Fatalf("LoadFile(, nil) error = %v, want ErrConfigUnreadable", err)
 	}
 	if errors.Is(err, ErrConfigCorrupt) {
 		t.Fatal("unreadable file must not be reported as corrupt")
@@ -127,9 +127,9 @@ func TestLoadFileIgnoresStatusWithUnknownState(t *testing.T) {
 	if err := os.WriteFile(path, data, 0o600); err != nil {
 		t.Fatalf("WriteFile() error = %v", err)
 	}
-	store, err := LoadFile(path)
+	store, err := LoadFile(path, nil)
 	if err != nil {
-		t.Fatalf("LoadFile() error = %v, want nil (invalid runtime state is ignored)", err)
+		t.Fatalf("LoadFile(, nil) error = %v, want nil (invalid runtime state is ignored)", err)
 	}
 	if _, exists := store.GetStatus(card.ID); exists {
 		t.Fatal("status with unknown state was loaded")
@@ -162,9 +162,9 @@ func TestSaveFileRoundTripExcludesHistory(t *testing.T) {
 		t.Fatalf("SaveFile() error = %v", err)
 	}
 
-	loaded, err := LoadFile(path)
+	loaded, err := LoadFile(path, nil)
 	if err != nil {
-		t.Fatalf("LoadFile() error = %v", err)
+		t.Fatalf("LoadFile(, nil) error = %v", err)
 	}
 	if loaded.GetSettings() != settings || !reflect.DeepEqual(loaded.ListCards(), []ActionCard{created}) {
 		t.Fatalf("loaded configuration differs: settings=%#v cards=%#v", loaded.GetSettings(), loaded.ListCards())
@@ -213,9 +213,9 @@ func TestSaveFileWithHistoryRoundTrip(t *testing.T) {
 		t.Fatalf("SaveFileWithHistory() error = %v", err)
 	}
 
-	loaded, err := LoadFile(path)
+	loaded, err := LoadFile(path, nil)
 	if err != nil {
-		t.Fatalf("LoadFile() error = %v", err)
+		t.Fatalf("LoadFile(, nil) error = %v", err)
 	}
 	loadedPrimary, err := loaded.GetRuns(created.ID, "primary")
 	if err != nil {
@@ -251,12 +251,12 @@ func TestLoadFileCorruptHistoryKeepsConfiguration(t *testing.T) {
 		t.Fatalf("WriteFile() error = %v", err)
 	}
 
-	loaded, err := LoadFile(path)
+	loaded, err := LoadFile(path, nil)
 	if err != nil {
-		t.Fatalf("LoadFile() error = %v", err)
+		t.Fatalf("LoadFile(, nil) error = %v", err)
 	}
 	if len(loaded.ListCards()) != 1 {
-		t.Fatalf("LoadFile() loaded %d cards, want 1", len(loaded.ListCards()))
+		t.Fatalf("LoadFile(, nil) loaded %d cards, want 1", len(loaded.ListCards()))
 	}
 	runs, err := loaded.GetRuns(card.ID, "primary")
 	if err != nil {
@@ -281,12 +281,12 @@ func TestLoadFileInvalidCardReturnsErrorAndEmptyStore(t *testing.T) {
 		t.Fatalf("WriteFile() error = %v", err)
 	}
 
-	store, err := LoadFile(path)
+	store, err := LoadFile(path, nil)
 	if !errors.Is(err, ErrConfigCorrupt) {
-		t.Fatalf("LoadFile() error = %v, want ErrConfigCorrupt for invalid card", err)
+		t.Fatalf("LoadFile(, nil) error = %v, want ErrConfigCorrupt for invalid card", err)
 	}
 	if store == nil || len(store.ListCards()) != 0 {
-		t.Fatal("LoadFile() did not return an empty store for invalid card")
+		t.Fatal("LoadFile(, nil) did not return an empty store for invalid card")
 	}
 }
 
@@ -328,17 +328,14 @@ func TestStoreOnChangeHookPersistsMutationsButNotRuns(t *testing.T) {
 	if _, err := store.UpdateCard(created.ID, created); err != nil {
 		t.Fatalf("UpdateCard() error = %v", err)
 	}
-	if err := store.UpdateSettings(validSettings()); err != nil {
-		t.Fatalf("UpdateSettings() error = %v", err)
-	}
 	if err := store.DeleteCard(created.ID); err != nil {
 		t.Fatalf("DeleteCard() error = %v", err)
 	}
-	if calls != 4 {
-		t.Fatalf("OnChange calls after mutations = %d, want 4", calls)
+	if calls != 3 {
+		t.Fatalf("OnChange calls after mutations = %d, want 3", calls)
 	}
 
-	loaded, err := LoadFile(path)
+	loaded, err := LoadFile(path, nil)
 	if err != nil {
 		t.Fatalf("persisted hook file could not be loaded: %v", err)
 	}

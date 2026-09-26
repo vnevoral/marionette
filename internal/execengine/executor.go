@@ -9,6 +9,7 @@ import (
 	"os"
 	"os/exec"
 	"regexp"
+	"sort"
 	"syscall"
 	"time"
 
@@ -217,10 +218,31 @@ func (process osProcess) Run() error {
 	return process.command.Run()
 }
 
+// baseEnvironmentKeys are the only variables an action inherits from the
+// service process (NFR-01 c): enough to locate binaries and behave
+// predictably, without leaking secrets from the service environment.
+var baseEnvironmentKeys = []string{"PATH", "HOME", "LANG", "TZ"}
+
+// actionEnvironment builds the process environment from the minimal base and
+// the action's own variables, which take precedence over the base. Keys are
+// emitted in a stable order.
 func actionEnvironment(values map[string]string) []string {
-	environment := os.Environ()
-	for key, value := range values {
-		environment = append(environment, key+"="+value)
+	environment := make([]string, 0, len(baseEnvironmentKeys)+len(values))
+	for _, key := range baseEnvironmentKeys {
+		if _, overridden := values[key]; overridden {
+			continue
+		}
+		if value, ok := os.LookupEnv(key); ok {
+			environment = append(environment, key+"="+value)
+		}
+	}
+	keys := make([]string, 0, len(values))
+	for key := range values {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+	for _, key := range keys {
+		environment = append(environment, key+"="+values[key])
 	}
 	return environment
 }

@@ -315,3 +315,62 @@ func TestExitCodeFromExecError(t *testing.T) {
 		t.Fatalf("exitCode() = %d, want 7", got)
 	}
 }
+
+func TestActionEnvironmentIsMinimalAndOverridable(t *testing.T) {
+	t.Setenv("PATH", "/usr/bin:/bin")
+	t.Setenv("HOME", "/home/svc")
+	t.Setenv("LANG", "C.UTF-8")
+	t.Setenv("TZ", "Europe/Prague")
+	t.Setenv("MARIONETTE_SECRET", "do-not-leak")
+
+	got := actionEnvironment(map[string]string{"ZETA": "1", "ALPHA": "2", "HOME": "/tmp/override"})
+	want := []string{"PATH=/usr/bin:/bin", "LANG=C.UTF-8", "TZ=Europe/Prague", "ALPHA=2", "HOME=/tmp/override", "ZETA=1"}
+	if strings.Join(got, "\n") != strings.Join(want, "\n") {
+		t.Fatalf("actionEnvironment() = %q, want %q", got, want)
+	}
+	for _, entry := range got {
+		if strings.HasPrefix(entry, "MARIONETTE_SECRET=") {
+			t.Fatal("service environment leaked into the action")
+		}
+	}
+}
+
+func TestExecutorRunsActionWithMinimalEnvironment(t *testing.T) {
+	if _, err := exec.LookPath("env"); err != nil {
+		t.Skip("env command is required")
+	}
+	t.Setenv("MARIONETTE_SECRET", "do-not-leak")
+	t.Setenv("TZ", "UTC")
+	executor := NewExecutor()
+	result, err := executor.Execute(context.Background(), config.Action{
+		Command:    "env",
+		Env:        map[string]string{"ACTION_VAR": "yes"},
+		TimeoutSec: 5,
+	})
+	if err != nil {
+		t.Fatalf("Execute() error = %v", err)
+	}
+	if result.Outcome != config.RunOutcomeOK {
+		t.Fatalf("outcome = %s, output %q", result.Outcome, result.Output)
+	}
+	seen := map[string]bool{}
+	for _, line := range strings.Split(strings.TrimSpace(result.Output), "\n") {
+		key, _, _ := strings.Cut(line, "=")
+		seen[key] = true
+	}
+	for _, key := range []string{"PATH", "TZ", "ACTION_VAR"} {
+		if !seen[key] {
+			t.Errorf("expected %s in the action environment, got %q", key, result.Output)
+		}
+	}
+	if seen["MARIONETTE_SECRET"] {
+		t.Fatalf("service environment leaked into the action: %q", result.Output)
+	}
+	for key := range seen {
+		switch key {
+		case "PATH", "HOME", "LANG", "TZ", "ACTION_VAR", "PWD", "_", "":
+		default:
+			t.Errorf("unexpected variable %q in the action environment", key)
+		}
+	}
+}

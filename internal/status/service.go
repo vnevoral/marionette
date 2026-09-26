@@ -7,7 +7,7 @@ import (
 	"fmt"
 
 	"marionette/internal/config"
-	execengine "marionette/internal/exec"
+	"marionette/internal/execengine"
 )
 
 // Errors returned by StatusCheckService.CheckNow.

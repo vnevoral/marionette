@@ -72,7 +72,7 @@ type Scheduler struct {
 
 	mu          sync.Mutex
 	running     bool
-	context     context.Context
+	ctx         context.Context
 	cancel      context.CancelFunc
 	workers     map[string]*pollWorker
 	fastUntil   map[string]time.Time
@@ -110,14 +110,44 @@ func (scheduler *Scheduler) Start(parent context.Context) error {
 	}
 	ctx, cancel := context.WithCancel(parent)
 	scheduler.running = true
-	scheduler.context = ctx
+	scheduler.ctx = ctx
 	scheduler.cancel = cancel
 	scheduler.workers = make(map[string]*pollWorker)
-	for _, card := range scheduler.store.ListCards() {
+	for _, card := range scheduler.desiredCards() {
 		scheduler.startWorkerLocked(ctx, card)
 	}
 	scheduler.mu.Unlock()
+	go scheduler.watchParent(ctx)
 	return nil
+}
+
+// watchParent marks the scheduler stopped once the context it was started
+// with ends, so that a cancelled parent context (application shutdown) leaves
+// the scheduler restartable and Stop reports ErrSchedulerStopped instead of
+// pretending to stop already-finished workers.
+func (scheduler *Scheduler) watchParent(ctx context.Context) {
+	<-ctx.Done()
+	scheduler.mu.Lock()
+	defer scheduler.mu.Unlock()
+	if scheduler.ctx != ctx {
+		return // Stop already ran, or a new Start replaced this run
+	}
+	scheduler.running = false
+	scheduler.ctx = nil
+	scheduler.cancel = nil
+}
+
+// desiredCards returns the cards that need a polling worker: those with a
+// status action and standard polling enabled. Start and Reconcile share it so
+// both apply the same rule.
+func (scheduler *Scheduler) desiredCards() map[string]config.ActionCard {
+	desired := make(map[string]config.ActionCard)
+	for _, card := range scheduler.store.ListCards() {
+		if card.PollingIntervalSeconds > 0 && card.Status != nil {
+			desired[card.ID] = card
+		}
+	}
+	return desired
 }
 
 // Stop cancels all polling workers and waits until they have returned.
@@ -129,7 +159,7 @@ func (scheduler *Scheduler) Stop() error {
 	}
 	cancel := scheduler.cancel
 	scheduler.running = false
-	scheduler.context = nil
+	scheduler.ctx = nil
 	scheduler.cancel = nil
 	scheduler.mu.Unlock()
 
@@ -156,12 +186,7 @@ func (scheduler *Scheduler) Reconcile() error {
 	for id, worker := range scheduler.workers {
 		current[id] = worker.card
 	}
-	desired := make(map[string]config.ActionCard)
-	for _, card := range scheduler.store.ListCards() {
-		if card.PollingIntervalSeconds > 0 && card.Status != nil {
-			desired[card.ID] = card
-		}
-	}
+	desired := scheduler.desiredCards()
 	stoppedWorkers := make([]*pollWorker, 0)
 	for id, worker := range scheduler.workers {
 		card, exists := desired[id]
@@ -181,7 +206,7 @@ func (scheduler *Scheduler) Reconcile() error {
 		scheduler.mu.Unlock()
 		return ErrSchedulerStopped
 	}
-	ctx := scheduler.context
+	ctx := scheduler.ctx
 	for id, card := range desired {
 		if _, exists := scheduler.workers[id]; !exists {
 			scheduler.startWorkerLocked(ctx, card)

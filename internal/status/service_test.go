@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"marionette/internal/config"
-	execengine "marionette/internal/exec"
+	"marionette/internal/execengine"
 )
 
 type fakeRunner struct {

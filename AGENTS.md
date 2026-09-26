@@ -28,11 +28,17 @@ nejprve navrhni jejich aktualizaci (ADR / requirements), teprve poté měň kód
 
 ## Architektura v kostce
 
-- `cmd/marionette` — entrypoint, spouští HTTP server jako službu
-- `internal/server` — HTTP routing (REST API + SPA fallback)
+- `cmd/marionette` — entrypoint: kompozice služeb, `slog`, lifecycle a
+  graceful shutdown
+- `internal/server` — čistě HTTP vrstva: routy, validace požadavků,
+  cross-site ochrana, SSE zápis, SPA fallback (žádné goroutiny mimo handlery)
+- `internal/config` — doménový model karet, in-memory store, JSON persistence
+- `internal/execengine` — bezpečné spouštění akcí (procesní skupina, timeout,
+  minimální prostředí) a limit souběžnosti
+- `internal/status` — vyhodnocení statusu karty a polling scheduler
+- `internal/actions` — fronta akcí na pozadí (bounded, deduplikace, drain)
+- `internal/events` — broker statusových událostí pro SSE
 - `internal/webui` — `go:embed` vestavěného `web/dist` do binárky
-- `internal/...` — doménové balíčky (akce, karty, config store) budou přidány
-  postupně dle [docs/plans/roadmap.md](docs/plans/roadmap.md)
 - `web` — Vue 3 + PrimeVue 4 (Aura theme) SPA, buildí se přes Vite do
   `internal/webui/dist`
 

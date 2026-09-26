@@ -11,81 +11,53 @@ import (
 	"time"
 
 	"marionette/internal/config"
+	"marionette/internal/events"
 )
 
-func TestStatusEventBrokerPublishesToSubscribers(t *testing.T) {
-	broker := NewStatusEventBroker()
-	subscriber, unsubscribe := broker.subscribe()
-	defer unsubscribe()
-
-	snapshot := config.StatusSnapshot{State: config.StatusStateOK}
-	broker.Publish("card-a", snapshot)
-
-	select {
-	case event := <-subscriber:
-		if event.ID != 1 || event.CardID != "card-a" || event.Snapshot.State != config.StatusStateOK {
-			t.Fatalf("event = %#v", event)
-		}
-	case <-time.After(time.Second):
-		t.Fatal("timed out waiting for status event")
-	}
-}
-
-func TestStatusEventBrokerKeepsNewestEventForSlowSubscriber(t *testing.T) {
-	broker := NewStatusEventBroker()
-	subscriber, unsubscribe := broker.subscribe()
-	defer unsubscribe()
-
-	for index := 1; index <= 9; index++ {
-		broker.Publish("card-a", config.StatusSnapshot{State: config.StatusStateOK})
-	}
-
-	var last StatusEvent
-	for {
-		select {
-		case last = <-subscriber:
-		default:
-			if last.ID != 9 {
-				t.Fatalf("last event ID = %d, want 9", last.ID)
-			}
-			return
-		}
-	}
-}
-
-func TestRouterWiresStoreStatusChangesToBroker(t *testing.T) {
+func TestNewRouterDoesNotMutateStoreAndStreamsBrokerEvents(t *testing.T) {
 	store := config.NewStore(config.Settings{HistorySize: 5, MaxConcurrentActions: 1})
-	card := config.ActionCard{
-		ID:      "card-status",
-		Name:    "Status card",
-		Primary: config.Action{Command: "primary", TimeoutSec: 1},
-		Status:  &config.Action{Command: "status", TimeoutSec: 1},
+	card := createServerCard(t, store, "wired")
+	broker := events.NewBroker()
+	handler := NewRouter(Dependencies{Store: store, Events: broker})
+	if store.OnStatusChange != nil {
+		t.Fatal("NewRouter must not install Store.OnStatusChange; that is the composition root's job")
 	}
-	if _, err := store.CreateCard(card); err != nil {
-		t.Fatalf("CreateCard() error = %v", err)
-	}
-	broker := NewStatusEventBroker()
-	subscriber, unsubscribe := broker.subscribe()
-	defer unsubscribe()
-	_ = NewRouterWithDependencies(RouterDependencies{Store: store, StatusEvents: broker})
+	// Composition root wiring, as done in cmd/marionette.
+	store.OnStatusChange = broker.Publish
 
+	testServer := httptest.NewServer(handler)
+	defer testServer.Close()
+	response, err := http.Get(testServer.URL + "/api/events")
+	if err != nil {
+		t.Fatalf("GET /api/events error = %v", err)
+	}
+	defer func() { _ = response.Body.Close() }()
+	reader := bufio.NewReader(response.Body)
+	if line, err := reader.ReadString('\n'); err != nil || line != ": connected\n" {
+		t.Fatalf("first SSE line = %q, %v", line, err)
+	}
 	if err := store.UpdateStatus(card.ID, config.StatusSnapshot{State: config.StatusStateOK}); err != nil {
 		t.Fatalf("UpdateStatus() error = %v", err)
 	}
-	select {
-	case event := <-subscriber:
-		if event.CardID != card.ID || event.Snapshot.State != config.StatusStateOK {
-			t.Fatalf("event = %#v", event)
+	var lines []string
+	for len(lines) < 4 {
+		line, err := reader.ReadString('\n')
+		if err != nil {
+			t.Fatalf("reading SSE stream: %v (got %q)", err, lines)
 		}
-	case <-time.After(time.Second):
-		t.Fatal("timed out waiting for router-wired status event")
+		lines = append(lines, line)
+	}
+	body := strings.Join(lines, "")
+	if !strings.Contains(body, "id: 1\n") || !strings.Contains(body, "event: status.changed\n") ||
+		!strings.Contains(body, `"cardId":"wired"`) || !strings.Contains(body, `"state":"ok"`) {
+		t.Fatalf("SSE body = %q", body)
 	}
 }
 
 func TestStatusEventsEndpointSetsSSEHeadersAndStopsWithRequest(t *testing.T) {
 	store := config.NewStore(config.Settings{HistorySize: 5, MaxConcurrentActions: 1})
-	broker := NewStatusEventBroker()
-	handler := NewRouterWithDependencies(RouterDependencies{Store: store, StatusEvents: broker})
+	broker := events.NewBroker()
+	handler := NewRouter(Dependencies{Store: store, Events: broker})
 	requestContext, cancel := context.WithCancel(context.Background())
 	request := httptest.NewRequest(http.MethodGet, "/api/events", nil).WithContext(requestContext)
 	response := httptest.NewRecorder()
@@ -101,8 +73,8 @@ func TestStatusEventsEndpointSetsSSEHeadersAndStopsWithRequest(t *testing.T) {
 
 func TestBrokerCloseEndsEventsHandler(t *testing.T) {
 	store := config.NewStore(config.Settings{HistorySize: 5, MaxConcurrentActions: 1})
-	broker := NewStatusEventBroker()
-	testServer := httptest.NewServer(NewRouterWithDependencies(RouterDependencies{Store: store, StatusEvents: broker}))
+	broker := events.NewBroker()
+	testServer := httptest.NewServer(NewRouter(Dependencies{Store: store, Events: broker}))
 	defer testServer.Close()
 
 	response, err := http.Get(testServer.URL + "/api/events")
@@ -139,9 +111,9 @@ func TestBrokerCloseEndsEventsHandler(t *testing.T) {
 
 func TestStatusEventsEndpointEndsImmediatelyWhenBrokerClosed(t *testing.T) {
 	store := config.NewStore(config.Settings{HistorySize: 5, MaxConcurrentActions: 1})
-	broker := NewStatusEventBroker()
+	broker := events.NewBroker()
 	broker.Close()
-	handler := NewRouterWithDependencies(RouterDependencies{Store: store, StatusEvents: broker})
+	handler := NewRouter(Dependencies{Store: store, Events: broker})
 	response := httptest.NewRecorder()
 	handler.ServeHTTP(response, httptest.NewRequest(http.MethodGet, "/api/events", nil))
 	if response.Code != http.StatusOK || !strings.Contains(response.Body.String(), ": connected\n\n") {

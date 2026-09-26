@@ -7,3 +7,6 @@ MARIONETTE_ADDR=:8080
 # Optional allowlist of Host values (host:port, comma-separated) accepted by
 # mutating API requests. Empty accepts any host.
 #MARIONETTE_ALLOWED_HOSTS=pi.local:8080,192.168.1.10:8080
+# Log format (text|json) and minimum level (debug|info|warn|error).
+#MARIONETTE_LOG_FORMAT=text
+#MARIONETTE_LOG_LEVEL=info

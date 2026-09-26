@@ -48,3 +48,11 @@ action.Args...)`; `Dir` a `Env` se nastaví přímo na `exec.Cmd`. Nebude se
 > rekonfigurace karty) ukončí proces s výsledkem `RunOutcomeCanceled`, který
 > se od `RunOutcomeTimeout` liší tím, že ho nevyvolal timeout akce. Status
 > check zrušený volajícím nemění poslední známý stav karty.
+
+> Doplněno 2026-09-26 (blok 0034): adresář balíčku byl přejmenován na
+> `internal/execengine`, aby odpovídal názvu balíčku. Spouštěný proces
+> **nedědí prostředí služby**: dostane jen `PATH`, `HOME`, `LANG` a `TZ`
+> (pokud jsou nastavené) a proměnné z `Action.Env`, které mají přednost
+> (NFR-01 c). Dopad pro uživatele: proměnné definované v
+> `/etc/default/marionette` nebo v systemd jednotce nejsou akcím dostupné;
+> co akce potřebuje, musí mít v `env` karty.

@@ -2,6 +2,7 @@ package status
 
 import (
 	"context"
+	"errors"
 	"sync"
 	"testing"
 	"time"
@@ -367,6 +368,71 @@ func TestSchedulerReconcileCancelsInFlightCheck(t *testing.T) {
 	}
 	if elapsed := time.Since(started); elapsed > 100*time.Millisecond {
 		t.Fatalf("Reconcile() waited %v for a check that should have been canceled", elapsed)
+	}
+	stopScheduler(t, scheduler)
+}
+
+func TestSchedulerDesiredCardsRequireStatusActionAndPolling(t *testing.T) {
+	store := config.NewStore(config.Settings{HistorySize: 5, MaxConcurrentActions: 1})
+	schedulerTestCard(t, store, "polled", 30, 0, 0)
+	schedulerTestCard(t, store, "no-polling", 0, 0, 0)
+	if _, err := store.CreateCard(config.ActionCard{
+		ID:                     "no-status",
+		Name:                   "no-status",
+		Primary:                config.Action{Command: "primary", TimeoutSec: 1},
+		PollingIntervalSeconds: 30,
+	}); err != nil {
+		t.Fatalf("CreateCard() error = %v", err)
+	}
+	scheduler, err := NewScheduler(store, &fakeChecker{calls: make(chan string, 8)})
+	if err != nil {
+		t.Fatalf("NewScheduler() error = %v", err)
+	}
+	desired := scheduler.desiredCards()
+	if len(desired) != 1 || desired["polled"].ID != "polled" {
+		t.Fatalf("desiredCards() = %v, want only \"polled\"", desired)
+	}
+	// Start applies the same rule: only the polled card gets a worker.
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	if err := scheduler.Start(ctx); err != nil {
+		t.Fatalf("Start() error = %v", err)
+	}
+	defer stopScheduler(t, scheduler)
+	scheduler.mu.Lock()
+	workers := len(scheduler.workers)
+	scheduler.mu.Unlock()
+	if workers != 1 {
+		t.Fatalf("workers after Start = %d, want 1", workers)
+	}
+}
+
+func TestSchedulerStopsWhenParentContextIsCanceled(t *testing.T) {
+	scheduler, _, _, cancel := newTestScheduler(t, "parent", 30, 0, 0)
+	cancel()
+	deadline := time.Now().Add(2 * time.Second)
+	for {
+		scheduler.mu.Lock()
+		running := scheduler.running
+		scheduler.mu.Unlock()
+		if !running {
+			break
+		}
+		if time.Now().After(deadline) {
+			t.Fatal("scheduler still running after the parent context was cancelled")
+		}
+		time.Sleep(5 * time.Millisecond)
+	}
+	if err := scheduler.Reconcile(); !errors.Is(err, ErrSchedulerStopped) {
+		t.Fatalf("Reconcile() after parent cancel error = %v, want ErrSchedulerStopped", err)
+	}
+	if err := scheduler.Stop(); !errors.Is(err, ErrSchedulerStopped) {
+		t.Fatalf("Stop() after parent cancel error = %v, want ErrSchedulerStopped", err)
+	}
+	ctx, cancelAgain := context.WithCancel(context.Background())
+	defer cancelAgain()
+	if err := scheduler.Start(ctx); err != nil {
+		t.Fatalf("Start() after parent cancel error = %v", err)
 	}
 	stopScheduler(t, scheduler)
 }

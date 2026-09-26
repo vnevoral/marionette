@@ -60,7 +60,9 @@ type Store struct {
 	OnChange func(*Store) error
 
 	// OnStatusChange is called after a status transition is stored. It runs
-	// outside the store lock and is intended for transient runtime consumers.
+	// outside the store lock and is intended for transient runtime consumers;
+	// the composition root wires it to the event broker. StatusSnapshot is a
+	// value type without references, so callers receive an independent copy.
 	OnStatusChange func(string, StatusSnapshot)
 }
 
@@ -236,45 +238,6 @@ func (store *Store) GetSettings() Settings {
 	return store.settings
 }
 
-// UpdateSettings validates and replaces the global settings. Histories are
-// trimmed to the newest records when the history limit is reduced.
-func (store *Store) UpdateSettings(settings Settings) error {
-	if err := settings.Validate(); err != nil {
-		return err
-	}
-
-	store.persistMu.Lock()
-	defer store.persistMu.Unlock()
-	store.mu.Lock()
-	previousSettings := store.settings
-	previousHistory := cloneHistory(store.history)
-	previousStatusHistory := make(map[string][]StatusChange, len(store.statusHistory))
-	for cardID, changes := range store.statusHistory {
-		previousStatusHistory[cardID] = cloneStatusChanges(changes)
-	}
-	store.settings = settings
-	for cardID, histories := range store.history {
-		for actionKind, runs := range histories {
-			store.history[cardID][actionKind] = trimRuns(runs, settings.HistorySize)
-		}
-	}
-	for cardID, changes := range store.statusHistory {
-		store.statusHistory[cardID] = trimStatusChanges(changes, settings.HistorySize)
-	}
-	store.changes++
-	store.mu.Unlock()
-	if err := store.notifyChange(); err != nil {
-		store.mu.Lock()
-		store.settings = previousSettings
-		store.changes++
-		store.history = previousHistory
-		store.statusHistory = previousStatusHistory
-		store.mu.Unlock()
-		return &PersistenceError{Operation: "settings update", Err: err}
-	}
-	return nil
-}
-
 // AppendRun adds a run to the card and action history, retaining only the
 // newest Settings.HistorySize records.
 func (store *Store) AppendRun(cardID string, run Run) error {
@@ -317,7 +280,7 @@ func (store *Store) GetStatus(cardID string) (StatusSnapshot, bool) {
 		return StatusSnapshot{}, false
 	}
 	snapshot, exists := store.statuses[cardID]
-	return cloneStatusSnapshot(snapshot), exists
+	return snapshot, exists
 }
 
 // GetStatusChanges returns the newest status transitions first.
@@ -350,7 +313,7 @@ func (store *Store) UpdateStatus(cardID string, snapshot StatusSnapshot) error {
 
 	previous, exists := store.statuses[cardID]
 	if exists && previous.State == snapshot.State {
-		store.statuses[cardID] = cloneStatusSnapshot(snapshot)
+		store.statuses[cardID] = snapshot
 		store.changes++
 		store.mu.Unlock()
 		return nil
@@ -369,12 +332,12 @@ func (store *Store) UpdateStatus(cardID string, snapshot StatusSnapshot) error {
 	}
 	change := StatusChange{State: snapshot.State, StartedAt: snapshot.CheckedAt}
 	store.statusHistory[cardID] = trimStatusChanges(append([]StatusChange{change}, changes...), store.settings.HistorySize)
-	store.statuses[cardID] = cloneStatusSnapshot(snapshot)
+	store.statuses[cardID] = snapshot
 	store.changes++
 	onStatusChange := store.OnStatusChange
 	store.mu.Unlock()
 	if onStatusChange != nil {
-		onStatusChange(cardID, cloneStatusSnapshot(snapshot))
+		onStatusChange(cardID, snapshot)
 	}
 	return nil
 }
@@ -390,18 +353,6 @@ func (store *Store) notifyChange() error {
 
 func validStatusState(state StatusState) bool {
 	return state == StatusStateUnknown || state == StatusStateOK || state == StatusStateFail
-}
-
-func cloneHistory(history map[string]map[string][]Run) map[string]map[string][]Run {
-	cloned := make(map[string]map[string][]Run, len(history))
-	for cardID, histories := range history {
-		clonedHistories := make(map[string][]Run, len(histories))
-		for actionKind, runs := range histories {
-			clonedHistories[actionKind] = append([]Run(nil), runs...)
-		}
-		cloned[cardID] = clonedHistories
-	}
-	return cloned
 }
 
 func generateCardID() (string, error) {
@@ -424,10 +375,6 @@ func trimStatusChanges(changes []StatusChange, limit int) []StatusChange {
 		return changes
 	}
 	return changes[:limit]
-}
-
-func cloneStatusSnapshot(snapshot StatusSnapshot) StatusSnapshot {
-	return snapshot
 }
 
 func cloneStatusChanges(changes []StatusChange) []StatusChange {

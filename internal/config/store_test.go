@@ -40,9 +40,6 @@ func TestStoreCRUD(t *testing.T) {
 		t.Fatalf("UpdateCard() returned %#v", updated)
 	}
 
-	if err := store.UpdateSettings(Settings{}); err == nil {
-		t.Fatal("UpdateSettings() accepted invalid settings")
-	}
 	if _, err := store.UpdateCard("missing", validCard()); !errors.Is(err, ErrNotFound) {
 		t.Fatalf("UpdateCard() error = %v, want ErrNotFound", err)
 	}
@@ -156,32 +153,6 @@ func TestStoreRunHistory(t *testing.T) {
 	}
 	if _, err := store.GetRuns("missing", "primary"); !errors.Is(err, ErrNotFound) {
 		t.Fatalf("GetRuns(missing) error = %v, want ErrNotFound", err)
-	}
-}
-
-func TestStoreUpdateSettingsTrimsHistory(t *testing.T) {
-	store := NewStore(validSettings())
-	card, err := store.CreateCard(validCard())
-	if err != nil {
-		t.Fatalf("CreateCard() error = %v", err)
-	}
-	for index := 1; index <= 3; index++ {
-		if err := store.AppendRun(card.ID, Run{ActionKind: "primary", ExitCode: index}); err != nil {
-			t.Fatalf("AppendRun() error = %v", err)
-		}
-	}
-
-	settings := validSettings()
-	settings.HistorySize = 1
-	if err := store.UpdateSettings(settings); err != nil {
-		t.Fatalf("UpdateSettings() error = %v", err)
-	}
-	runs, err := store.GetRuns(card.ID, "primary")
-	if err != nil {
-		t.Fatalf("GetRuns() error = %v", err)
-	}
-	if len(runs) != 1 || runs[0].ExitCode != 3 {
-		t.Fatalf("GetRuns() = %#v, want newest run only", runs)
 	}
 }
 
@@ -377,7 +348,9 @@ func TestStoreStatusTransitionsIgnoreRepeatedChecks(t *testing.T) {
 }
 
 func TestStoreStatusHistoryTrimsWithSettings(t *testing.T) {
-	store := NewStore(validSettings())
+	settings := validSettings()
+	settings.HistorySize = 2
+	store := NewStore(settings)
 	card, err := store.CreateCard(validCard())
 	if err != nil {
 		t.Fatalf("CreateCard() error = %v", err)
@@ -387,11 +360,6 @@ func TestStoreStatusHistoryTrimsWithSettings(t *testing.T) {
 		if err := store.UpdateStatus(card.ID, StatusSnapshot{State: state, CheckedAt: base.Add(time.Duration(index) * time.Second)}); err != nil {
 			t.Fatalf("UpdateStatus() error = %v", err)
 		}
-	}
-	settings := validSettings()
-	settings.HistorySize = 2
-	if err := store.UpdateSettings(settings); err != nil {
-		t.Fatalf("UpdateSettings() error = %v", err)
 	}
 	changes, err := store.GetStatusChanges(card.ID)
 	if err != nil || len(changes) != 2 {
@@ -480,15 +448,6 @@ func TestStoreRollsBackMutationsWhenPersistenceFails(t *testing.T) {
 	if changes, err := store.GetStatusChanges(card.ID); err != nil || len(changes) != 1 {
 		t.Fatalf("status history not restored after failed delete: %v, %v", changes, err)
 	}
-
-	settings := validSettings()
-	settings.HistorySize = 1
-	if err := store.UpdateSettings(settings); !errors.As(err, &persistenceErr) {
-		t.Fatalf("UpdateSettings() error = %v", err)
-	}
-	if got := store.GetSettings(); got != validSettings() {
-		t.Fatalf("settings changed despite persistence failure: %#v", got)
-	}
 }
 
 func TestStoreErrorsAreClassifiable(t *testing.T) {
@@ -552,9 +511,9 @@ func TestStoreDirtyTracksChangesSinceHistorySave(t *testing.T) {
 	if !store.Dirty() {
 		t.Fatal("SaveFile without history must not clear the dirty flag")
 	}
-	loaded, err := LoadFile(path)
+	loaded, err := LoadFile(path, nil)
 	if err != nil {
-		t.Fatalf("LoadFile() error = %v", err)
+		t.Fatalf("LoadFile(, nil) error = %v", err)
 	}
 	if loaded.Dirty() {
 		t.Fatal("freshly loaded store must not be dirty")

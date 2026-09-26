@@ -6,8 +6,13 @@ happens in this repo's dev container on any host.
 
 ## Layout
 
-- `cmd/marionette` — application entrypoint
-- `internal/server` — HTTP routing (API + SPA fallback)
+- `cmd/marionette` — application entrypoint (composition, logging, lifecycle)
+- `internal/server` — HTTP layer (API routes, SSE, SPA fallback)
+- `internal/config` — card domain model, in-memory store, JSON persistence
+- `internal/execengine` — action execution (process groups, timeouts, minimal environment)
+- `internal/status` — status checks and polling scheduler
+- `internal/actions` — background action queue
+- `internal/events` — status event broker feeding SSE
 - `internal/webui` — embeds `web/dist` (the built SPA) into the Go binary via `go:embed`
 - `web` — Vue 3 + PrimeVue SPA source (built with Vite)
 
@@ -65,6 +70,17 @@ service. Runtime settings are read from `/etc/default/marionette`:
 | `MARIONETTE_ADDR`             | `:8080`             | HTTP listen address.                                                                                      |
 | `MARIONETTE_SHUTDOWN_TIMEOUT` | `20s`               | Total budget for a graceful stop (Go duration). Keep it below the unit's `TimeoutStopSec` (90 s default). |
 | `MARIONETTE_ALLOWED_HOSTS`    | empty               | Comma-separated `host:port` values accepted for mutating API requests; empty accepts any host.            |
+| `MARIONETTE_LOG_FORMAT`       | `text`              | `text` (journald friendly) or `json` structured logs.                                                     |
+| `MARIONETTE_LOG_LEVEL`        | `info`              | Minimum log level: `debug`, `info`, `warn` or `error`.                                                    |
+
+Global settings (`historySize`, `maxConcurrentActions`) live in the
+`settings` object of the configuration file. There is no API for them: edit
+the file and restart the service for a change to take effect.
+
+Actions do not inherit the service environment. Each process gets only
+`PATH`, `HOME`, `LANG` and `TZ` from the service plus the variables defined
+on the action itself, so secrets in `/etc/default/marionette` never reach
+user-configured commands.
 
 On `SIGTERM`/`SIGINT` Marionette stops accepting requests, closes the live
 status streams, saves the configuration and run history, discards queued

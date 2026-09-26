@@ -52,6 +52,13 @@ serveru do připojených browser klientů.
 - V MVP se nepersistuje event log a klient nemůže žádat historické události;
   při reconnectu načte aktuální projekci přes REST.
 
+## Doplnění 2026-09-26 (blok 0034)
+
+Broadcaster žije v samostatném balíčku `internal/events` (`events.Broker`
+s `Publish`, `Subscribe`, `Close`, `Done`); `internal/server` obsahuje jen
+SSE zápis přes rozhraní `EventSource`. Napojení `Store.OnStatusChange →
+Broker.Publish` provádí kompoziční kořen v `cmd/marionette`, ne router.
+
 ## Doplnění 2026-09-26 (blok 0027)
 
 Broadcaster (`StatusEventBroker`) má `Close()`, které při řízeném ukončení
