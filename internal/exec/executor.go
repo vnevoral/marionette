@@ -9,6 +9,7 @@ import (
 	"os"
 	"os/exec"
 	"regexp"
+	"syscall"
 	"time"
 
 	"marionette/internal/config"
@@ -54,19 +55,31 @@ func NewExecutorWithFactory(factory ProcessFactory) (*Executor, error) {
 	return &Executor{factory: factory}, nil
 }
 
-// Execute validates and runs one action. Process failures are represented in
-// Result with RunOutcomeFail; the returned error is reserved for invalid input
-// and executor setup failures.
-func (executor *Executor) Execute(action config.Action) (Result, error) {
+// processWaitDelay bounds how long Wait blocks on the output pipe after the
+// process was killed. Grandchildren that inherited stdout/stderr keep the pipe
+// open even though the whole process group received SIGKILL; without the delay
+// a timed-out action would hold its concurrency slot until they exit.
+const processWaitDelay = 2 * time.Second
+
+// Execute validates and runs one action. The action timeout is derived from
+// ctx, so canceling ctx terminates the process early and yields
+// RunOutcomeCanceled, whereas an expired action timeout yields
+// RunOutcomeTimeout. Process failures are represented in Result with
+// RunOutcomeFail; the returned error is reserved for invalid input and
+// executor setup failures.
+func (executor *Executor) Execute(ctx context.Context, action config.Action) (Result, error) {
+	if ctx == nil {
+		return Result{}, errors.New("context is required")
+	}
 	if err := action.Validate(); err != nil {
 		return Result{}, fmt.Errorf("validate action: %w", err)
 	}
 
 	startedAt := time.Now()
-	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(action.TimeoutSec)*time.Second)
+	runContext, cancel := context.WithTimeout(ctx, time.Duration(action.TimeoutSec)*time.Second)
 	defer cancel()
 
-	process, err := executor.factory.New(ctx, action)
+	process, err := executor.factory.New(runContext, action)
 	if err != nil {
 		return Result{}, fmt.Errorf("create process: %w", err)
 	}
@@ -86,9 +99,12 @@ func (executor *Executor) Execute(action config.Action) (Result, error) {
 	if processErr != nil {
 		result.ExitCode = exitCode(processErr)
 		result.Outcome = config.RunOutcomeFail
-		if errors.Is(ctx.Err(), context.DeadlineExceeded) {
+		switch {
+		case ctx.Err() != nil:
+			result.Outcome = config.RunOutcomeCanceled
+		case errors.Is(runContext.Err(), context.DeadlineExceeded):
 			result.Outcome = config.RunOutcomeTimeout
-		} else if result.ExitCode == 0 {
+		case result.ExitCode == 0:
 			result.Outcome, err = Evaluate(action.Rule, result.ExitCode, result.Output)
 		}
 	} else {
@@ -170,7 +186,26 @@ func (osProcessFactory) New(ctx context.Context, action config.Action) (Process,
 	command := exec.CommandContext(ctx, action.Command, action.Args...)
 	command.Dir = action.Dir
 	command.Env = actionEnvironment(action.Env)
+	// The action runs in its own process group so that cancellation kills the
+	// whole tree (shell wrappers, ssh, background children), not only the
+	// direct child. See ADR-0005 and FR-19.
+	command.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
+	command.Cancel = func() error {
+		return killProcessGroup(command)
+	}
+	command.WaitDelay = processWaitDelay
 	return osProcess{command: command}, nil
+}
+
+func killProcessGroup(command *exec.Cmd) error {
+	if command.Process == nil {
+		return nil
+	}
+	err := syscall.Kill(-command.Process.Pid, syscall.SIGKILL)
+	if errors.Is(err, syscall.ESRCH) {
+		return os.ErrProcessDone
+	}
+	return err
 }
 
 func (process osProcess) SetOutput(writer io.Writer) {

@@ -42,7 +42,7 @@ export interface Run {
 	exitCode: number;
 	output: string;
 	truncated: boolean;
-	outcome: "ok" | "fail" | "timeout";
+	outcome: "ok" | "fail" | "timeout" | "canceled";
 }
 
 export interface StatusSnapshot {

@@ -81,18 +81,21 @@ function currentStatusView() {
 function outcomeLabel(outcome: Run["outcome"]) {
 	if (outcome === "ok") return "Successful";
 	if (outcome === "timeout") return "Timed out";
+	if (outcome === "canceled") return "Canceled";
 	return "Failed";
 }
 
 function outcomeTone(outcome: Run["outcome"]): StatusTone {
 	if (outcome === "ok") return "healthy";
 	if (outcome === "timeout") return "warning";
+	if (outcome === "canceled") return "unknown";
 	return "problem";
 }
 
 function outcomeIcon(outcome: Run["outcome"]) {
 	if (outcome === "ok") return "pi pi-check-circle";
 	if (outcome === "timeout") return "pi pi-clock";
+	if (outcome === "canceled") return "pi pi-ban";
 	return "pi pi-times-circle";
 }
 

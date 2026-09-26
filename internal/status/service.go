@@ -2,6 +2,7 @@
 package status
 
 import (
+	"context"
 	"errors"
 	"fmt"
 
@@ -9,11 +10,17 @@ import (
 	execengine "marionette/internal/exec"
 )
 
-// ErrStatusActionMissing is returned when a card has no status action configured.
-var ErrStatusActionMissing = errors.New("status action is not configured")
+// Errors returned by StatusCheckService.CheckNow.
+var (
+	// ErrStatusActionMissing is returned when a card has no status action configured.
+	ErrStatusActionMissing = errors.New("status action is not configured")
+	// ErrStatusCheckCanceled is returned when the caller canceled the check
+	// before it finished; the status projection is left untouched.
+	ErrStatusCheckCanceled = errors.New("status check canceled")
+)
 
 type runner interface {
-	Run(config.Action) (execengine.Result, error)
+	Run(context.Context, config.Action) (execengine.Result, error)
 }
 
 // StatusCheckService runs status actions and records their interpreted result.
@@ -33,8 +40,10 @@ func NewStatusCheckService(store *config.Store, actionRunner runner) (*StatusChe
 	return &StatusCheckService{store: store, runner: actionRunner}, nil
 }
 
-// CheckNow executes the configured status action for one card and updates its status projection.
-func (service *StatusCheckService) CheckNow(cardID string) (config.StatusSnapshot, error) {
+// CheckNow executes the configured status action for one card and updates its
+// status projection. Canceling ctx aborts the check without changing the
+// last known status.
+func (service *StatusCheckService) CheckNow(ctx context.Context, cardID string) (config.StatusSnapshot, error) {
 	card, exists := service.store.GetCard(cardID)
 	if !exists {
 		return config.StatusSnapshot{}, config.ErrNotFound
@@ -43,9 +52,12 @@ func (service *StatusCheckService) CheckNow(cardID string) (config.StatusSnapsho
 		return config.StatusSnapshot{}, ErrStatusActionMissing
 	}
 
-	result, err := service.runner.Run(*card.Status)
+	result, err := service.runner.Run(ctx, *card.Status)
 	if err != nil {
 		return config.StatusSnapshot{}, fmt.Errorf("run status action: %w", err)
+	}
+	if result.Outcome == config.RunOutcomeCanceled {
+		return config.StatusSnapshot{}, ErrStatusCheckCanceled
 	}
 	snapshot := config.StatusSnapshot{
 		State:     stateFromOutcome(result.Outcome),

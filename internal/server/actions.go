@@ -1,6 +1,7 @@
 package server
 
 import (
+	"context"
 	"errors"
 	"log"
 	"sync"
@@ -17,12 +18,12 @@ var (
 
 // ActionRunner executes one configured action through the shared concurrency limit.
 type ActionRunner interface {
-	Run(config.Action) (execengine.Result, error)
+	Run(context.Context, config.Action) (execengine.Result, error)
 }
 
 // StatusChecker runs one status action and updates the status projection.
 type StatusChecker interface {
-	CheckNow(string) (config.StatusSnapshot, error)
+	CheckNow(context.Context, string) (config.StatusSnapshot, error)
 }
 
 // PrimaryActionNotifier activates fast polling after a primary action is accepted.
@@ -48,9 +49,12 @@ type BackgroundActions struct {
 	statusChecker StatusChecker
 	store         *config.Store
 
+	ctx    context.Context
+	cancel context.CancelFunc
+
 	mu      sync.Mutex
 	closed  bool
-	jobs    chan func()
+	jobs    chan func(context.Context)
 	group   sync.WaitGroup
 	pending sync.WaitGroup
 }
@@ -68,11 +72,14 @@ func NewBackgroundActions(store *config.Store, runner ActionRunner, statusChecke
 	}
 	workers := store.GetSettings().MaxConcurrentActions
 	queueCapacity := workers * 4
+	ctx, cancel := context.WithCancel(context.Background())
 	actions := &BackgroundActions{
 		store:         store,
 		runner:        runner,
 		statusChecker: statusChecker,
-		jobs:          make(chan func(), queueCapacity),
+		ctx:           ctx,
+		cancel:        cancel,
+		jobs:          make(chan func(context.Context), queueCapacity),
 	}
 	for range workers {
 		actions.group.Add(1)
@@ -83,8 +90,8 @@ func NewBackgroundActions(store *config.Store, runner ActionRunner, statusChecke
 
 // EnqueuePrimary schedules a primary action without waiting for process completion.
 func (actions *BackgroundActions) EnqueuePrimary(cardID string, action config.Action) error {
-	return actions.enqueue(func() {
-		result, err := actions.runner.Run(action)
+	return actions.enqueue(func(ctx context.Context) {
+		result, err := actions.runner.Run(ctx, action)
 		if err != nil {
 			log.Printf("primary action %q failed: %v", cardID, err)
 			return
@@ -97,19 +104,26 @@ func (actions *BackgroundActions) EnqueuePrimary(cardID string, action config.Ac
 
 // EnqueueStatus schedules a manual status action without waiting for its result.
 func (actions *BackgroundActions) EnqueueStatus(cardID string) error {
-	return actions.enqueue(func() {
-		if _, err := actions.statusChecker.CheckNow(cardID); err != nil {
+	return actions.enqueue(func(ctx context.Context) {
+		if _, err := actions.statusChecker.CheckNow(ctx, cardID); err != nil && ctx.Err() == nil {
 			log.Printf("status action %q failed: %v", cardID, err)
 		}
 	})
 }
 
-// Close rejects new actions and waits for accepted actions to finish.
+// Close rejects new actions, cancels the context shared by accepted actions so
+// that running processes are terminated, and waits for the workers to return.
+// Block 0027 refines this into a graceful drain with a bounded grace period.
 func (actions *BackgroundActions) Close() {
 	actions.mu.Lock()
+	if actions.closed {
+		actions.mu.Unlock()
+		return
+	}
 	actions.closed = true
 	close(actions.jobs)
 	actions.mu.Unlock()
+	actions.cancel()
 	actions.Wait()
 	actions.group.Wait()
 }
@@ -119,7 +133,7 @@ func (actions *BackgroundActions) Wait() {
 	actions.pending.Wait()
 }
 
-func (actions *BackgroundActions) enqueue(job func()) error {
+func (actions *BackgroundActions) enqueue(job func(context.Context)) error {
 	actions.mu.Lock()
 	defer actions.mu.Unlock()
 	if actions.closed {
@@ -138,7 +152,7 @@ func (actions *BackgroundActions) enqueue(job func()) error {
 func (actions *BackgroundActions) runWorker() {
 	defer actions.group.Done()
 	for job := range actions.jobs {
-		job()
+		job(actions.ctx)
 		actions.pending.Done()
 	}
 }

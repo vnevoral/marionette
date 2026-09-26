@@ -136,6 +136,9 @@ const (
 	RunOutcomeFail RunOutcome = "fail"
 	// RunOutcomeTimeout indicates execution was forcibly terminated after timeout.
 	RunOutcomeTimeout RunOutcome = "timeout"
+	// RunOutcomeCanceled indicates the caller canceled execution (for example
+	// during shutdown or card reconfiguration) before the action finished.
+	RunOutcomeCanceled RunOutcome = "canceled"
 )
 
 // Run records one execution of a primary or status action.

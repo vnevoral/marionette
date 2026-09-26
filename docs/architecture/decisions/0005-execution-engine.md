@@ -39,3 +39,12 @@ action.Args...)`; `Dir` a `Env` se nastaví přímo na `exec.Cmd`. Nebude se
   akce.
 - Engine nebude řešit konfiguraci karet, polling ani HTTP API; ty patří do
   config store, fáze 4 a fáze 5.
+
+> Doplněno 2026-09-26 (blok 0024): terminace po timeoutu zabíjí celou
+> **procesní skupinu** akce (`Setpgid` + `SIGKILL` na `-pgid`), ne jen přímého
+> potomka, a `Cmd.WaitDelay` (2 s) ohraničuje čekání na uzavření výstupního
+> pipe drženého případnými přeživšími procesy. `Executor.Execute` a
+> `Runner.Run` přijímají kontext volajícího; jeho zrušení (shutdown,
+> rekonfigurace karty) ukončí proces s výsledkem `RunOutcomeCanceled`, který
+> se od `RunOutcomeTimeout` liší tím, že ho nevyvolal timeout akce. Status
+> check zrušený volajícím nemění poslední známý stav karty.

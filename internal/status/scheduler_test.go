@@ -11,10 +11,17 @@ import (
 
 type fakeChecker struct {
 	calls chan string
+	// blockUntilCanceled makes CheckNow behave like a long-running status action
+	// that only returns once the scheduler cancels its context.
+	blockUntilCanceled bool
 }
 
-func (checker *fakeChecker) CheckNow(cardID string) (config.StatusSnapshot, error) {
+func (checker *fakeChecker) CheckNow(ctx context.Context, cardID string) (config.StatusSnapshot, error) {
 	checker.calls <- cardID
+	if checker.blockUntilCanceled {
+		<-ctx.Done()
+		return config.StatusSnapshot{}, ErrStatusCheckCanceled
+	}
 	return config.StatusSnapshot{State: config.StatusStateOK}, nil
 }
 
@@ -332,4 +339,34 @@ func stopScheduler(t *testing.T, scheduler *Scheduler) {
 	if err := scheduler.Stop(); err != nil {
 		t.Fatalf("stop scheduler: %v", err)
 	}
+}
+
+func TestSchedulerReconcileCancelsInFlightCheck(t *testing.T) {
+	store := config.NewStore(config.Settings{HistorySize: 5, MaxConcurrentActions: 1})
+	const cardID = "slow"
+	schedulerTestCard(t, store, cardID, 10, 2, 5)
+	checker := &fakeChecker{calls: make(chan string, 8), blockUntilCanceled: true}
+	scheduler, err := NewScheduler(store, checker)
+	if err != nil {
+		t.Fatalf("NewScheduler() error = %v", err)
+	}
+	scheduler.clock = newFakeClock()
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	if err := scheduler.Start(ctx); err != nil {
+		t.Fatalf("Start() error = %v", err)
+	}
+	waitForInitialCheck(t, checker, cardID)
+
+	if err := store.DeleteCard(cardID); err != nil {
+		t.Fatalf("DeleteCard() error = %v", err)
+	}
+	started := time.Now()
+	if err := scheduler.Reconcile(); err != nil {
+		t.Fatalf("Reconcile() error = %v", err)
+	}
+	if elapsed := time.Since(started); elapsed > 100*time.Millisecond {
+		t.Fatalf("Reconcile() waited %v for a check that should have been canceled", elapsed)
+	}
+	stopScheduler(t, scheduler)
 }

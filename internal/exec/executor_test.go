@@ -6,7 +6,9 @@ import (
 	"io"
 	"os/exec"
 	"path/filepath"
+	"strconv"
 	"strings"
+	"syscall"
 	"testing"
 	"time"
 
@@ -61,7 +63,7 @@ func TestExecutorRunsActionAndCapturesTiming(t *testing.T) {
 	action.Args = []string{"hello"}
 	action.Dir = filepath.Dir(t.TempDir())
 	action.Env = map[string]string{"MARIONETTE_TEST": "yes"}
-	result, err := executor.Execute(action)
+	result, err := executor.Execute(context.Background(), action)
 	if err != nil {
 		t.Fatalf("Execute() error = %v", err)
 	}
@@ -83,7 +85,7 @@ func TestExecutorReturnsFailureForProcessError(t *testing.T) {
 		t.Fatalf("NewExecutorWithFactory() error = %v", err)
 	}
 
-	result, err := executor.Execute(validAction())
+	result, err := executor.Execute(context.Background(), validAction())
 	if err != nil {
 		t.Fatalf("Execute() error = %v", err)
 	}
@@ -98,7 +100,7 @@ func TestExecutorRejectsInvalidAction(t *testing.T) {
 		t.Fatalf("NewExecutorWithFactory() error = %v", err)
 	}
 
-	if _, err := executor.Execute(config.Action{}); err == nil {
+	if _, err := executor.Execute(context.Background(), config.Action{}); err == nil {
 		t.Fatal("Execute() accepted an invalid action")
 	}
 }
@@ -118,7 +120,7 @@ func TestExecutorCapturesCombinedOutputAtLimit(t *testing.T) {
 		t.Fatalf("NewExecutorWithFactory() error = %v", err)
 	}
 
-	result, err := executor.Execute(validAction())
+	result, err := executor.Execute(context.Background(), validAction())
 	if err != nil {
 		t.Fatalf("Execute() error = %v", err)
 	}
@@ -128,7 +130,7 @@ func TestExecutorCapturesCombinedOutputAtLimit(t *testing.T) {
 
 	process.stdout = strings.Repeat("b", outputLimit)
 	process.stderr = "stderr-after-limit"
-	result, err = executor.Execute(validAction())
+	result, err = executor.Execute(context.Background(), validAction())
 	if err != nil {
 		t.Fatalf("Execute() second error = %v", err)
 	}
@@ -192,7 +194,7 @@ func TestExecutorTimeoutTerminatesProcess(t *testing.T) {
 	action.TimeoutSec = 1
 
 	started := time.Now()
-	result, err := executor.Execute(action)
+	result, err := executor.Execute(context.Background(), action)
 	if err != nil {
 		t.Fatalf("Execute() error = %v", err)
 	}
@@ -202,6 +204,108 @@ func TestExecutorTimeoutTerminatesProcess(t *testing.T) {
 	if time.Since(started) >= 2*time.Second {
 		t.Fatalf("timeout took too long: %v", time.Since(started))
 	}
+}
+
+func TestExecutorKillsProcessGroupOnTimeout(t *testing.T) {
+	executor := NewExecutor()
+	action := validAction()
+	action.Command = "sh"
+	// The shell prints its own PID (which is also the process group ID) and
+	// then waits for a background child that inherited the output pipe.
+	action.Args = []string{"-c", "echo $$; sleep 30 & wait"}
+	action.TimeoutSec = 1
+
+	started := time.Now()
+	result, err := executor.Execute(context.Background(), action)
+	if err != nil {
+		t.Fatalf("Execute() error = %v", err)
+	}
+	if result.Outcome != config.RunOutcomeTimeout {
+		t.Fatalf("Execute() outcome = %q, want timeout; result = %#v", result.Outcome, result)
+	}
+	if elapsed := time.Since(started); elapsed >= 3*time.Second {
+		t.Fatalf("timeout with a background child took %v, want < 3s", elapsed)
+	}
+	pgid, err := strconv.Atoi(strings.TrimSpace(result.Output))
+	if err != nil {
+		t.Fatalf("output %q does not contain the shell PID: %v", result.Output, err)
+	}
+	waitForProcessGroupExit(t, pgid)
+}
+
+func TestExecutorDoesNotHoldSlotForDetachedGrandchild(t *testing.T) {
+	if _, err := exec.LookPath("setsid"); err != nil {
+		t.Skip("setsid not available")
+	}
+	executor := NewExecutor()
+	action := validAction()
+	action.Command = "sh"
+	// setsid moves the child into a new session, so it survives the group kill
+	// and keeps the output pipe open; WaitDelay must bound how long we wait.
+	action.Args = []string{"-c", "setsid sleep 6 & wait"}
+	action.TimeoutSec = 1
+
+	started := time.Now()
+	result, err := executor.Execute(context.Background(), action)
+	if err != nil {
+		t.Fatalf("Execute() error = %v", err)
+	}
+	if result.Outcome != config.RunOutcomeTimeout {
+		t.Fatalf("Execute() outcome = %q, want timeout; result = %#v", result.Outcome, result)
+	}
+	if elapsed := time.Since(started); elapsed >= 5*time.Second {
+		t.Fatalf("Execute() returned after %v, want < 5s (timeout + WaitDelay)", elapsed)
+	}
+}
+
+func TestExecutorCanceledByCaller(t *testing.T) {
+	factory := &runnerProcessFactory{started: make(chan struct{}, 1), waitContext: true}
+	executor, err := NewExecutorWithFactory(factory)
+	if err != nil {
+		t.Fatalf("NewExecutorWithFactory() error = %v", err)
+	}
+	action := validAction()
+	action.TimeoutSec = 30
+	ctx, cancel := context.WithCancel(context.Background())
+	done := make(chan Result, 1)
+	go func() {
+		result, err := executor.Execute(ctx, action)
+		if err != nil {
+			t.Errorf("Execute() error = %v", err)
+		}
+		done <- result
+	}()
+	<-factory.started
+	cancel()
+	select {
+	case result := <-done:
+		if result.Outcome != config.RunOutcomeCanceled {
+			t.Fatalf("Execute() outcome = %q, want canceled; result = %#v", result.Outcome, result)
+		}
+	case <-time.After(time.Second):
+		t.Fatal("Execute() did not return after the caller canceled the context")
+	}
+}
+
+func TestExecutorRejectsNilContext(t *testing.T) {
+	executor := NewExecutor()
+	//nolint:staticcheck // passing nil on purpose to verify the guard
+	if _, err := executor.Execute(nil, validAction()); err == nil {
+		t.Fatal("Execute() accepted a nil context")
+	}
+}
+
+func waitForProcessGroupExit(t *testing.T, pgid int) {
+	t.Helper()
+	deadline := time.Now().Add(time.Second)
+	for time.Now().Before(deadline) {
+		err := syscall.Kill(-pgid, 0)
+		if errors.Is(err, syscall.ESRCH) {
+			return
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+	t.Fatalf("process group %d still exists after timeout", pgid)
 }
 
 func TestExitCodeFromExecError(t *testing.T) {

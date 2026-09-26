@@ -3,7 +3,7 @@
 - **Fáze**: 8 — Zpevnění
 - **Vazba na požadavky**: FR-11, FR-19, FR-18, NFR-04, NFR-07
 - **Vazba na ADR**: ADR-0005
-- **Stav**: Schváleno
+- **Stav**: Hotovo
 - **Závislosti**: Bloky 0004–0006 (execution engine), 0009 (scheduler), 0011 (orchestrace)
 
 ## Cíl bloku
@@ -92,6 +92,28 @@ Viz [Definition of Done](../../devops/definition-of-done.md) +:
 
 ## Uzavření
 
-- **Stav po implementaci**: čeká
-- **Ověření**: čeká
-- **Dokumentace aktualizována**: čeká
+- **Stav po implementaci**: Hotovo (2026-09-26)
+- **Ověření**: `make verify` prošel (golangci-lint, eslint, vue-tsc,
+  prettier, `go test -race -count=1 ./...`, build, vet). Nové testy:
+  `TestExecutorKillsProcessGroupOnTimeout` (reálný `sh -c "echo $$; sleep 30
+  & wait"`, timeout 1 s → návrat za 1,0 s, outcome `timeout`, `kill(-pgid,
+  0)` hlásí ESRCH), `TestExecutorDoesNotHoldSlotForDetachedGrandchild`
+  (`setsid sleep 6` drží pipe → návrat za 3,0 s díky `WaitDelay`),
+  `TestExecutorCanceledByCaller`, `TestExecutorRejectsNilContext`,
+  `TestRunnerWaitForSlotHonoursContext`, `TestCheckNowCanceledDoesNotUpdateStatus`,
+  `TestSchedulerReconcileCancelsInFlightCheck` (Reconcile smazané karty s
+  blokovaným checkem skončí < 100 ms), `TestBackgroundActionsCloseCancelsRunningJob`
+  (vč. idempotentního druhého `Close`). Manuální end-to-end na reálné
+  binárce: karta `sh -c "echo $$; sleep 60 & wait"` s timeoutem 3 s → 202,
+  po 3,0 s záznam `outcome: timeout`, v procesní skupině ani mezi procesy
+  `sleep 60` nic nezůstalo.
+- **Odchylky od návrhu**: `BackgroundActions.Close()` nyní kontext jobů
+  ruší okamžitě (běžící akce při shutdownu skončí jako `canceled` a zapíší
+  se do historie); ochranné okno pro doběhnutí běžících akcí doplní blok
+  0027 dle svého návrhu. Chyba `ErrStatusCheckCanceled` je v balíčku
+  `status`; `internal/server` ji kvůli vrstvení nerozpoznává přes `errors.Is`,
+  ale přes `ctx.Err()`. Test s `setsid` se přeskočí, pokud binárka není
+  dostupná. Horní mez `TimeoutSec` zůstává na bloku 0028.
+- **Dokumentace aktualizována**: ano — ADR-0005 (poznámka o procesní skupině,
+  `WaitDelay` a `RunOutcomeCanceled`), godoc na `Execute`, `Run`, `CheckNow`,
+  `Close`; frontend zobrazuje `canceled` jako „Canceled“; roadmapa.

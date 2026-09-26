@@ -102,14 +102,14 @@ func TestRunnerLimitOneQueuesSecondAction(t *testing.T) {
 
 	firstDone := make(chan struct{})
 	go func() {
-		_, _ = runner.Run(validAction())
+		_, _ = runner.Run(context.Background(), validAction())
 		close(firstDone)
 	}()
 	<-factory.started
 
 	secondDone := make(chan struct{})
 	go func() {
-		_, _ = runner.Run(validAction())
+		_, _ = runner.Run(context.Background(), validAction())
 		close(secondDone)
 	}()
 	select {
@@ -133,7 +133,7 @@ func TestRunnerReleasesSlotAfterError(t *testing.T) {
 	runner := newRunner(t, settings, factory)
 
 	for range 2 {
-		result, err := runner.Run(validAction())
+		result, err := runner.Run(context.Background(), validAction())
 		if err != nil || result.Outcome != config.RunOutcomeFail {
 			t.Fatalf("Run() result = %#v, error = %v", result, err)
 		}
@@ -150,7 +150,7 @@ func TestRunnerReleasesSlotAfterTimeout(t *testing.T) {
 
 	firstDone := make(chan Result)
 	go func() {
-		result, _ := runner.Run(action)
+		result, _ := runner.Run(context.Background(), action)
 		firstDone <- result
 	}()
 	<-factory.started
@@ -161,7 +161,7 @@ func TestRunnerReleasesSlotAfterTimeout(t *testing.T) {
 
 	secondDone := make(chan Result)
 	go func() {
-		result, _ := runner.Run(action)
+		result, _ := runner.Run(context.Background(), action)
 		secondDone <- result
 	}()
 	select {
@@ -186,7 +186,7 @@ func TestRunnerDoesNotLoseConcurrentCalls(t *testing.T) {
 	for range calls {
 		go func() {
 			defer waitGroup.Done()
-			if _, err := runner.Run(validAction()); err != nil {
+			if _, err := runner.Run(context.Background(), validAction()); err != nil {
 				t.Errorf("Run() error = %v", err)
 			}
 		}()
@@ -194,5 +194,36 @@ func TestRunnerDoesNotLoseConcurrentCalls(t *testing.T) {
 	waitGroup.Wait()
 	if factory.maxActive.Load() > int32(settings.MaxConcurrentActions) {
 		t.Fatalf("max concurrent actions = %d, want <= %d", factory.maxActive.Load(), settings.MaxConcurrentActions)
+	}
+}
+
+func TestRunnerWaitForSlotHonoursContext(t *testing.T) {
+	factory := &runnerProcessFactory{started: make(chan struct{}, 1), release: make(chan struct{})}
+	settings := validRunnerSettings()
+	settings.MaxConcurrentActions = 1
+	runner := newRunner(t, settings, factory)
+
+	firstDone := make(chan struct{})
+	go func() {
+		_, _ = runner.Run(context.Background(), validAction())
+		close(firstDone)
+	}()
+	<-factory.started
+
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	started := time.Now()
+	_, err := runner.Run(ctx, validAction())
+	if !errors.Is(err, context.Canceled) {
+		t.Fatalf("Run() with canceled context error = %v, want context.Canceled", err)
+	}
+	if time.Since(started) > 100*time.Millisecond {
+		t.Fatalf("Run() blocked %v on the semaphore despite a canceled context", time.Since(started))
+	}
+
+	close(factory.release)
+	<-firstDone
+	if factory.maxActive.Load() != 1 {
+		t.Fatalf("max concurrent actions = %d, want 1", factory.maxActive.Load())
 	}
 }

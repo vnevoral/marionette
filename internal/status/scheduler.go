@@ -17,7 +17,7 @@ var (
 )
 
 type statusChecker interface {
-	CheckNow(string) (config.StatusSnapshot, error)
+	CheckNow(context.Context, string) (config.StatusSnapshot, error)
 }
 
 type schedulerTimer interface {
@@ -221,7 +221,7 @@ func (scheduler *Scheduler) runWorker(ctx context.Context, cardID string, worker
 	if !exists || card.PollingIntervalSeconds <= 0 || card.Status == nil {
 		return
 	}
-	_, _ = scheduler.checker.CheckNow(cardID)
+	_, _ = scheduler.checker.CheckNow(ctx, cardID)
 	timer := scheduler.clock.NewTimer(scheduler.nextInterval(card))
 	defer timer.Stop()
 
@@ -232,7 +232,7 @@ func (scheduler *Scheduler) runWorker(ctx context.Context, cardID string, worker
 		case <-worker.wake:
 			scheduler.resetTimer(timer, scheduler.nextInterval(card))
 		case <-timer.Chan():
-			_, _ = scheduler.checker.CheckNow(cardID)
+			_, _ = scheduler.checker.CheckNow(ctx, cardID)
 			card, exists = scheduler.store.GetCard(cardID)
 			if !exists || card.PollingIntervalSeconds <= 0 || card.Status == nil {
 				return

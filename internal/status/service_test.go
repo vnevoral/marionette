@@ -1,6 +1,7 @@
 package status
 
 import (
+	"context"
 	"errors"
 	"testing"
 	"time"
@@ -15,7 +16,7 @@ type fakeRunner struct {
 	action config.Action
 }
 
-func (runner *fakeRunner) Run(action config.Action) (execengine.Result, error) {
+func (runner *fakeRunner) Run(_ context.Context, action config.Action) (execengine.Result, error) {
 	runner.action = action
 	return runner.result, runner.err
 }
@@ -49,7 +50,7 @@ func TestCheckNowMapsOutcomeAndStoresSnapshot(t *testing.T) {
 		t.Fatalf("NewCheckService() error = %v", err)
 	}
 
-	snapshot, err := service.CheckNow(card.ID)
+	snapshot, err := service.CheckNow(context.Background(), card.ID)
 	if err != nil {
 		t.Fatalf("CheckNow() error = %v", err)
 	}
@@ -72,11 +73,11 @@ func TestCheckNowDoesNotDuplicateRepeatedState(t *testing.T) {
 	card := testStatusCard(t, store)
 	service, _ := NewStatusCheckService(store, runner)
 
-	if _, err := service.CheckNow(card.ID); err != nil {
+	if _, err := service.CheckNow(context.Background(), card.ID); err != nil {
 		t.Fatalf("first CheckNow() error = %v", err)
 	}
 	runner.result.StartedAt = checkedAt.Add(time.Minute)
-	if _, err := service.CheckNow(card.ID); err != nil {
+	if _, err := service.CheckNow(context.Background(), card.ID); err != nil {
 		t.Fatalf("second CheckNow() error = %v", err)
 	}
 	changes, err := store.GetStatusChanges(card.ID)
@@ -95,14 +96,14 @@ func TestCheckNowRejectsMissingCardAndStatusAction(t *testing.T) {
 	if err != nil {
 		t.Fatalf("NewCheckService() error = %v", err)
 	}
-	if _, err := service.CheckNow("missing"); !errors.Is(err, config.ErrNotFound) {
+	if _, err := service.CheckNow(context.Background(), "missing"); !errors.Is(err, config.ErrNotFound) {
 		t.Fatalf("missing card error = %v", err)
 	}
 	card := config.ActionCard{ID: "without-status", Name: "No status", Primary: config.Action{Command: "primary", TimeoutSec: 1}}
 	if _, err := store.CreateCard(card); err != nil {
 		t.Fatalf("CreateCard() error = %v", err)
 	}
-	if _, err := service.CheckNow(card.ID); !errors.Is(err, ErrStatusActionMissing) {
+	if _, err := service.CheckNow(context.Background(), card.ID); !errors.Is(err, ErrStatusActionMissing) {
 		t.Fatalf("missing status error = %v", err)
 	}
 }
@@ -113,10 +114,34 @@ func TestCheckNowDoesNotUpdateOnRunnerError(t *testing.T) {
 	card := testStatusCard(t, store)
 	service, _ := NewStatusCheckService(store, runner)
 
-	if _, err := service.CheckNow(card.ID); err == nil {
+	if _, err := service.CheckNow(context.Background(), card.ID); err == nil {
 		t.Fatal("CheckNow() succeeded despite runner error")
 	}
 	if _, ok := store.GetStatus(card.ID); ok {
 		t.Fatal("CheckNow() stored status after runner error")
+	}
+}
+
+func TestCheckNowCanceledDoesNotUpdateStatus(t *testing.T) {
+	store := config.NewStore(config.Settings{HistorySize: 5, MaxConcurrentActions: 1})
+	card := testStatusCard(t, store)
+	runner := &fakeRunner{result: execengine.Result{Outcome: config.RunOutcomeOK, StartedAt: time.Now(), Duration: time.Millisecond}}
+	service, err := NewStatusCheckService(store, runner)
+	if err != nil {
+		t.Fatalf("NewStatusCheckService() error = %v", err)
+	}
+	if _, err := service.CheckNow(context.Background(), card.ID); err != nil {
+		t.Fatalf("initial CheckNow() error = %v", err)
+	}
+	before, _ := store.GetStatus(card.ID)
+
+	runner.result = execengine.Result{Outcome: config.RunOutcomeCanceled}
+	_, err = service.CheckNow(context.Background(), card.ID)
+	if !errors.Is(err, ErrStatusCheckCanceled) {
+		t.Fatalf("CheckNow() error = %v, want ErrStatusCheckCanceled", err)
+	}
+	after, _ := store.GetStatus(card.ID)
+	if after.State != before.State || !after.CheckedAt.Equal(before.CheckedAt) {
+		t.Fatalf("canceled check changed status: before %#v, after %#v", before, after)
 	}
 }

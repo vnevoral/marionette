@@ -2,6 +2,7 @@ package server
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
 	"net/http"
@@ -337,7 +338,7 @@ type fakeBackgroundRunner struct {
 	result execengine.Result
 }
 
-func (runner *fakeBackgroundRunner) Run(action config.Action) (execengine.Result, error) {
+func (runner *fakeBackgroundRunner) Run(_ context.Context, action config.Action) (execengine.Result, error) {
 	runner.called <- action
 	return runner.result, nil
 }
@@ -346,7 +347,7 @@ type fakeStatusChecker struct {
 	called chan string
 }
 
-func (checker *fakeStatusChecker) CheckNow(cardID string) (config.StatusSnapshot, error) {
+func (checker *fakeStatusChecker) CheckNow(_ context.Context, cardID string) (config.StatusSnapshot, error) {
 	checker.called <- cardID
 	return config.StatusSnapshot{State: config.StatusStateOK}, nil
 }
@@ -392,4 +393,44 @@ func TestBackgroundActionsRunAndDrainAcceptedWork(t *testing.T) {
 	if err := actions.EnqueuePrimary(card.ID, card.Primary); !errors.Is(err, ErrActionQueueClosed) {
 		t.Fatalf("enqueue after close error = %v", err)
 	}
+}
+
+type blockingBackgroundRunner struct {
+	started chan struct{}
+}
+
+func (runner *blockingBackgroundRunner) Run(ctx context.Context, _ config.Action) (execengine.Result, error) {
+	close(runner.started)
+	<-ctx.Done()
+	return execengine.Result{Outcome: config.RunOutcomeCanceled}, nil
+}
+
+func TestBackgroundActionsCloseCancelsRunningJob(t *testing.T) {
+	store := config.NewStore(config.Settings{HistorySize: 5, MaxConcurrentActions: 1})
+	card := createServerCard(t, store, "cancel-on-close")
+	runner := &blockingBackgroundRunner{started: make(chan struct{})}
+	actions, err := NewBackgroundActions(store, runner, &fakeStatusChecker{called: make(chan string, 1)})
+	if err != nil {
+		t.Fatalf("NewBackgroundActions() error = %v", err)
+	}
+	if err := actions.EnqueuePrimary(card.ID, card.Primary); err != nil {
+		t.Fatalf("EnqueuePrimary() error = %v", err)
+	}
+	<-runner.started
+
+	closed := make(chan struct{})
+	go func() {
+		actions.Close()
+		close(closed)
+	}()
+	select {
+	case <-closed:
+	case <-time.After(time.Second):
+		t.Fatal("Close() did not cancel the running job")
+	}
+	runs, err := store.GetRuns(card.ID, "primary")
+	if err != nil || len(runs) != 1 || runs[0].Outcome != config.RunOutcomeCanceled {
+		t.Fatalf("primary runs after cancel = %#v, error = %v", runs, err)
+	}
+	actions.Close() // second Close must be a no-op
 }
