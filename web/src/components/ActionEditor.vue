@@ -235,10 +235,6 @@ label,
 	font-size: 0.85rem;
 	font-weight: var(--font-weight-medium);
 }
-.field-error {
-	color: var(--color-danger);
-	font-size: 0.78rem;
-}
 .row-line {
 	display: flex;
 	align-items: center;

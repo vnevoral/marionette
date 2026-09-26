@@ -3,7 +3,7 @@ import Aura from "@primevue/themes/aura";
 
 // Marionette's PrimeVue preset (ADR-0009, UX spec §8.2): the sage/green
 // palette from tokens.css expressed as Aura semantic tokens, so components
-// pick the colours up natively and no CSS override needs !important.
+// pick the colours up natively and no CSS override needs the important flag.
 const MarionettePreset = definePreset(Aura, {
 	semantic: {
 		primary: {

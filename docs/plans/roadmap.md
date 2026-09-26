@@ -21,7 +21,7 @@ uloží do `docs/plans/blocks/NNNN-nazev.md`. Blok se implementuje promptem
 | 5    | REST API (CRUD karet/akcí, spuštění, čtení stavu)                                            | **Hotovo**                                       | FR-40, FR-41                   |
 | 6    | Dashboard UI (karty, stavové indikátory, formuláře správy)                                   | **Hotovo**                                       | FR-20..23                      |
 | 7    | Balíčkování a nasazení (systemd unit, install skript, arm64 release)                         | **Probíhá** (0023)                               | FR-01..04, NFR-02              |
-| 8    | Zpevnění (auth/access control, logování, chybové stavy, testy, dokumentace)                  | **Probíhá** (hotovo 0024–0032, 0034; zbývá 0033) | NFR-01, NFR-04..06, NFR-12     |
+| 8    | Zpevnění (auth/access control, logování, chybové stavy, testy, dokumentace)                  | **Hotovo** (2026-09-26; bloky 0024–0034)         | NFR-01, NFR-04..06, NFR-12     |
 | 9    | UX redesign a sdílený design systém                                                          | **Hotovo**                                       | FR-24..29, NFR-08..10          |
 | 10   | Realtime doručování statusů přes SSE                                                         | **Hotovo**                                       | FR-42, NFR-11                  |
 
@@ -134,7 +134,8 @@ uloží do `docs/plans/blocks/NNNN-nazev.md`. Blok se implementuje promptem
      — **Hotovo** (2026-09-26); `ApiError` s `fields`, ConfirmDialog místo
      `window.confirm`, přístupný `ActionEditor`, `ConnectionStatus`.
   3. [0033 — Sdílený slovník stavů, komponenty a theme preset](blocks/0033-frontend-vocabulary-and-shared-components.md)
-     (refaktor až po 0029 a 0032).
+     — **Hotovo** (2026-09-26); `src/ui/vocabulary.ts`, komponenty §8.4,
+     `definePreset`, žádný `!important`, view < 300 řádků.
 
   Otevřené otázky revize jsou rozhodnuté v
   [requirements.md, sekce 13](../requirements/requirements.md#13-rozhodnutí-revize-projektu-2026-09-26)

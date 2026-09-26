@@ -198,27 +198,29 @@ sections, and nested cards.
 
 ### 8.2 Shared tokens
 
-Tokens are defined once and consumed by all views:
+Tokens are defined once in `web/src/styles/tokens.css` and consumed by all
+views (values as implemented in blocks 0019/0020 and confirmed in 0033):
 
 ```css
 :root {
-  --color-canvas: #f2f7f3;
-  --color-surface: #fbfdfb;
+  --color-canvas: #eef2f1;
+  --color-surface: #f8faf9;
   --color-surface-raised: #ffffff;
-  --color-ink: #1d3028;
-  --color-muted: #60746b;
-  --color-border: #d6e3da;
-  --color-border-strong: #b7cbbd;
-  --color-accent: #3e8064;
-  --color-accent-strong: #2e604b;
-  --color-accent-soft: #e5f0e8;
-  --color-success: #2f805f;
-  --color-info: #3e7184;
-  --color-info-soft: #e7f0f3;
-  --color-warning: #a87528;
-  --color-warning-soft: #f6eedc;
-  --color-danger: #b2504b;
+  --color-ink: #26332f;
+  --color-muted: #68746f;
+  --color-border: #d7e0dd;
+  --color-border-strong: #b9c9c3;
+  --color-accent: #4b8969;
+  --color-accent-strong: #397254;
+  --color-accent-soft: #e6f1e8;
+  --color-success: #4f8c68;
+  --color-info: #557f8a;
+  --color-info-soft: #e9f2f3;
+  --color-warning: #ad7e3f;
+  --color-warning-soft: #f8f0e2;
+  --color-danger: #b45d56;
   --color-danger-soft: #f7e7e5;
+  --color-focus: #2f7181;
   --radius-sm: 6px;
   --radius-md: 10px;
   --space-1: 4px;
@@ -230,8 +232,11 @@ Tokens are defined once and consumed by all views:
 }
 ```
 
-Views use semantic tokens rather than local hex values. PrimeVue theme tokens
-are aligned with these values.
+Views use semantic tokens rather than local hex values. PrimeVue components
+take the same palette from `web/src/theme/preset.ts` (`definePreset(Aura, …)`:
+primary and surface scales, form field, text, content and overlay tokens), so
+no component style is overridden with `!important`. The app ships one light
+scheme; the OS dark mode is not followed.
 
 ### 8.3 Typography and density
 
@@ -244,13 +249,20 @@ are aligned with these values.
 
 ### 8.4 Shared components
 
-Build these shared patterns before polishing individual views:
+Shared patterns live in `web/src/components` and are used by every view
+(block 0033):
 
 - `AppShell`, `PageHeader`, `ConnectionStatus`;
 - `StatusBadge`, `RequestState`, `InlineError`, `EmptyState`;
 - `ActionCard`, `ActionControls`;
-- `ActionEditor`, `FormSection`, `UnsavedChangesDialog`;
-- `RunTable`, `StatusTimeline`.
+- `ActionEditor`, `FormSection`, `CardIdentityFields`, `PollingFields`,
+  `SaveBar`; the unsaved-changes dialog is the shared `ConfirmDialog` driven
+  by the `useUnsavedChangesGuard` composable;
+- `RunTable`, `StatusTimeline`, `StatusSummary`, `DetailPanel`,
+  `DetailErrorState`.
+
+All labels, icons and tones come from `web/src/ui/vocabulary.ts` (§3, §4);
+dates and durations are formatted in `web/src/ui/format.ts`.
 
 ## 9. Accessibility and responsive behavior
 

@@ -19,7 +19,7 @@ flowchart LR
 | ---------------------- | ----------------- | --------------------------------------------------------------- | ------------------------------------------- |
 | HTTP server / routing  | `internal/server` | API routy, SPA fallback                                         | Implementováno (CRUD, enqueue, status read) |
 | Embed vestavěného UI   | `internal/webui`  | `go:embed` `web/dist`                                           | Implementováno                              |
-| SPA (Vue 3 + PrimeVue) | `web/src`         | Dashboard, detail a editor karet; sdílený SSE stream s REST fallbackem (`composables/`) | Implementováno — fáze 5–8 (0029)            |
+| SPA (Vue 3 + PrimeVue) | `web/src`         | Dashboard, detail a editor karet; sdílený SSE stream s REST fallbackem (`composables/`), slovník stavů a formátování (`ui/`), sdílené komponenty (`components/`), PrimeVue preset (`theme/`) | Implementováno — fáze 5–8 (0029, 0032, 0033) |
 | Config store           | `internal/config` | In-memory karty, Settings, JSON perzistence a historie (viz [Ochrana konfiguračního souboru](#ochrana-konfiguračního-souboru)) | Implementováno — fáze 2                     |
 | Execution engine       | `internal/execengine` | Bezpečné spouštění akcí na hostu (procesní skupina, timeout, minimální prostředí), capture výstupu, limit souběžnosti | Implementováno — fáze 3, zpevněno 0024/0034 |
 | Status/health engine   | `internal/status` | Vyhodnocení stavu karty, transition historie, volitelný polling | Implementováno — fáze 4                     |

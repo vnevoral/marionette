@@ -1,11 +1,14 @@
 <script setup lang="ts">
 import Tag from "primevue/tag";
+import type { StatusTone } from "@/types";
 
+// Text, icon and tone always travel together (FR-25); pass a Presentation
+// from the vocabulary with v-bind.
 withDefaults(
 	defineProps<{
 		label: string;
 		icon: string;
-		tone?: "healthy" | "problem" | "unknown" | "info" | "warning";
+		tone?: StatusTone;
 	}>(),
 	{ tone: "unknown" },
 );

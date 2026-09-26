@@ -28,7 +28,9 @@
   (`HomeView`, `CardDetailView`, `CardEditView` s pamětovým routerem —
   `CardEditView` přes `RouterView`, aby platil `onBeforeRouteLeave`;
   `ActionEditor` včetně přístupných názvů, `ConnectionStatus`,
-  `StatusBadge`) — netestuje se vzhled PrimeVue komponent samotných. REST
+  `StatusBadge`, `ActionCard` pro každý stav, `StatusTimeline` s dobou
+  trvání) a slovník/formátování (`ui/vocabulary`, `ui/format`) — netestuje
+  se vzhled PrimeVue komponent samotných. REST
   funkce se mockují přes `vi.mock("@/api")` s částečným přepisem, SSE přes
   sdílený `src/test/fakeEventSource.ts` (`vi.stubGlobal("EventSource", …)`),
   potvrzovací dialog přes `src/test/fakeConfirm.ts` (provide místo

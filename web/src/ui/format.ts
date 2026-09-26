@@ -1,3 +1,4 @@
+import type { StatusChange } from "@/api";
 import { EMPTY } from "@/ui/vocabulary";
 
 const NANOSECONDS_PER_MILLISECOND = 1_000_000;
@@ -36,4 +37,11 @@ export function lastCheckedLabel(checkedAt?: string): string {
 /** Elapsed time between an ISO timestamp and `now` (defaults to the current time). */
 export function elapsedSince(startedAt: string, now: number = Date.now()): string {
 	return formatElapsed(now - new Date(startedAt).getTime());
+}
+
+/** Duration of a status transition: the stored one when it has ended, the
+ * elapsed time until `now` while it is the current state (FR-17). */
+export function transitionDuration(change: StatusChange, now: number = Date.now()): string {
+	if (change.endedAt) return formatDuration(change.duration);
+	return elapsedSince(change.startedAt, now);
 }

@@ -4,9 +4,9 @@
 import type { Action, ActionCard } from "@/api";
 import { DEFAULT_CARD_ICON } from "@/ui/icons";
 
-/** Repeatable editor rows carry a stable id so Vue keys survive removal. */
-export type ArgumentRow = { id: string; value: string };
-export type EnvironmentRow = { id: string; key: string; value: string };
+import type { ArgumentRow, EnvironmentRow } from "@/types";
+
+export type { ArgumentRow, EnvironmentRow };
 
 let rowSequence = 0;
 
@@ -188,4 +188,21 @@ export function fieldErrorsFromServer(fields: Record<string, string>): {
 		unmapped.push(`${path}: ${message}`);
 	}
 	return { fieldErrors, unmapped };
+}
+
+// The card created by the last save. After creating a card the edit view moves
+// to its edit route; the router may reuse or recreate the component, and either
+// way the form shows the saved card with "Card saved" without a reload.
+let justSaved: ActionCard | undefined;
+
+export function rememberSavedCard(card: ActionCard) {
+	justSaved = card;
+}
+
+/** Returns and forgets the just-saved card when it matches `id`. */
+export function takeSavedCard(id: string): ActionCard | undefined {
+	if (justSaved?.id !== id) return undefined;
+	const card = justSaved;
+	justSaved = undefined;
+	return card;
 }

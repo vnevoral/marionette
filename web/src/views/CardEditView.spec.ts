@@ -88,8 +88,8 @@ describe("CardEditView", () => {
 		expect(errors).toContain("name is too long");
 		expect(errors).toContain("action command is required");
 		expect(errors).toContain("environment variable name is invalid");
-		expect(wrapper.find(".p-message-error").text()).toContain("validation failed");
-		expect(wrapper.find(".p-message-error").text()).toContain("id: immutable");
+		expect(wrapper.find(".request-feedback-error").text()).toContain("validation failed");
+		expect(wrapper.find(".request-feedback-error").text()).toContain("id: immutable");
 		expect((inputInLabel(wrapper, "Name").element as HTMLInputElement).value).toBe(
 			"Printer renamed",
 		);
