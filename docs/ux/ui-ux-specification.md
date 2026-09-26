@@ -81,8 +81,15 @@ Rules:
   success.
 - While work is pending, controls for that card are disabled and the card
   shows **Running**.
-- After acceptance, status reads update the card until a new check is visible
-  or the configured fast-polling window expires.
+- After acceptance, the card waits for a check newer than the last one: a
+  `status.changed` event from the shared stream or a REST read every 2 s,
+  until the configured fast-polling window expires. The stream is shared by
+  all views; while it is down, monitored cards are refreshed over REST every
+  5 s.
+- When the wait ends, the controls are released immediately and the outcome
+  (**Updated**, **Result not available yet**, or the enqueue error) stays
+  visible for about 4 s. A card without a status action shows **Accepted**
+  right after the request is queued.
 - An enqueue failure is an operation error, not automatically a device
   failure.
 - A status read failure keeps the card visible and marks its data as unknown;
@@ -137,7 +144,10 @@ The detail header contains the card name, icon, current state, and last check.
 The body contains:
 
 - **Summary**: current state, state duration, and last check;
-- **Actions**: run primary action and manually check status;
+- **Actions**: run primary action and manually check status; both buttons
+  are blocked while a check is pending, the **Action queued** note is
+  replaced by the outcome, and recent runs and status history are refetched
+  once a newer check is visible;
 - **Recent runs**: time, outcome, duration, and expandable output;
 - **Status history**: chronological transition timeline with duration;
 - **Configuration**: link to edit, not inline configuration in diagnostics.

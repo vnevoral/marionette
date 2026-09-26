@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from "vue";
+import { computed, onBeforeUnmount, ref, watch } from "vue";
 import { RouterLink, useRoute, useRouter } from "vue-router";
 import Button from "primevue/button";
 import Message from "primevue/message";
@@ -10,19 +10,18 @@ import {
 	deleteCard,
 	getCard,
 	getRuns,
-	getStatus,
 	getStatusHistory,
 	type ActionCard,
 	type Run,
 	type StatusChange,
-	type StatusSnapshot,
 } from "@/api";
 import StatusBadge from "@/components/StatusBadge.vue";
+import { useCardStatus } from "@/composables/useCardStatus";
+import { singleParam } from "@/router/params";
 
 const route = useRoute();
 const router = useRouter();
 const card = ref<ActionCard>();
-const status = ref<StatusSnapshot>();
 const runs = ref<Run[]>([]);
 const history = ref<StatusChange[]>([]);
 const loading = ref(true);
@@ -35,7 +34,13 @@ const requestMessage = ref("");
 const actionLoading = ref<"primary" | "status" | "">("");
 type StatusTone = "healthy" | "problem" | "unknown" | "info" | "warning";
 
-const cardID = computed(() => String(route.params.id));
+const defaultFastPollingWindowSeconds = 120;
+const cardID = computed(() => singleParam(route.params.id));
+const cardStatus = useCardStatus(cardID, () => Boolean(card.value?.status));
+const status = cardStatus.snapshot;
+// Bumped on every id change so responses for a previous card are ignored.
+let loadGeneration = 0;
+let pendingWait: AbortController | undefined;
 
 function formatDuration(durationNanoseconds: number) {
 	const milliseconds = durationNanoseconds / 1_000_000;
@@ -75,6 +80,9 @@ function currentStatusView() {
 	if (!card.value?.status) {
 		return { label: "No status check", icon: "pi pi-minus-circle", tone: "unknown" as const };
 	}
+	if (actionLoading.value) {
+		return { label: "Running", icon: "pi pi-spin pi-spinner", tone: "info" as const };
+	}
 	return stateView(status.value?.state);
 }
 
@@ -99,51 +107,105 @@ function outcomeIcon(outcome: Run["outcome"]) {
 	return "pi pi-times-circle";
 }
 
+async function loadRuns(generation: number) {
+	const id = cardID.value;
+	try {
+		const loaded = await getRuns(id);
+		if (generation !== loadGeneration) return;
+		runs.value = loaded ?? [];
+		delete sectionErrors.value.runs;
+	} catch {
+		if (generation === loadGeneration) sectionErrors.value.runs = "Run history is unavailable";
+	} finally {
+		if (generation === loadGeneration) runsLoading.value = false;
+	}
+}
+
+async function loadHistory(generation: number) {
+	const id = cardID.value;
+	try {
+		const loaded = await getStatusHistory(id);
+		if (generation !== loadGeneration) return;
+		history.value = loaded ?? [];
+		delete sectionErrors.value.history;
+	} catch {
+		if (generation === loadGeneration)
+			sectionErrors.value.history = "Status history is unavailable";
+	} finally {
+		if (generation === loadGeneration) historyLoading.value = false;
+	}
+}
+
+function loadActivity(generation: number) {
+	return Promise.allSettled([loadRuns(generation), loadHistory(generation)]);
+}
+
 async function loadDetail() {
+	const generation = ++loadGeneration;
+	pendingWait?.abort();
+	pendingWait = undefined;
+	actionLoading.value = "";
+	requestMessage.value = "";
 	loading.value = true;
+	runsLoading.value = true;
+	historyLoading.value = true;
 	error.value = "";
 	notFound.value = false;
 	sectionErrors.value = {};
+	card.value = undefined;
+	runs.value = [];
+	history.value = [];
+	cardStatus.set(undefined);
 	try {
-		card.value = await getCard(cardID.value);
-		status.value = card.value.currentStatus;
+		const loaded = await getCard(cardID.value);
+		if (generation !== loadGeneration) return;
+		card.value = loaded;
+		cardStatus.set(loaded.currentStatus);
 	} catch (loadError) {
+		if (generation !== loadGeneration) return;
 		notFound.value = true;
 		error.value = loadError instanceof Error ? loadError.message : "Unable to load card";
 		loading.value = false;
 		return;
 	}
 	loading.value = false;
-
-	void Promise.allSettled([getRuns(cardID.value), getStatusHistory(cardID.value)]).then(
-		(results) => {
-			const [runsResult, historyResult] = results;
-			if (runsResult.status === "fulfilled") runs.value = runsResult.value ?? [];
-			else sectionErrors.value.runs = "Run history is unavailable";
-			if (historyResult.status === "fulfilled") history.value = historyResult.value ?? [];
-			else sectionErrors.value.history = "Status history is unavailable";
-			runsLoading.value = false;
-			historyLoading.value = false;
-		},
-	);
+	void loadActivity(generation);
 }
 
 async function runAction(action: "primary" | "status") {
-	if (action === "status" && !card.value?.status) return;
+	if (actionLoading.value) return;
+	const current = card.value;
+	if (!current || (action === "status" && !current.status)) return;
+	const generation = loadGeneration;
+	const previousCheckedAt = status.value?.checkedAt;
 	actionLoading.value = action;
 	requestMessage.value = "Queued";
+	const controller = new AbortController();
+	pendingWait = controller;
 	try {
-		if (action === "primary") await enqueuePrimary(cardID.value);
-		else await enqueueStatus(cardID.value);
-		requestMessage.value = "Action queued";
-		if (action === "status") {
-			status.value = await getStatus(cardID.value);
+		if (action === "primary") await enqueuePrimary(current.id);
+		else await enqueueStatus(current.id);
+		if (generation !== loadGeneration) return;
+		if (!current.status) {
+			requestMessage.value = "Action accepted";
+			void loadActivity(generation);
+			return;
 		}
+		requestMessage.value = "Action queued";
+		const result = await cardStatus.waitForNewer(previousCheckedAt, {
+			signal: controller.signal,
+			maxWaitMs: (current.fastPollingWindowSeconds || defaultFastPollingWindowSeconds) * 1000,
+		});
+		if (result === "aborted" || generation !== loadGeneration) return;
+		requestMessage.value = result === "updated" ? "Status updated" : "Result not available yet";
+		void loadActivity(generation);
 	} catch (actionError) {
+		if (generation !== loadGeneration) return;
 		requestMessage.value =
 			actionError instanceof Error ? actionError.message : "Unable to queue action";
 	} finally {
-		actionLoading.value = "";
+		if (pendingWait === controller) pendingWait = undefined;
+		if (generation === loadGeneration) actionLoading.value = "";
 	}
 }
 
@@ -159,7 +221,12 @@ async function removeCard() {
 	}
 }
 
-onMounted(loadDetail);
+watch(cardID, () => void loadDetail(), { immediate: true });
+
+onBeforeUnmount(() => {
+	pendingWait?.abort();
+	pendingWait = undefined;
+});
 </script>
 
 <template>

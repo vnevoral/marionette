@@ -21,7 +21,7 @@ uloží do `docs/plans/blocks/NNNN-nazev.md`. Blok se implementuje promptem
 | 5    | REST API (CRUD karet/akcí, spuštění, čtení stavu)                                            | **Hotovo**                                       | FR-40, FR-41                   |
 | 6    | Dashboard UI (karty, stavové indikátory, formuláře správy)                                   | **Hotovo**                                       | FR-20..23                      |
 | 7    | Balíčkování a nasazení (systemd unit, install skript, arm64 release)                         | **Probíhá** (0023)                               | FR-01..04, NFR-02              |
-| 8    | Zpevnění (auth/access control, logování, chybové stavy, testy, dokumentace)                  | **Probíhá** (proudy A a B hotové: 0024–0028, 0030, 0031, 0034; proud C 0029, 0032, 0033 schválen) | NFR-01, NFR-04..06, NFR-12     |
+| 8    | Zpevnění (auth/access control, logování, chybové stavy, testy, dokumentace)                  | **Probíhá** (hotovo 0024–0031, 0034; zbývá 0032, 0033) | NFR-01, NFR-04..06, NFR-12     |
 | 9    | UX redesign a sdílený design systém                                                          | **Hotovo**                                       | FR-24..29, NFR-08..10          |
 | 10   | Realtime doručování statusů přes SSE                                                         | **Hotovo**                                       | FR-42, NFR-11                  |
 
@@ -128,7 +128,8 @@ uloží do `docs/plans/blocks/NNNN-nazev.md`. Blok se implementuje promptem
 
   **Proud C — frontend (po 0030):**
   1. [0029 — Stav akcí na dashboardu a sdílené sledování statusu](blocks/0029-dashboard-action-state-and-shared-status.md)
-     — tlačítka karty dnes po první akci zůstanou disabled.
+     — **Hotovo** (2026-09-26); `useStatusEvents`/`useCardStatus`, tlačítka
+     se po dokončení akce uvolní, detail refetchuje runs/history.
   2. [0032 — API vrstva frontendu a shoda s UX specifikací](blocks/0032-frontend-api-layer-and-ux-conformance.md)
      (závisí na 0028 kvůli kontraktu `fields`).
   3. [0033 — Sdílený slovník stavů, komponenty a theme preset](blocks/0033-frontend-vocabulary-and-shared-components.md)

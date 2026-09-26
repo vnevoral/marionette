@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, ref } from "vue";
+import { computed, onBeforeUnmount, onMounted, ref } from "vue";
 import { RouterLink } from "vue-router";
 import Button from "primevue/button";
 import Card from "primevue/card";
@@ -11,51 +11,47 @@ import {
 	getStatus,
 	listCards,
 	type ActionCard,
-	connectStatusEvents,
-	type StatusSnapshot,
 	type StatusEvent,
+	type StatusSnapshot,
 } from "@/api";
 import StatusBadge from "@/components/StatusBadge.vue";
+import { waitForNewerStatus } from "@/composables/useCardStatus";
+import { useStatusEvents } from "@/composables/useStatusEvents";
 
 type ActionKind = "primary" | "status";
-type RequestState = "queued" | "running" | "success" | "error";
+type PendingState = "queued" | "running";
 type StatusTone = "healthy" | "problem" | "unknown" | "info" | "warning";
+
+interface PendingRequest {
+	action: ActionKind;
+	state: PendingState;
+	message: string;
+}
+
+interface RequestResult {
+	tone: "success" | "error";
+	message: string;
+}
 
 const cards = ref<ActionCard[]>([]);
 const statuses = ref<Record<string, StatusSnapshot>>({});
 const statusErrors = ref<Record<string, boolean>>({});
-const requests = ref<Record<string, { action: ActionKind; state: RequestState; message: string }>>(
-	{},
-);
+// Only queued/running requests live here; a finished request is removed so the
+// card's buttons are released, and its outcome is shown briefly via lastResult.
+const requests = ref<Record<string, PendingRequest>>({});
+const lastResult = ref<Record<string, RequestResult>>({});
 const loading = ref(true);
 const error = ref("");
 
-const defaultFastPollingIntervalSeconds = 10;
 const defaultFastPollingWindowSeconds = 120;
+const resultVisibleMs = 4000;
 let statusRefreshGeneration = 0;
-let statusPollTimer: number | undefined;
-let statusEventSource: EventSource | undefined;
+const resultTimers = new Map<string, ReturnType<typeof setTimeout>>();
+const pendingWaits = new Map<string, AbortController>();
 
 const healthyCount = computed(
 	() => cards.value.filter((card) => statuses.value[card.id]?.state === "ok").length,
 );
-
-function wait(milliseconds: number) {
-	return new Promise((resolve) => window.setTimeout(resolve, milliseconds));
-}
-
-function startStatusPolling() {
-	if (statusPollTimer !== undefined) return;
-	statusPollTimer = window.setInterval(() => {
-		if (cards.value.length) void refreshStatuses(cards.value);
-	}, 5000);
-}
-
-function stopStatusPolling() {
-	if (statusPollTimer === undefined) return;
-	window.clearInterval(statusPollTimer);
-	statusPollTimer = undefined;
-}
 
 async function loadDashboard() {
 	loading.value = true;
@@ -73,7 +69,6 @@ async function loadDashboard() {
 		void refreshStatuses(loadedCards);
 	} catch (loadError) {
 		error.value = loadError instanceof Error ? loadError.message : "Unable to load cards";
-		loading.value = false;
 	} finally {
 		loading.value = false;
 	}
@@ -106,67 +101,77 @@ function applyStatusEvent(event: StatusEvent) {
 	statusErrors.value[event.cardId] = false;
 }
 
-function connectLiveStatusEvents() {
-	const source = connectStatusEvents(applyStatusEvent);
-	if (!source) {
-		startStatusPolling();
-		return;
-	}
-	statusEventSource = source;
-	source.addEventListener("open", () => {
-		void refreshStatuses(cards.value);
-		stopStatusPolling();
-	});
-	source.addEventListener("error", startStatusPolling);
+useStatusEvents().subscribe({
+	onStatus: applyStatusEvent,
+	onRefresh() {
+		if (cards.value.length) void refreshStatuses(cards.value);
+	},
+});
+
+function withoutKey<T>(record: Record<string, T>, key: string): Record<string, T> {
+	const copy = { ...record };
+	delete copy[key];
+	return copy;
 }
 
-async function waitForStatusUpdate(card: ActionCard, previousCheckedAt?: string) {
-	if (!card.status) return;
-	const intervalMilliseconds =
-		(card.fastPollingIntervalSeconds || defaultFastPollingIntervalSeconds) * 1000;
-	const deadline =
-		Date.now() + (card.fastPollingWindowSeconds || defaultFastPollingWindowSeconds) * 1000;
+function showResult(cardID: string, result: RequestResult) {
+	lastResult.value = { ...lastResult.value, [cardID]: result };
+	clearTimeout(resultTimers.get(cardID));
+	resultTimers.set(
+		cardID,
+		setTimeout(() => {
+			resultTimers.delete(cardID);
+			lastResult.value = withoutKey(lastResult.value, cardID);
+		}, resultVisibleMs),
+	);
+}
 
-	while (Date.now() < deadline) {
-		await wait(intervalMilliseconds);
-		try {
-			const snapshot = await getStatus(card.id);
-			statuses.value[card.id] = snapshot;
-			statusErrors.value[card.id] = false;
-			if (snapshot.checkedAt !== previousCheckedAt) return true;
-		} catch {
-			statusErrors.value[card.id] = true;
-			return false;
-		}
-	}
-	return false;
+function setPending(cardID: string, request: PendingRequest | undefined) {
+	const rest = withoutKey(requests.value, cardID);
+	requests.value = request ? { ...rest, [cardID]: request } : rest;
 }
 
 async function runAction(card: ActionCard, action: ActionKind) {
 	if (requests.value[card.id]) return;
 	const previousCheckedAt = statuses.value[card.id]?.checkedAt;
-	requests.value = {
-		...requests.value,
-		[card.id]: { action, state: "queued", message: "Queued" },
-	};
+	setPending(card.id, { action, state: "queued", message: "Queued" });
+	const controller = new AbortController();
+	pendingWaits.set(card.id, controller);
 	try {
 		if (action === "primary") await enqueuePrimary(card.id);
 		else await enqueueStatus(card.id);
-		requests.value[card.id] = { action, state: "running", message: "Running" };
-		if (card.status) {
-			const updated = await waitForStatusUpdate(card, previousCheckedAt);
-			requests.value[card.id] = updated
-				? { action, state: "success", message: "Updated" }
-				: { action, state: "error", message: "Result not available yet" };
-		} else {
-			requests.value[card.id] = { action, state: "success", message: "Accepted" };
+		if (!card.status) {
+			showResult(card.id, { tone: "success", message: "Accepted" });
+			return;
 		}
+		setPending(card.id, { action, state: "running", message: "Running" });
+		const result = await waitForNewerStatus(card.id, previousCheckedAt, {
+			signal: controller.signal,
+			maxWaitMs: (card.fastPollingWindowSeconds || defaultFastPollingWindowSeconds) * 1000,
+			onSnapshot(snapshot) {
+				statusRefreshGeneration++;
+				statuses.value[card.id] = snapshot;
+				statusErrors.value[card.id] = false;
+			},
+			onError() {
+				statusErrors.value[card.id] = true;
+			},
+		});
+		if (result === "aborted") return;
+		showResult(
+			card.id,
+			result === "updated"
+				? { tone: "success", message: "Updated" }
+				: { tone: "error", message: "Result not available yet" },
+		);
 	} catch (actionError) {
-		requests.value[card.id] = {
-			action,
-			state: "error",
+		showResult(card.id, {
+			tone: "error",
 			message: actionError instanceof Error ? actionError.message : "Unable to queue action",
-		};
+		});
+	} finally {
+		pendingWaits.delete(card.id);
+		setPending(card.id, undefined);
 	}
 }
 
@@ -185,7 +190,7 @@ function statusView(card: ActionCard): {
 		};
 	}
 	const request = requests.value[card.id];
-	if (request?.state === "queued" || request?.state === "running") {
+	if (request) {
 		return {
 			label: request.message,
 			icon: "pi pi-spin pi-spinner",
@@ -212,19 +217,22 @@ function statusView(card: ActionCard): {
 }
 
 function requestLabel(cardID: string) {
-	return requests.value[cardID]?.message ?? "";
+	return requests.value[cardID]?.message ?? lastResult.value[cardID]?.message ?? "";
+}
+
+function requestTone(cardID: string) {
+	return lastResult.value[cardID]?.tone ?? "info";
 }
 
 onMounted(() => {
 	void loadDashboard();
-	startStatusPolling();
-	connectLiveStatusEvents();
 });
 
-onUnmounted(() => {
-	stopStatusPolling();
-	statusEventSource?.close();
-	statusEventSource = undefined;
+onBeforeUnmount(() => {
+	for (const controller of pendingWaits.values()) controller.abort();
+	pendingWaits.clear();
+	for (const timer of resultTimers.values()) clearTimeout(timer);
+	resultTimers.clear();
 });
 </script>
 
@@ -295,6 +303,7 @@ onUnmounted(() => {
 						<p
 							v-if="requestLabel(card.id)"
 							class="request-feedback"
+							:class="`request-feedback-${requests[card.id] ? 'info' : requestTone(card.id)}`"
 							role="status"
 							aria-live="polite"
 						>
@@ -312,9 +321,7 @@ onUnmounted(() => {
 									label="Run action"
 									icon="pi pi-play"
 									class="primary-action-button"
-									:loading="
-										requests[card.id]?.action === 'primary' && requests[card.id]?.state !== 'error'
-									"
+									:loading="requests[card.id]?.action === 'primary'"
 									:disabled="Boolean(requests[card.id])"
 									@click="runAction(card, 'primary')"
 								/>
@@ -324,9 +331,7 @@ onUnmounted(() => {
 									icon="pi pi-heart"
 									severity="secondary"
 									outlined
-									:loading="
-										requests[card.id]?.action === 'status' && requests[card.id]?.state !== 'error'
-									"
+									:loading="requests[card.id]?.action === 'status'"
 									:disabled="Boolean(requests[card.id])"
 									@click="runAction(card, 'status')"
 								/>
@@ -538,6 +543,18 @@ h1 {
 	color: var(--color-info);
 	font-size: 0.85rem;
 	font-weight: var(--font-weight-medium);
+}
+
+.request-feedback-success {
+	border-left-color: var(--color-success);
+	background: var(--color-accent-soft);
+	color: var(--color-success);
+}
+
+.request-feedback-error {
+	border-left-color: var(--color-danger);
+	background: var(--color-danger-soft);
+	color: var(--color-danger);
 }
 
 .loading-state {

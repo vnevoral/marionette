@@ -56,6 +56,13 @@ export interface StatusEvent {
 	snapshot: StatusSnapshot;
 }
 
+/** 202 response of the enqueue endpoints. */
+export interface AcceptedAction {
+	cardId: string;
+	actionKind: "primary" | "status";
+	status: "accepted";
+}
+
 async function request<T>(path: string, options?: RequestInit): Promise<T> {
 	// Spread options first: a later spread would replace the merged headers and
 	// drop Accept on every call that sets its own Content-Type.
@@ -153,15 +160,15 @@ export function connectStatusEvents(
 
 // Mutating calls always declare application/json, even without a body, so
 // they pass the server's cross-site protection (NFR-12).
-export function enqueuePrimary(cardID: string): Promise<void> {
-	return request(`/api/cards/${encodeURIComponent(cardID)}/actions/primary`, {
+export function enqueuePrimary(cardID: string): Promise<AcceptedAction> {
+	return request<AcceptedAction>(`/api/cards/${encodeURIComponent(cardID)}/actions/primary`, {
 		method: "POST",
 		headers: { "Content-Type": "application/json" },
 	});
 }
 
-export function enqueueStatus(cardID: string): Promise<void> {
-	return request(`/api/cards/${encodeURIComponent(cardID)}/actions/status/check`, {
+export function enqueueStatus(cardID: string): Promise<AcceptedAction> {
+	return request<AcceptedAction>(`/api/cards/${encodeURIComponent(cardID)}/actions/status/check`, {
 		method: "POST",
 		headers: { "Content-Type": "application/json" },
 	});

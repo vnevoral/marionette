@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, reactive, ref } from "vue";
+import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from "vue";
 import { onBeforeRouteLeave, RouterLink, useRoute, useRouter } from "vue-router";
 import Button from "primevue/button";
 import Card from "primevue/card";
@@ -21,11 +21,12 @@ import {
 	validate as validateCard,
 	type EnvironmentRow,
 } from "@/views/cardEditModel";
+import { singleParam } from "@/router/params";
 
 const route = useRoute();
 const router = useRouter();
 const isNew = () => route.name === "card-new";
-const cardID = () => String(route.params.id);
+const cardID = () => singleParam(route.params.id);
 
 const loading = ref(!isNew());
 const saving = ref(false);
@@ -40,6 +41,8 @@ const primaryArgs = ref<string[]>([]);
 const statusArgs = ref<string[]>([]);
 const primaryEnv = ref<EnvironmentRow[]>([]);
 const statusEnv = ref<EnvironmentRow[]>([]);
+// Bumped on every route change so a response for a previous card is ignored.
+let loadGeneration = 0;
 
 function formFingerprint() {
 	return fingerprint({
@@ -116,21 +119,41 @@ function addEnvironment(target: "primary" | "status") {
 	(target === "primary" ? primaryEnv : statusEnv).value.push({ key: "", value: "" });
 }
 
-onMounted(async () => {
+async function loadCard() {
+	const generation = ++loadGeneration;
+	error.value = "";
+	notice.value = "";
 	if (isNew()) {
+		applyCard(emptyCard());
 		loading.value = false;
-		markClean();
-		window.addEventListener("beforeunload", handleBeforeUnload);
 		return;
 	}
+	loading.value = true;
 	try {
-		applyCard(await getCard(cardID()));
+		const loaded = await getCard(cardID());
+		if (generation !== loadGeneration) return;
+		applyCard(loaded);
 	} catch (loadError) {
+		if (generation !== loadGeneration) return;
 		error.value = loadError instanceof Error ? loadError.message : "Unable to load card";
 	} finally {
-		loading.value = false;
-		window.addEventListener("beforeunload", handleBeforeUnload);
+		if (generation === loadGeneration) loading.value = false;
 	}
+}
+
+// The same component serves /cards/new/edit and /cards/:id/edit, so a route
+// change reuses the instance and must reload the form instead of relying on
+// mount.
+watch(
+	() => [route.name, singleParam(route.params.id)] as const,
+	() => void loadCard(),
+	{
+		immediate: true,
+	},
+);
+
+onMounted(() => {
+	window.addEventListener("beforeunload", handleBeforeUnload);
 });
 
 function handleBeforeUnload(event: BeforeUnloadEvent) {
