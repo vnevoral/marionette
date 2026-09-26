@@ -49,6 +49,11 @@ type Store struct {
 	history       map[string]map[string][]Run
 	statuses      map[string]StatusSnapshot
 	statusHistory map[string][]StatusChange
+	// changes counts every in-memory mutation; savedChanges is the value
+	// captured by the last successful SaveFileWithHistory. They differ while
+	// the file on disk lags behind memory (see Dirty).
+	changes      uint64
+	savedChanges uint64
 
 	// OnChange is called after a successful configuration mutation. It is not
 	// called for AppendRun because run history is saved only at shutdown.
@@ -129,11 +134,13 @@ func (store *Store) CreateCard(card ActionCard) (ActionCard, error) {
 
 	card = cloneCard(card)
 	store.cards[card.ID] = card
+	store.changes++
 	created := cloneCard(card)
 	store.mu.Unlock()
 	if err := store.notifyChange(); err != nil {
 		store.mu.Lock()
 		delete(store.cards, card.ID)
+		store.changes++
 		store.mu.Unlock()
 		return ActionCard{}, &PersistenceError{Operation: "card creation", Err: err}
 	}
@@ -160,11 +167,13 @@ func (store *Store) UpdateCard(id string, card ActionCard) (ActionCard, error) {
 
 	card = cloneCard(card)
 	store.cards[id] = card
+	store.changes++
 	updated := cloneCard(card)
 	store.mu.Unlock()
 	if err := store.notifyChange(); err != nil {
 		store.mu.Lock()
 		store.cards[id] = previous
+		store.changes++
 		store.mu.Unlock()
 		return ActionCard{}, &PersistenceError{Operation: "card update", Err: err}
 	}
@@ -189,10 +198,12 @@ func (store *Store) DeleteCard(id string) error {
 	delete(store.history, id)
 	delete(store.statuses, id)
 	delete(store.statusHistory, id)
+	store.changes++
 	store.mu.Unlock()
 	if err := store.notifyChange(); err != nil {
 		store.mu.Lock()
 		store.cards[id] = previousCard
+		store.changes++
 		if hadHistory {
 			store.history[id] = previousHistory
 		}
@@ -206,6 +217,16 @@ func (store *Store) DeleteCard(id string) error {
 		return &PersistenceError{Operation: "card deletion", Err: err}
 	}
 	return nil
+}
+
+// Dirty reports whether the in-memory state (configuration, run history or
+// status projection) changed since the last successful SaveFileWithHistory.
+// A freshly loaded store is clean. Shutdown uses it to skip a second history
+// save when nothing changed while the queue and scheduler were stopping.
+func (store *Store) Dirty() bool {
+	store.mu.RLock()
+	defer store.mu.RUnlock()
+	return store.changes != store.savedChanges
 }
 
 // GetSettings returns the current global settings.
@@ -240,10 +261,12 @@ func (store *Store) UpdateSettings(settings Settings) error {
 	for cardID, changes := range store.statusHistory {
 		store.statusHistory[cardID] = trimStatusChanges(changes, settings.HistorySize)
 	}
+	store.changes++
 	store.mu.Unlock()
 	if err := store.notifyChange(); err != nil {
 		store.mu.Lock()
 		store.settings = previousSettings
+		store.changes++
 		store.history = previousHistory
 		store.statusHistory = previousStatusHistory
 		store.mu.Unlock()
@@ -268,6 +291,7 @@ func (store *Store) AppendRun(cardID string, run Run) error {
 	runs := store.history[cardID][run.ActionKind]
 	runs = append([]Run{run}, runs...)
 	store.history[cardID][run.ActionKind] = trimRuns(runs, store.settings.HistorySize)
+	store.changes++
 	return nil
 }
 
@@ -327,6 +351,7 @@ func (store *Store) UpdateStatus(cardID string, snapshot StatusSnapshot) error {
 	previous, exists := store.statuses[cardID]
 	if exists && previous.State == snapshot.State {
 		store.statuses[cardID] = cloneStatusSnapshot(snapshot)
+		store.changes++
 		store.mu.Unlock()
 		return nil
 	}
@@ -345,6 +370,7 @@ func (store *Store) UpdateStatus(cardID string, snapshot StatusSnapshot) error {
 	change := StatusChange{State: snapshot.State, StartedAt: snapshot.CheckedAt}
 	store.statusHistory[cardID] = trimStatusChanges(append([]StatusChange{change}, changes...), store.settings.HistorySize)
 	store.statuses[cardID] = cloneStatusSnapshot(snapshot)
+	store.changes++
 	onStatusChange := store.OnStatusChange
 	store.mu.Unlock()
 	if onStatusChange != nil {

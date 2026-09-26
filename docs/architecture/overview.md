@@ -65,3 +65,36 @@ zpět a API vrátí 500, takže stav v paměti vždy odpovídá poslednímu úsp
 uloženému souboru. Zápis probíhá do `<cesta>.tmp` s `fsync`, přejmenováním
 přes cílový soubor a `fsync` adresáře; existující soubor si zachová práva,
 nový vzniká s `0600`.
+
+## Řízené ukončení (shutdown)
+
+Po přijetí `SIGINT`/`SIGTERM` proběhne v `cmd/marionette` (funkce
+`shutdown`, blok 0027) pevně daná sekvence s celkovým limitem
+`MARIONETTE_SHUTDOWN_TIMEOUT` (výchozí 20 s, musí být menší než systemd
+`TimeoutStopSec`); každý krok se zaloguje s dobou trvání:
+
+1. **Zastavení HTTP** — `http.Server.Shutdown` zavře listener a přes
+   `RegisterOnShutdown` uzavře `StatusEventBroker`, takže všechny SSE streamy
+   (`/api/events`) skončí okamžitě a shutdown na ně nečeká. Rozpracované
+   běžné požadavky doběhnou.
+2. **Uložení historie (první průchod)** — konfigurace, historie běhů a
+   status projekce se uloží hned, dříve než by čekání na akce mohlo narazit
+   na limit (FR-35). V režimu jen pro čtení (nečitelný soubor, viz výše) se
+   krok přeskočí, aby se původní soubor nepřepsal.
+3. **Uzavření fronty akcí** — čekající joby se zahodí (počet se zaloguje),
+   běžící mohou doběhnout do zbytku limitu minus rezerva 3 s; poté se jejich
+   kontext zruší a execution engine procesy ukončí (blok 0024).
+4. **Zastavení scheduleru** — zruší probíhající kontroly a počká na workery.
+5. **Uložení historie (druhý průchod)** — jen pokud se od prvního průchodu
+   stav změnil (`Store.Dirty`), typicky doběhlá nebo zrušená akce.
+
+Druhý signál během shutdownu proces ukončí okamžitě (výchozí obsluha
+signálu se po zahájení shutdownu obnoví).
+
+Fronta akcí (`BackgroundActions`) je omezená na `4 × MaxConcurrentActions`
+(FR-18): plná fronta vrací `503` s hlavičkou `Retry-After` (odhad
+z délky fronty na jednoho workera, min. 1 s), požadavek na kartu a druh
+akce, které už ve frontě čekají, se nezařadí znovu a API vrátí `202`
+idempotentně; deduplikace platí jen pro čekající joby, běžící job nový
+požadavek neblokuje. Po zahájení shutdownu fronta vrací `503` s
+`Retry-After: 1`.

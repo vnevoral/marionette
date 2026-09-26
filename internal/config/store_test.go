@@ -3,6 +3,7 @@ package config
 import (
 	"errors"
 	"fmt"
+	"path/filepath"
 	"sync"
 	"testing"
 	"time"
@@ -511,5 +512,51 @@ func TestStoreErrorsAreClassifiable(t *testing.T) {
 	}
 	if err := store.UpdateStatus("dup", StatusSnapshot{State: "bogus"}); !errors.Is(err, ErrValidation) {
 		t.Fatalf("UpdateStatus() error = %v, want ErrValidation", err)
+	}
+}
+
+func TestStoreDirtyTracksChangesSinceHistorySave(t *testing.T) {
+	store := NewStore(Settings{HistorySize: 5, MaxConcurrentActions: 1})
+	if store.Dirty() {
+		t.Fatal("new store must not be dirty")
+	}
+	card, err := store.CreateCard(ActionCard{ID: "dirty", Name: "Dirty", Primary: Action{Command: "true", TimeoutSec: 1}, Status: &Action{Command: "true", TimeoutSec: 1}})
+	if err != nil {
+		t.Fatalf("CreateCard() error = %v", err)
+	}
+	path := filepath.Join(t.TempDir(), "marionette.json")
+	if err := store.SaveFileWithHistory(path); err != nil {
+		t.Fatalf("SaveFileWithHistory() error = %v", err)
+	}
+	if store.Dirty() {
+		t.Fatal("store is dirty right after SaveFileWithHistory")
+	}
+	if err := store.AppendRun(card.ID, Run{ActionKind: "primary", Outcome: RunOutcomeOK, StartedAt: time.Now()}); err != nil {
+		t.Fatalf("AppendRun() error = %v", err)
+	}
+	if !store.Dirty() {
+		t.Fatal("AppendRun did not mark the store dirty")
+	}
+	if err := store.SaveFileWithHistory(path); err != nil {
+		t.Fatalf("second SaveFileWithHistory() error = %v", err)
+	}
+	if err := store.UpdateStatus(card.ID, StatusSnapshot{State: StatusStateOK}); err != nil {
+		t.Fatalf("UpdateStatus() error = %v", err)
+	}
+	if !store.Dirty() {
+		t.Fatal("UpdateStatus did not mark the store dirty")
+	}
+	if err := store.SaveFile(path); err != nil {
+		t.Fatalf("SaveFile() error = %v", err)
+	}
+	if !store.Dirty() {
+		t.Fatal("SaveFile without history must not clear the dirty flag")
+	}
+	loaded, err := LoadFile(path)
+	if err != nil {
+		t.Fatalf("LoadFile() error = %v", err)
+	}
+	if loaded.Dirty() {
+		t.Fatal("freshly loaded store must not be dirty")
 	}
 }

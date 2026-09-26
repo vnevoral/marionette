@@ -25,16 +25,28 @@ type StatusEventBroker struct {
 	mu          sync.Mutex
 	nextID      uint64
 	subscribers map[chan StatusEvent]struct{}
+	// done is closed by Close so that every events handler returns at once
+	// instead of keeping its connection open until the HTTP server gives up.
+	done   chan struct{}
+	closed bool
 }
 
 // NewStatusEventBroker creates an empty broker with no subscribers.
 func NewStatusEventBroker() *StatusEventBroker {
-	return &StatusEventBroker{subscribers: make(map[chan StatusEvent]struct{})}
+	return &StatusEventBroker{
+		subscribers: make(map[chan StatusEvent]struct{}),
+		done:        make(chan struct{}),
+	}
 }
 
 // Publish sends a transition to subscribers without waiting for any client.
+// Events published after Close are dropped.
 func (broker *StatusEventBroker) Publish(cardID string, snapshot config.StatusSnapshot) {
 	broker.mu.Lock()
+	defer broker.mu.Unlock()
+	if broker.closed {
+		return
+	}
 	broker.nextID++
 	event := StatusEvent{ID: broker.nextID, CardID: cardID, Snapshot: snapshot}
 	for subscriber := range broker.subscribers {
@@ -53,13 +65,33 @@ func (broker *StatusEventBroker) Publish(cardID string, snapshot config.StatusSn
 			}
 		}
 	}
-	broker.mu.Unlock()
+}
+
+// Close disconnects every subscriber and makes the events endpoint end new
+// streams immediately. It is idempotent and safe to call concurrently with
+// Publish and with connected clients.
+func (broker *StatusEventBroker) Close() {
+	broker.mu.Lock()
+	defer broker.mu.Unlock()
+	if broker.closed {
+		return
+	}
+	broker.closed = true
+	close(broker.done)
+	broker.subscribers = make(map[chan StatusEvent]struct{})
+}
+
+// Done is closed once the broker has been closed.
+func (broker *StatusEventBroker) Done() <-chan struct{} {
+	return broker.done
 }
 
 func (broker *StatusEventBroker) subscribe() (<-chan StatusEvent, func()) {
 	subscriber := make(chan StatusEvent, 8)
 	broker.mu.Lock()
-	broker.subscribers[subscriber] = struct{}{}
+	if !broker.closed {
+		broker.subscribers[subscriber] = struct{}{}
+	}
 	broker.mu.Unlock()
 
 	var once sync.Once
@@ -96,6 +128,8 @@ func (api cardAPI) events(w http.ResponseWriter, request *http.Request) {
 	for {
 		select {
 		case <-request.Context().Done():
+			return
+		case <-api.statusEvents.Done():
 			return
 		case event := <-subscriber:
 			payload, err := json.Marshal(struct {

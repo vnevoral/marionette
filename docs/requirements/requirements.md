@@ -153,9 +153,13 @@ spustitelný soubor.
   neřeší se škálování na velké objemy ani multi-tenant.
 - **FR-33**: Poškozený/chybějící konfigurační soubor při startu nesmí shodit
   aplikaci — spustí se s prázdnou konfigurací a chyba se zaloguje.
-- **FR-34**: Cesta ke konfiguračnímu souboru je nastavitelná proměnnou
-  prostředí `MARIONETTE_CONFIG` (výchozí `./marionette.json`), analogicky k
-  již existující `MARIONETTE_ADDR` (výchozí `:8080`) pro HTTP adresu/port.
+- **FR-34** _(doplněno 2026-09-26)_: Cesta ke konfiguračnímu souboru je
+  nastavitelná proměnnou prostředí `MARIONETTE_CONFIG` (výchozí
+  `./marionette.json`), analogicky k již existující `MARIONETTE_ADDR`
+  (výchozí `:8080`) pro HTTP adresu/port. Celkový limit řízeného ukončení
+  (FR-35) je nastavitelný proměnnou `MARIONETTE_SHUTDOWN_TIMEOUT` (formát Go
+  `time.Duration`, výchozí `20s`; musí být kratší než `TimeoutStopSec`
+  systemd jednotky, výchozí 90 s).
 - **FR-35**: Při **řízeném ukončení aplikace** (přijetí SIGINT/SIGTERM a
   doběhnutí graceful shutdown) se historie primárních běhů a historie změn
   statusu (FR-17) uloží na
@@ -274,7 +278,7 @@ promítnuty do FR/NFR výše:
 | Automatický polling            | Volitelný, per karta, výchozí interval 60 s (FR-15).                                             |
 | Validace příkazů               | Bez whitelistingu; jen strukturované argumenty, žádný shell string (NFR-01).                     |
 | Limit výstupu akce             | 4 KB kombinovaně stdout+stderr, zbytek se ořízne (FR-13).                                        |
-| Cesta ke config souboru / port | `MARIONETTE_CONFIG` (default `./marionette.json`) / `MARIONETTE_ADDR` (default `:8080`) (FR-34). |
+| Cesta ke config souboru / port | `MARIONETTE_CONFIG` (default `./marionette.json`) / `MARIONETTE_ADDR` (default `:8080`) / `MARIONETTE_SHUTDOWN_TIMEOUT` (default `20s`) (FR-34). |
 | Počet akcí na kartu            | 1 primární + 1 nepovinná status akce, víc akcí na kartu není v MVP (viz FR-11, FR-12).           |
 | Souběžnost spouštění akcí      | Konfigurovatelný limit, výchozí 4 (FR-18, NFR-07).                                               |
 

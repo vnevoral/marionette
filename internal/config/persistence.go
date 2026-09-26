@@ -103,12 +103,28 @@ func (store *Store) SaveFile(path string) error {
 	return writePersistedFile(path, store.snapshot(false))
 }
 
-// SaveFileWithHistory atomically saves settings, cards, and run history.
+// SaveFileWithHistory atomically saves settings, cards, run history and the
+// status projection, and marks the store clean (see Dirty) as of the
+// snapshot that was written.
 func (store *Store) SaveFileWithHistory(path string) error {
-	return writePersistedFile(path, store.snapshot(true))
+	file, revision := store.snapshotWithRevision(true)
+	if err := writePersistedFile(path, file); err != nil {
+		return err
+	}
+	store.mu.Lock()
+	if revision > store.savedChanges {
+		store.savedChanges = revision
+	}
+	store.mu.Unlock()
+	return nil
 }
 
 func (store *Store) snapshot(includeHistory bool) persistedFile {
+	file, _ := store.snapshotWithRevision(includeHistory)
+	return file
+}
+
+func (store *Store) snapshotWithRevision(includeHistory bool) (persistedFile, uint64) {
 	store.mu.RLock()
 	defer store.mu.RUnlock()
 
@@ -124,7 +140,7 @@ func (store *Store) snapshot(includeHistory bool) persistedFile {
 		file.Status = cloneStatuses(store.statuses)
 		file.History = marshalHistory(store.history, store.statusHistory)
 	}
-	return file
+	return file, store.changes
 }
 
 func marshalHistory(history map[string]map[string][]Run, statusHistory map[string][]StatusChange) json.RawMessage {

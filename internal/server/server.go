@@ -8,7 +8,9 @@ import (
 	"io"
 	"io/fs"
 	"log"
+	"math"
 	"net/http"
+	"strconv"
 	"strings"
 
 	"marionette/internal/config"
@@ -211,12 +213,8 @@ func (api cardAPI) enqueuePrimary(w http.ResponseWriter, request *http.Request) 
 		writeError(w, http.StatusNotFound, config.ErrNotFound)
 		return
 	}
-	if err := api.actions.EnqueuePrimary(cardID, card.Primary); err != nil {
-		status := http.StatusInternalServerError
-		if errors.Is(err, ErrActionQueueFull) {
-			status = http.StatusServiceUnavailable
-		}
-		writeError(w, status, err)
+	if err := api.actions.EnqueuePrimary(cardID, card.Primary); err != nil && !errors.Is(err, ErrActionAlreadyQueued) {
+		writeQueueError(w, err)
 		return
 	}
 	if api.notifier != nil {
@@ -238,12 +236,8 @@ func (api cardAPI) enqueueStatus(w http.ResponseWriter, request *http.Request) {
 		writeError(w, http.StatusUnprocessableEntity, errors.New("status action is not configured"))
 		return
 	}
-	if err := api.actions.EnqueueStatus(cardID); err != nil {
-		status := http.StatusInternalServerError
-		if errors.Is(err, ErrActionQueueFull) {
-			status = http.StatusServiceUnavailable
-		}
-		writeError(w, status, err)
+	if err := api.actions.EnqueueStatus(cardID); err != nil && !errors.Is(err, ErrActionAlreadyQueued) {
+		writeQueueError(w, err)
 		return
 	}
 	writeJSON(w, http.StatusAccepted, acceptedAction{CardID: cardID, ActionKind: "status", Status: "accepted"})
@@ -275,6 +269,24 @@ func writeJSON(w http.ResponseWriter, status int, value any) {
 
 func writeError(w http.ResponseWriter, status int, err error) {
 	writeJSON(w, status, map[string]string{"error": err.Error()})
+}
+
+// writeQueueError maps action queue errors: a full queue → 503 with a
+// Retry-After hint (FR-18), a closed queue (shutdown in progress) → 503,
+// anything else → 500.
+func writeQueueError(w http.ResponseWriter, err error) {
+	var full *QueueFullError
+	switch {
+	case errors.As(err, &full):
+		seconds := int(math.Ceil(full.RetryAfter.Seconds()))
+		w.Header().Set("Retry-After", strconv.Itoa(max(seconds, 1)))
+		writeError(w, http.StatusServiceUnavailable, err)
+	case errors.Is(err, ErrActionQueueFull), errors.Is(err, ErrActionQueueClosed):
+		w.Header().Set("Retry-After", "1")
+		writeError(w, http.StatusServiceUnavailable, err)
+	default:
+		writeError(w, http.StatusInternalServerError, err)
+	}
 }
 
 // writeStoreError maps config store errors to HTTP statuses: not found → 404,

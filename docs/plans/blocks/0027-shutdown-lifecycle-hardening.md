@@ -3,7 +3,7 @@
 - **Fáze**: 8 — Zpevnění
 - **Vazba na požadavky**: FR-35, FR-18, NFR-03, NFR-04, NFR-11
 - **Vazba na ADR**: ADR-0004, ADR-0008
-- **Stav**: Schváleno
+- **Stav**: Hotovo
 - **Závislosti**: Blok 0024 (kontext skrz Runner), blok 0012 (lifecycle), blok 0022 (SSE)
 
 ## Cíl bloku
@@ -96,6 +96,47 @@ Viz [Definition of Done](../../devops/definition-of-done.md) +:
 
 ## Uzavření
 
-- **Stav po implementaci**: čeká
-- **Ověření**: čeká
-- **Dokumentace aktualizována**: čeká
+- **Stav po implementaci**: Hotovo (2026-09-26)
+- **Ověření**: `make verify` prošel (golangci-lint, eslint, vue-tsc, prettier,
+  `go test -race -count=1 ./...`, build, vet). Nové a upravené testy:
+  `TestBrokerCloseEndsEventsHandler` (skutečný HTTP klient, stream skončí
+  do 100 ms), `TestStatusEventsEndpointEndsImmediatelyWhenBrokerClosed`,
+  `TestBackgroundActionsCloseDropsQueued` (4 čekající zahozeny, běžící
+  zrušen po 50 ms grace), `TestBackgroundActionsCloseIdempotent`,
+  `TestBackgroundActionsCloseLetsRunningJobFinishWithinGrace`,
+  `TestEnqueueDeduplicatesWaitingJob` (stejná karta + druh → `202`, jiný
+  druh se zařadí, po startu jobu se nový požadavek zařadí znovu),
+  `TestEnqueueReportsFullQueueWithRetryAfter`,
+  `TestRouterMapsQueueErrorsToAcceptedOrServiceUnavailable` (`202`/`503` +
+  `Retry-After`), `TestStoreDirtyTracksChangesSinceHistorySave`,
+  `TestLoadEnvironmentDefaultsAndShutdownTimeout`,
+  `TestShutdownSavesHistoryBeforeQueueDrain` (pořadí http → save → actions →
+  scheduler → save), `TestShutdownSkipsSecondSaveWhenCleanAndSaveWhenReadOnly`,
+  `TestGraceDeadlineNeverInThePast` a integrační smoke test
+  `TestRunShutsDownQuicklyWithOpenSSEClientAndSavesHistory` (běžící
+  `sleep 30`, připojený SSE klient, limit 2 s → `run()` skončí do 3 s, stream
+  uzavřen, v souboru je běh s výsledkem `canceled`, procesní skupina
+  neexistuje). Manuální ověření na referenčním hostu (`systemctl restart`
+  s otevřeným dashboardem < 3 s) zbývá provést spolu s blokem 0023.
+- **Odchylky od návrhu**: (1) `requestTracker` odstraněn — `http.Server.Shutdown`
+  sám čeká na doběhnutí aktivních handlerů, tracker byl duplicitní;
+  (2) `BackgroundActions.Close(ctx)` bere kontext místo vnitřního
+  `shutdownTimeout` a vrací počet zahozených jobů; běžící joby dostanou
+  grace (limit minus rezerva 3 s) a teprve pak se zruší, aby krátké akce
+  doběhly a zapsaly se do historie; (3) idempotence Close je řešena
+  příznakem pod zámkem, ne `sync.Once`, kvůli návratové hodnotě;
+  (4) fronta je místo kanálu slice pod zámkem, protože kanál neumožňuje
+  deduplikaci ani zahození čekajících jobů; (5) `Retry-After` se počítá
+  jako `ceil(čekající / workery) × 1 s`, min. 1 s — délky akcí nejsou
+  předem známé; (6) navíc opraven dopad bloku 0025: v režimu jen pro čtení
+  se historie při shutdownu neukládá, aby se nečitelný soubor nepřepsal
+  prázdnou konfigurací (`openStore` vrací příznak `readOnly`);
+  (7) druhý signál během shutdownu ukončí proces okamžitě
+  (`signal.NotifyContext` + obnovení výchozí obsluhy); (8) `http.Server`
+  dostal `IdleTimeout` 60 s a `BaseContext` z aplikačního kontextu.
+- **Dokumentace aktualizována**: ano — `docs/architecture/overview.md`
+  (sekce „Řízené ukončení (shutdown)“), requirements FR-34 a tabulka
+  rozhodnutí (`MARIONETTE_SHUTDOWN_TIMEOUT`), ADR-0008 (doplnění o
+  `Close()`), README (tabulka proměnných, chování shutdownu),
+  `deploy/marionette.default`, godoc (`shutdown`, `BackgroundActions.Close`,
+  `StatusEventBroker.Close`, `Store.Dirty`), roadmapa.

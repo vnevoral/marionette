@@ -51,3 +51,12 @@ serveru do připojených browser klientů.
   odpojení, reconnectu a paralelních klientů.
 - V MVP se nepersistuje event log a klient nemůže žádat historické události;
   při reconnectu načte aktuální projekci přes REST.
+
+## Doplnění 2026-09-26 (blok 0027)
+
+Broadcaster (`StatusEventBroker`) má `Close()`, které při řízeném ukončení
+aplikace odpojí všechny odběratele a ukončí každý běžící `/api/events`
+handler okamžitě; volá se z `http.Server.RegisterOnShutdown`, takže
+`Shutdown` na dlouhožijící SSE spojení nečeká. Události publikované po
+`Close()` se zahazují. Klient se po restartu služby připojí znovu díky
+nativnímu reconnectu `EventSource`.

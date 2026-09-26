@@ -54,7 +54,19 @@ sudo ./install.sh ./marionette-linux-arm64
 
 The installer creates the `marionette` service account, preserves an existing
 `/var/lib/marionette/marionette.json`, installs the unit, and starts the
-service. Runtime settings are read from `/etc/default/marionette`.
+service. Runtime settings are read from `/etc/default/marionette`:
+
+| Variable                      | Default             | Meaning                                                                                                   |
+| ----------------------------- | ------------------- | --------------------------------------------------------------------------------------------------------- |
+| `MARIONETTE_CONFIG`           | `./marionette.json` | Path of the configuration file (cards, settings, saved history).                                          |
+| `MARIONETTE_ADDR`             | `:8080`             | HTTP listen address.                                                                                      |
+| `MARIONETTE_SHUTDOWN_TIMEOUT` | `20s`               | Total budget for a graceful stop (Go duration). Keep it below the unit's `TimeoutStopSec` (90 s default). |
+
+On `SIGTERM`/`SIGINT` Marionette stops accepting requests, closes the live
+status streams, saves the configuration and run history, discards queued
+actions, lets running actions finish within the remaining budget (minus a
+3 s reserve for terminating them), stops the status scheduler and saves the
+history again if it changed. A second signal terminates the process at once.
 
 If the configuration file cannot be parsed at startup, Marionette moves it to
 `marionette.json.corrupt-<timestamp>` (logged as a warning), starts with an
