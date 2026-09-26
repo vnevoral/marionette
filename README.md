@@ -32,6 +32,11 @@ The backend reads `./marionette.json`, which is git-ignored and created from
 `deploy/dev-fixture.json` on the first `make backend-dev` (or `make
 dev-config`). Node 22 is required for the UI (`web/.nvmrc`).
 
+Access control is on in development too: the first start prints a pairing
+code in the backend output; enter it on the pairing screen once (the paired
+device is kept in `./devices.json`). Set `MARIONETTE_AUTH=off` to skip
+pairing while developing.
+
 ## Production build
 
 ```bash
@@ -73,6 +78,10 @@ service. Runtime settings are read from `/etc/default/marionette`:
 | `MARIONETTE_ALLOWED_HOSTS`    | empty               | Comma-separated hosts (optionally `host:port`; 80/443 equal no port) accepted for mutating API requests; empty accepts any host. |
 | `MARIONETTE_LOG_FORMAT`       | `text`              | `text` (journald friendly) or `json` structured logs.                                                     |
 | `MARIONETTE_LOG_LEVEL`        | `info`              | Minimum log level: `debug`, `info`, `warn` or `error`.                                                    |
+| `MARIONETTE_AUTH`             | `on`                | `on` requires paired devices; `off` leaves the API open (development only, logged as a warning).          |
+| `MARIONETTE_DEVICES`          | next to the config  | Path of the paired devices file (`devices.json` in the directory of `MARIONETTE_CONFIG`).                 |
+| `MARIONETTE_DEVICE_EXPIRY_DAYS` | `60`              | A device unused for this many days must pair again (1–400). Devices in use are renewed automatically.     |
+| `MARIONETTE_COOKIE_SECURE`    | `auto`              | `Secure` attribute of the device cookie: `auto` (when the connection uses TLS), `always` (behind a TLS proxy) or `never`. |
 
 Global settings (`historySize`, `maxConcurrentActions`) live in the
 `settings` object of the configuration file. There is no API for them: edit
@@ -95,8 +104,43 @@ operator's browser: they must use `Content-Type: application/json`, and a
 browser-supplied `Origin` or `Sec-Fetch-Site: cross-site` that does not match
 the server is rejected with 403. Hosts are compared without regard to the
 default ports 80 and 443, so the check also works behind a TLS-terminating
-reverse proxy. Plain `curl -X POST` without those headers keeps working. There
-is no authentication; keep the service on a trusted network.
+reverse proxy.
+
+### Pairing devices
+
+Only paired devices (browsers) can use Marionette. A device pairs once with a
+one-time code and is never asked again; there is no password.
+
+1. **First device.** After installation, open Marionette in a browser. It
+   shows the pairing screen. Read the code from the service log on the host
+   and enter it with a name for the device:
+
+   ```bash
+   journalctl -u marionette | grep "pairing code"
+   ```
+
+   The code is valid for 10 minutes; opening the pairing screen again writes
+   a fresh one while no device is paired.
+2. **More devices.** On a paired device open **Devices** → **Pair a new
+   device** and enter the shown code (or open the link) on the new device.
+3. **Removing a device** on the Devices page ends its access at once.
+   A device that is not used for `MARIONETTE_DEVICE_EXPIRY_DAYS` (60 by
+   default) expires; a device in use is renewed automatically.
+4. **Lost every device?** On the host:
+
+   ```bash
+   sudo rm /var/lib/marionette/devices.json
+   sudo systemctl restart marionette
+   ```
+
+   A new pairing code appears in the log.
+
+The device token lives in an `HttpOnly` cookie and is stored on the host only
+as a hash in `devices.json`; back that file up together with
+`marionette.json`. Over plain HTTP the token travels unencrypted: use the
+service inside a VPN, or put a TLS reverse proxy in front and set
+`MARIONETTE_COOKIE_SECURE=always`. The API requires a paired browser; `curl`
+without the cookie only reaches `/api/health`.
 
 If the configuration file cannot be parsed at startup, Marionette moves it to
 `marionette.json.corrupt-<timestamp>` (logged as a warning), starts with an

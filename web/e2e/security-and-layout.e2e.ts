@@ -52,13 +52,22 @@ test("a page on another origin cannot trigger an action in the operator's browse
 test.describe("at 320 px", () => {
 	test.use({ viewport: { width: 320, height: 640 } });
 
-	test("overview, detail and edit do not scroll horizontally", async ({ page, request }) => {
+	test("overview, detail, edit and devices do not scroll horizontally", async ({
+		page,
+		request,
+	}) => {
 		await createCard(request, {
 			id: "narrow",
 			name: "A card with a fairly long name",
 			withStatus: true,
 		});
-		for (const path of ["/", "/cards/narrow", "/cards/narrow/edit", "/cards/new/edit"]) {
+		for (const path of [
+			"/",
+			"/cards/narrow",
+			"/cards/narrow/edit",
+			"/cards/new/edit",
+			"/devices",
+		]) {
 			await page.goto(path);
 			await expect(page.locator("main.page")).toBeVisible();
 			await expect(page.locator(".loading-state")).toHaveCount(0);
@@ -79,5 +88,23 @@ test.describe("at 320 px", () => {
 		expect(box!.x).toBeGreaterThanOrEqual(0);
 		expect(box!.x + box!.width).toBeLessThanOrEqual(320);
 		await expectNoHorizontalScroll(page);
+	});
+
+	test("the pairing screen and a shown code fit the screen", async ({ page, browser, baseURL }) => {
+		await page.goto("/devices");
+		await page.getByRole("button", { name: "Pair a new device" }).click();
+		await expect(page.getByLabel("Pairing code")).toBeVisible();
+		await expectNoHorizontalScroll(page);
+
+		const context = await browser.newContext({
+			baseURL,
+			viewport: { width: 320, height: 640 },
+			storageState: { cookies: [], origins: [] },
+		});
+		const unpaired = await context.newPage();
+		await unpaired.goto("/pair");
+		await expect(unpaired.getByRole("button", { name: "Pair device" })).toBeVisible();
+		await expectNoHorizontalScroll(unpaired);
+		await context.close();
 	});
 });

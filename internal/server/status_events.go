@@ -11,11 +11,13 @@ import (
 	"marionette/internal/config"
 )
 
-const statusEventHeartbeat = 15 * time.Second
+// statusEventHeartbeat is a variable only so tests can shorten it.
+var statusEventHeartbeat = 15 * time.Second
 
 // events streams status transitions as Server-Sent Events (ADR-0008). The
-// stream ends when the client goes away or the event source is closed
-// during shutdown.
+// stream ends when the client goes away, the event source is closed during
+// shutdown, or (with access control) at the first heartbeat after the
+// client's device was removed (FR-55).
 func (api cardAPI) events(w http.ResponseWriter, request *http.Request) {
 	flusher, ok := w.(http.Flusher)
 	if !ok {
@@ -53,6 +55,9 @@ func (api cardAPI) events(w http.ResponseWriter, request *http.Request) {
 			_, _ = fmt.Fprintf(w, "id: %s\nevent: status.changed\ndata: %s\n\n", strconv.FormatUint(event.ID, 10), payload)
 			flusher.Flush()
 		case <-heartbeat.C:
+			if device, ok := currentDevice(request); ok && api.devices != nil && !api.devices.Exists(device.ID) {
+				return
+			}
 			_, _ = fmt.Fprint(w, ": heartbeat\n\n")
 			flusher.Flush()
 		}

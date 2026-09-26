@@ -68,12 +68,25 @@ export const REQUEST_TIMEOUT_MS = 15_000;
 export class ApiError extends Error {
 	readonly status: number;
 	readonly fields?: Record<string, string>;
+	/** The whole JSON error envelope, for endpoints that add their own keys. */
+	readonly envelope?: Record<string, unknown>;
 
-	constructor(message: string, status: number, fields?: Record<string, string>) {
+	constructor(
+		message: string,
+		status: number,
+		fields?: Record<string, string>,
+		envelope?: Record<string, unknown>,
+	) {
 		super(message);
 		this.name = "ApiError";
 		this.status = status;
 		this.fields = fields;
+		this.envelope = envelope;
+	}
+
+	/** The device is not paired (FR-50). */
+	get isUnauthorized() {
+		return this.status === 401;
 	}
 
 	get isNotFound() {
@@ -109,10 +122,26 @@ async function errorFromResponse(response: Response): Promise<ApiError> {
 	try {
 		const envelope = (await response.json()) as ErrorEnvelope;
 		const message = typeof envelope.error === "string" ? envelope.error : fallback;
-		return new ApiError(message, response.status, fieldMessages(envelope.fields));
+		return new ApiError(
+			message,
+			response.status,
+			fieldMessages(envelope.fields),
+			envelope && typeof envelope === "object" ? (envelope as Record<string, unknown>) : undefined,
+		);
 	} catch {
 		return new ApiError(fallback, response.status);
 	}
+}
+
+// Called when any API request answers 401 because this device is not (or no
+// longer) paired; the router sends the user to the pairing screen. The
+// session and pairing endpoints answer 401 as part of their contract and are
+// excluded.
+let unauthorizedHandler: (() => void) | undefined;
+const unauthorizedIsExpected = new Set(["/api/session", "/api/pairing"]);
+
+export function setUnauthorizedHandler(handler: (() => void) | undefined) {
+	unauthorizedHandler = handler;
 }
 
 async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
@@ -138,7 +167,11 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
 			if (failure instanceof DOMException && failure.name === "AbortError") throw failure;
 			throw new ApiError("Server unreachable", 0);
 		}
-		if (!response.ok) throw await errorFromResponse(response);
+		if (!response.ok) {
+			const failure = await errorFromResponse(response);
+			if (failure.isUnauthorized && !unauthorizedIsExpected.has(path)) unauthorizedHandler?.();
+			throw failure;
+		}
 		if (response.status === 204) return undefined as T;
 		if (!isJSON(response)) throw new ApiError("Unexpected response from server", response.status);
 		try {
@@ -238,6 +271,72 @@ export function enqueuePrimary(cardID: string): Promise<AcceptedAction> {
 export function enqueueStatus(cardID: string): Promise<AcceptedAction> {
 	return request<AcceptedAction>(`/api/cards/${encodeURIComponent(cardID)}/actions/status/check`, {
 		method: "POST",
+		headers: { "Content-Type": "application/json" },
+	});
+}
+
+/** A paired browser as listed on the Devices page (FR-55). */
+export interface Device {
+	id: string;
+	name: string;
+	pairedAt: string;
+	lastSeenAt: string;
+	/** True for the device that made the request. */
+	current: boolean;
+}
+
+/**
+ * Access state of this browser: `open` when the server runs without access
+ * control (MARIONETTE_AUTH=off), `paired`, or `unpaired` — with `bootstrap`
+ * set while no device is paired at all and the code is in the service log.
+ */
+export type Session =
+	| { status: "open" }
+	| { status: "paired"; device: Device; expiryDays: number }
+	| { status: "unpaired"; bootstrap: boolean };
+
+export async function getSession(): Promise<Session> {
+	try {
+		const session = await request<{ device: Device; expiryDays: number }>("/api/session");
+		return { status: "paired", device: session.device, expiryDays: session.expiryDays };
+	} catch (failure) {
+		if (failure instanceof ApiError && failure.isUnauthorized) {
+			return { status: "unpaired", bootstrap: failure.envelope?.bootstrap === true };
+		}
+		if (failure instanceof ApiError && failure.isNotFound) return { status: "open" };
+		throw failure;
+	}
+}
+
+export async function pairDevice(code: string, name: string): Promise<Device> {
+	const paired = await request<{ device: Device }>("/api/pairing", {
+		method: "POST",
+		headers: { "Content-Type": "application/json" },
+		body: JSON.stringify({ code, name }),
+	});
+	return paired.device;
+}
+
+export interface PairingCode {
+	/** Grouped for display, e.g. "K7QM-3XRD". */
+	code: string;
+	expiresAt: string;
+}
+
+export function createPairingCode(): Promise<PairingCode> {
+	return request<PairingCode>("/api/pairing/code", {
+		method: "POST",
+		headers: { "Content-Type": "application/json" },
+	});
+}
+
+export function listDevices(): Promise<Device[]> {
+	return request<Device[]>("/api/devices");
+}
+
+export function removeDevice(id: string): Promise<void> {
+	return request<void>(`/api/devices/${encodeURIComponent(id)}`, {
+		method: "DELETE",
 		headers: { "Content-Type": "application/json" },
 	});
 }

@@ -206,13 +206,14 @@ func TestShutdownSavesHistoryBeforeQueueDrain(t *testing.T) {
 		},
 		stopScheduler: func() error { recorded.add("scheduler"); return nil },
 		historyDirty:  func() bool { return dirty },
+		saveDevices:   func() error { recorded.add("devices"); return nil },
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
 	defer cancel()
 	if err := shutdown(ctx, steps, slog.New(slog.NewTextHandler(io.Discard, nil))); err != nil {
 		t.Fatalf("shutdown() error = %v", err)
 	}
-	want := []string{"http", "save", "actions", "scheduler", "save"}
+	want := []string{"http", "save", "actions", "scheduler", "save", "devices"}
 	if strings.Join(recorded.calls, ",") != strings.Join(want, ",") {
 		t.Fatalf("shutdown order = %v, want %v", recorded.calls, want)
 	}

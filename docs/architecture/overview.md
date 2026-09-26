@@ -40,7 +40,8 @@ Návrh musí od začátku počítat s: absencí shell interpolace uživatelskéh
 vstupu (spouštět přes `exec.Command(name, args...)`, ne přes shell string),
 timeoutem pro každý běh, a omezením přístupu k UI/API (viz NFR-01). Spouštění
 je popsáno v ADR-0005; ochrana API před cizími weby níže (NFR-12);
-autentizace zůstává mimo MVP.
+přístup jen ze spárovaných zařízení v sekci „Přístup ze spárovaných
+zařízení“ (NFR-01, ADR-0011).
 
 ## Ochrana před cross-site požadavky
 
@@ -78,6 +79,49 @@ omezení. Chyby mají stejnou JSON obálku `{"error": "..."}` jako ostatní
 odpovědi API. SPA proto posílá `Content-Type: application/json` u všech
 mutujících volání včetně těch bez těla. Žádné CORS hlavičky se nevydávají
 (jiné originy se záměrně nepovolují).
+
+## Přístup ze spárovaných zařízení
+
+Balíček `internal/access` (blok 0043, FR-50..FR-56, NFR-13, ADR-0011) drží
+spárovaná zařízení v `devices.json` (výchozí vedle `MARIONETTE_CONFIG`,
+práva `0600`, zápis přes `fsutil.WriteFileAtomic`) a nejvýš jeden párovací
+kód v paměti. Middleware `requireDevice` v `internal/server` stojí za
+`requireSameOrigin` (NFR-12) a pro každý požadavek pod `/api/` kromě
+`GET /api/health`, `GET /api/session` a `POST /api/pairing` vyžaduje cookie
+`marionette_device` s platným tokenem, jinak `401`
+`{"error","code":"pairing_required"}`. Soubory SPA zůstávají veřejné.
+
+| Endpoint                     | Popis                                                                                       |
+| ---------------------------- | ------------------------------------------------------------------------------------------- |
+| `GET /api/session`           | `200 {device, expiryDays}`, nebo `401` s `bootstrap: true`, když není spárované nic          |
+| `POST /api/pairing`          | `{code, name}` → `201 {device}` + cookie; neplatný kód `400`, prázdné jméno `422`           |
+| `POST /api/pairing/code`     | kód pro další zařízení `201 {code, expiresAt}` (jen spárované zařízení)                      |
+| `GET /api/devices`           | seznam `{id, name, pairedAt, lastSeenAt, current}` bez hashe tokenu                           |
+| `DELETE /api/devices/{id}`   | `204`; u vlastního zařízení smaže cookie (odhlášení)                                          |
+
+- **Token**: 32 bajtů z `crypto/rand` (base64url); na disku jen SHA-256
+  hash; nikdy v logu ani v těle odpovědi. Cookie `HttpOnly`,
+  `SameSite=Strict`, `Path=/`, `Max-Age` = platnost zařízení, `Secure` podle
+  `MARIONETTE_COOKIE_SECURE` (`auto` = TLS spojení, `always`, `never`).
+- **Platnost**: `MARIONETTE_DEVICE_EXPIRY_DAYS` (výchozí 60, 1–400).
+  Poslední použití se drží v paměti; na disk se zapíše a cookie se obnoví
+  nejvýš jednou denně na zařízení a při shutdownu (krok „save devices“) —
+  šetří SD kartu. Zařízení nepoužité déle než platnost se při příštím
+  dotazu nebo načtení odstraní.
+- **Kód**: 8 znaků Crockford Base32 (normalizace velikosti písmen, pomlček
+  a znaků I/L/O), 10 minut, jednorázový, po 5 chybách zneplatněn, nový kód
+  ruší starý, porovnání v konstantním čase. Bez spárovaného zařízení se kód
+  zapíše do logu při startu a znovu při `GET /api/session`, pokud žádný
+  neplatí — obrazovka párování tak vždy najde aktuální kód v
+  `journalctl -u marionette`.
+- **Odebrání** platí pro REST okamžitě; SSE stream odebraného zařízení
+  skončí při dalším heartbeatu (15 s).
+- **Selhání**: poškozený `devices.json` se karanténuje (`.corrupt-<čas>`)
+  a služba startuje bez zařízení (nový kód v logu); nečitelný soubor
+  zastaví start (přístup se nikdy tiše neotevře). Obnova ztraceného
+  přístupu: smazat `devices.json` a restartovat službu.
+- `MARIONETTE_AUTH=off` ověřování vypne (vývoj); start to zaloguje jako
+  varování.
 
 ## Ochrana konfiguračního souboru
 

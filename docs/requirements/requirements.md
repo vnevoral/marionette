@@ -190,9 +190,50 @@ spustitelný soubor.
   fallback. REST API zůstává zdrojem pro počáteční načtení obrazovky a
   synchronní načtení aktuální projekce.
 
+### 3.6 Přístup a párování zařízení _(přijato 2026-09-26, ADR-0011)_
+
+Přístup do UI a API mají jen **spárovaná zařízení** (prohlížeče). Zařízení
+se ověří jednou, jednorázovým kódem, a pak už se neověřuje; žádné heslo se
+nezadává. Služba běží ve vnitřní síti, zvenčí přes VPN.
+
+- **FR-50 Povinné spárování**: Všechny endpointy pod `/api/` kromě
+  `GET /api/health` a párovacích endpointů vyžadují platný device token;
+  bez něj odpoví `401` s JSON obálkou. Statické soubory SPA zůstávají
+  veřejné (neobsahují data); SPA na `401` zobrazí obrazovku párování.
+  SSE stream (`/api/events`) vyžaduje token stejně jako REST.
+- **FR-51 Párovací kód**: Kód má 8 znaků z abecedy bez zaměnitelných znaků
+  (Crockford Base32, ~40 bitů), platí 10 minut, je jednorázový a po
+  5 chybných pokusech se zneplatní. Existuje nejvýš jeden platný kód; nový
+  kód předchozí zneplatní. Kódy se drží jen v paměti.
+- **FR-52 Device token**: Po zadání platného kódu a názvu zařízení (např.
+  „Pracovní notebook“) server vydá náhodný token (256 bitů) v cookie
+  `HttpOnly`, `SameSite=Strict`, `Path=/`. Server ukládá jen hash tokenu.
+  Zařízení, které se nepoužilo déle než **platnost zařízení**, vyprší;
+  platnost je parametr `MARIONETTE_DEVICE_EXPIRY_DAYS` (výchozí 60 dní,
+  rozsah 1–400) a stejnou dobu má i cookie. Používané zařízení nevyprší:
+  server při používání obnoví cookie i čas posledního použití (nejvýš
+  jednou denně).
+- **FR-53 První zařízení**: Pokud není spárované žádné zařízení, služba při
+  startu vygeneruje párovací kód a zapíše ho do logu
+  (`journalctl -u marionette`); obrazovka párování operátora na log odkáže.
+  Jakmile existuje spárované zařízení, kód se do logu nezapisuje.
+- **FR-54 Další zařízení**: Spárované zařízení může v UI (**Devices** →
+  **Pair a new device**) vygenerovat kód pro další zařízení; zobrazí se
+  kód a odkaz, který ho předvyplní.
+- **FR-55 Správa zařízení**: UI zobrazí seznam spárovaných zařízení (název,
+  kdy spárováno, kdy naposledy použito, označení „this device“) a umožní
+  zařízení odebrat. Odebrání platí okamžitě pro REST; otevřený SSE stream
+  odebraného zařízení skončí nejpozději při dalším heartbeatu (15 s).
+  Odebrání vlastního zařízení je odhlášení.
+- **FR-56 Obnova přístupu**: Při ztrátě všech zařízení operátor na hostu
+  smaže soubor se zařízeními a restartuje službu; při startu se pak
+  vygeneruje nový kód podle FR-53. Postup je v README.
+
 ## 4. Nefunkční požadavky
 
-- **NFR-01 Bezpečnost**: MVP neimplementuje autentizaci/autorizaci k UI/API —
+- **NFR-01 Bezpečnost** _(změněno 2026-09-26: přístup jen ze spárovaných
+  zařízení, sekce 3.6, ADR-0011; věta o chybějící autentizaci níže tím
+  přestává platit, ostatní body a–c platí dál)_: MVP neimplementuje autentizaci/autorizaci k UI/API —
   vychází se z předpokladu nasazení v důvěryhodné síti (domácí/lab síť za
   firewallem, bez přímé expozice do internetu). Pokud je potřeba přístup zvenčí,
   je to odpovědnost provozovatele (VPN/reverse proxy s vlastní autentizací), ne
@@ -247,6 +288,13 @@ args...)` se strukturovanými argumenty, nikdy skládáním shell příkazu ze
   prohlížeč — cizí webová stránka otevřená operátorem by jinak mohla spustit
   libovolnou nakonfigurovanou akci na hostu. Neřeší autentizaci (ta zůstává
   mimo MVP). Implementace: blok 0026.
+- **NFR-13 Ochrana párování a tokenů** _(přijato 2026-09-26, ADR-0011)_:
+  Tokeny a kódy se generují z `crypto/rand`, porovnávají v konstantním čase
+  a na disk se ukládá jen SHA-256 hash tokenu v souboru s právy `0600`
+  odděleném od konfigurace karet. Token se nikdy nezapisuje do logu ani
+  nevrací v těle odpovědi. Cookie má atribut `Secure`, pokud spojení
+  používá TLS nebo je to vynucené konfigurací (za TLS proxy). Autentizace
+  nenahrazuje NFR-12 — cross-site ochrana zůstává.
 
 ## 5. Omezení a předpoklady
 
@@ -316,6 +364,7 @@ fáze 8).
 | Budoucnost PrimeFlex           | Po fázi 8 odstraněn a nahrazen vlastní utility vrstvou se stejnými třídami; Tailwind zamítnut, PrimeVue zůstává na v4 (MIT) kvůli licenci v5 ([ADR-0010](../architecture/decisions/0010-own-layout-utilities-replace-primeflex.md), blok 0035). |
 | Cross-site ochrana API         | NFR-12 přijat; implementace v bloku 0026.                                                                                                                   |
 | Licence repozitáře             | MIT (blok 0031 přidá `LICENSE`).                                                                                                                            |
+| Autentizace (NFR-01)           | Přístup jen ze spárovaných zařízení: jednorázový kód (první v logu služby), pak device token v cookie bez dalšího ověřování; platnost 60 dní nepoužívání, konfigurovatelná; bez tokenů pro skripty (FR-50..56, NFR-13, [ADR-0011](../architecture/decisions/0011-device-pairing-access.md), bloky 0043–0044). |
 
 ## 12. Sledovatelnost
 

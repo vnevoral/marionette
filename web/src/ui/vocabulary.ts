@@ -65,6 +65,14 @@ export const FEEDBACK = {
 	statusUnavailable: "Status could not be refreshed",
 	cardSaved: "Card saved",
 	cardDeleted: "Card deleted",
+	devicePaired: "Device paired",
+	deviceRemoved: "Device removed",
+	signedOut: "This device was removed",
+	invalidCode: "The pairing code is invalid or has expired.",
+	unableToPair: "Unable to pair this device",
+	unableToLoadDevices: "Unable to load devices",
+	unableToRemoveDevice: "Unable to remove device",
+	unableToCreateCode: "Unable to create a pairing code",
 	deleting: "Deleting card...",
 	unableToQueue: "Unable to queue action",
 	unableToSave: "Unable to save card",
@@ -94,4 +102,38 @@ export const LOADING = {
 	card: "Loading card...",
 	runs: "Loading recent runs...",
 	history: "Loading status history...",
+	devices: "Loading devices...",
+} as const;
+
+/** Wording of the pairing screen and the Devices page (FR-50..FR-55). */
+export const ACCESS = {
+	pairTitle: "Pair this device",
+	pairLede:
+		"Enter a pairing code once. After that this browser opens Marionette without asking again.",
+	bootstrapHint: "No device is paired yet. The pairing code is in the service log on the host:",
+	bootstrapCommand: 'journalctl -u marionette | grep "pairing code"',
+	otherDeviceHint: "Get a code on a paired device: Devices → Pair a new device.",
+	codeLabel: "Pairing code",
+	nameLabel: "Device name",
+	pairAction: "Pair device",
+	devicesTitle: "Devices",
+	devicesLede: (days: number) =>
+		`Browsers that can use Marionette. A device that is not used for ${days} days must pair again.`,
+	thisDevice: "This device",
+	pairedAt: "Paired",
+	lastUsed: "Last used",
+	pairNewDevice: "Pair a new device",
+	newCode: "New code",
+	codeHint: "Enter this code on the new device, or open the link there.",
+	codeExpiresIn: (time: string) => `Valid for ${time}`,
+	codeExpired: "The code has expired.",
+	copyLink: "Copy link",
+	linkCopied: "Link copied",
+	removeDevice: "Remove device",
+	removeMessage: (name: string, current: boolean) =>
+		current
+			? `Remove "${name}"? This is the device you are using: it will need a new pairing code to open Marionette again.`
+			: `Remove "${name}"? It will need a new pairing code to open Marionette again.`,
+	nowPaired: (name: string) => `"${name}" is now paired.`,
+	removed: (name: string) => `"${name}" was removed.`,
 } as const;

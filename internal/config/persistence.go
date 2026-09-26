@@ -8,8 +8,9 @@ import (
 	"io"
 	"log/slog"
 	"os"
-	"path/filepath"
 	"time"
+
+	"marionette/internal/fsutil"
 )
 
 // Errors returned by LoadFile. Both wrap the underlying cause.
@@ -21,10 +22,10 @@ var (
 	// example because of permissions). Its content may be perfectly valid.
 	ErrConfigUnreadable = errors.New("config file is not readable")
 	// ErrDirectorySync is returned by the save functions when the file was
-	// already replaced but its directory entry could not be fsynced. The new
-	// content is on disk; only its durability across a crash is uncertain.
-	// Callers should log it and must not undo the change in memory.
-	ErrDirectorySync = errors.New("config directory could not be synced")
+	// already replaced but its directory entry could not be fsynced (see
+	// fsutil.ErrDirectorySync). Callers should log it and must not undo the
+	// change in memory.
+	ErrDirectorySync = fsutil.ErrDirectorySync
 )
 
 type persistedFile struct {
@@ -92,26 +93,10 @@ func LoadFile(path string, logger *slog.Logger) (*Store, error) {
 }
 
 // QuarantineFile renames a config file that could not be loaded to
-// "<path>.corrupt-<UTC timestamp>" so that a later save never overwrites it.
-// A numeric suffix is appended when that name is already taken. The new path
-// is returned.
+// "<path>.corrupt-<UTC timestamp>" so that a later save never overwrites it
+// (see fsutil.Quarantine). The new path is returned.
 func QuarantineFile(path string, now time.Time) (string, error) {
-	base := path + ".corrupt-" + now.UTC().Format("20060102T150405Z")
-	target := base
-	for suffix := 1; ; suffix++ {
-		_, err := os.Lstat(target)
-		if errors.Is(err, os.ErrNotExist) {
-			break
-		}
-		if err != nil {
-			return "", fmt.Errorf("inspect quarantine target %q: %w", target, err)
-		}
-		target = fmt.Sprintf("%s-%d", base, suffix)
-	}
-	if err := os.Rename(path, target); err != nil {
-		return "", fmt.Errorf("quarantine config file %q: %w", path, err)
-	}
-	return target, nil
+	return fsutil.Quarantine(path, now)
 }
 
 // SaveFile atomically saves settings and cards without run history.
@@ -242,68 +227,15 @@ func loadHistory(store *Store, raw json.RawMessage, path string, logger *slog.Lo
 	}
 }
 
-// writePersistedFile replaces path atomically: the content is written to a
-// unique "<name>.<random>.tmp" file next to the target, fsynced, renamed over
-// the target and the directory entry is fsynced. The unique name keeps two
-// writers (a second instance on the same file, or a save racing a mutation)
-// from truncating each other's temporary file; the last rename wins with a
-// complete file. An existing file keeps its permission bits; a new file is
-// 0600. A failure after the rename is reported as ErrDirectorySync.
+// writePersistedFile encodes the file and replaces path atomically with
+// fsutil.WriteFileAtomic; a new file is 0600.
 func writePersistedFile(path string, file persistedFile) error {
 	data, err := json.MarshalIndent(file, "", "  ")
 	if err != nil {
 		return fmt.Errorf("encode config file %q: %w", path, err)
 	}
-
-	mode := os.FileMode(0o600)
-	if info, err := os.Stat(path); err == nil {
-		mode = info.Mode().Perm()
-	}
-	temporary, err := os.CreateTemp(filepath.Dir(path), filepath.Base(path)+".*.tmp")
-	if err != nil {
-		return fmt.Errorf("create temporary config file for %q: %w", path, err)
-	}
-	temporaryName := temporary.Name()
-	cleanup := func() {
-		_ = temporary.Close()
-		_ = os.Remove(temporaryName)
-	}
-
-	if _, err := temporary.Write(data); err != nil {
-		cleanup()
-		return fmt.Errorf("write temporary config file %q: %w", temporaryName, err)
-	}
-	if err := temporary.Sync(); err != nil {
-		cleanup()
-		return fmt.Errorf("sync temporary config file %q: %w", temporaryName, err)
-	}
-	if err := temporary.Close(); err != nil {
-		_ = os.Remove(temporaryName)
-		return fmt.Errorf("close temporary config file %q: %w", temporaryName, err)
-	}
-	// CreateTemp always uses 0600; apply the target's permission bits.
-	if err := os.Chmod(temporaryName, mode); err != nil {
-		_ = os.Remove(temporaryName)
-		return fmt.Errorf("set permissions of temporary config file %q: %w", temporaryName, err)
-	}
-	if err := os.Rename(temporaryName, path); err != nil {
-		_ = os.Remove(temporaryName)
-		return fmt.Errorf("replace config file %q: %w", path, err)
-	}
-	if err := syncDirectory(filepath.Dir(path)); err != nil {
-		return fmt.Errorf("sync config directory for %q: %w: %w", path, ErrDirectorySync, err)
+	if err := fsutil.WriteFileAtomic(path, data, 0o600); err != nil {
+		return fmt.Errorf("save config file: %w", err)
 	}
 	return nil
-}
-
-func syncDirectory(path string) error {
-	directory, err := os.Open(path)
-	if err != nil {
-		return err
-	}
-	if err := directory.Sync(); err != nil {
-		_ = directory.Close()
-		return err
-	}
-	return directory.Close()
 }

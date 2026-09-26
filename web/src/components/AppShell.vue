@@ -1,8 +1,21 @@
 <script setup lang="ts">
-import { RouterLink } from "vue-router";
+import { computed } from "vue";
+import { RouterLink, useRoute } from "vue-router";
 import ConnectionStatus from "@/components/ConnectionStatus.vue";
+import { useSession } from "@/composables/useSession";
 
-const navigation = [{ label: "Overview", to: "/", icon: "pi pi-th-large" }];
+const route = useRoute();
+const session = useSession();
+
+// Devices appears only when access control is on and this browser is
+// paired; the pairing screen shows neither navigation nor the live stream.
+const navigation = computed(() => [
+	{ label: "Overview", to: "/", icon: "pi pi-th-large" },
+	...(session.value.status === "paired"
+		? [{ label: "Devices", to: "/devices", icon: "pi pi-desktop" }]
+		: []),
+]);
+const pairing = computed(() => Boolean(route.meta.pairing));
 </script>
 
 <template>
@@ -12,13 +25,13 @@ const navigation = [{ label: "Overview", to: "/", icon: "pi pi-th-large" }];
 				<span class="brand-mark" aria-hidden="true">M</span>
 				<span class="brand-name">Marionette</span>
 			</RouterLink>
-			<nav class="primary-nav" aria-label="Primary navigation">
+			<nav v-if="!pairing" class="primary-nav" aria-label="Primary navigation">
 				<RouterLink v-for="item in navigation" :key="item.to" :to="item.to" class="nav-link">
 					<i :class="item.icon" aria-hidden="true"></i>
 					<span>{{ item.label }}</span>
 				</RouterLink>
 			</nav>
-			<ConnectionStatus class="connection-slot" />
+			<ConnectionStatus v-if="!pairing" class="connection-slot" />
 		</header>
 		<div class="app-content">
 			<slot />

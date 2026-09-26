@@ -62,6 +62,12 @@
   posílá prohlížeč (stránka na jiném originu nespustí akci), a absenci
   horizontálního scrollu ve 320 px na přehledu, detailu a formulářích
   (UX spec §9, §10 scénáře 1, 3, 5, 6, 7 a 2 částečně).
+- Server běží se zapnutým ověřováním (blok 0044): projekt `setup`
+  (`e2e/pair.setup.ts`) spáruje prohlížeč kódem z logu serveru
+  (`E2E_SERVER_LOG`) přes obrazovku párování a uloží cookie do
+  `e2e/.auth/device.json`; ostatní specy běží jako spárované zařízení.
+  Nespárované prohlížeče se vytvářejí s prázdným `storageState` —
+  `browser.newContext()` jinak dědí uložený stav projektu.
 - Lokátory hledají prvky podle rolí a přístupných jmen (jako uživatel),
   CSS třídy jen tam, kde role chybí (badge, `.field-error`).
 - Není součástí `make verify` (vyžaduje prohlížeč, ~15 s); běží jako

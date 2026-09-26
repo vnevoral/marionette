@@ -15,7 +15,10 @@ trap 'rm -rf "$data"' EXIT
 export MARIONETTE_CONFIG="$data/marionette.json"
 export MARIONETTE_ADDR="127.0.0.1:${E2E_PORT:-18080}"
 export MARIONETTE_LOG_LEVEL=warn
-"$binary" &
+# The setup project reads the first pairing code from this log (FR-53).
+log="${E2E_SERVER_LOG:?E2E_SERVER_LOG is set by playwright.config.ts}"
+: >"$log"
+"$binary" >>"$log" 2>&1 &
 server=$!
 trap 'kill "$server" 2>/dev/null; wait "$server" 2>/dev/null; rm -rf "$data"' EXIT INT TERM
 wait "$server"

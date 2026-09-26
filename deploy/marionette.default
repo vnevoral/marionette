@@ -7,6 +7,16 @@ MARIONETTE_ADDR=:8080
 # Optional allowlist of Host values (host:port, comma-separated) accepted by
 # mutating API requests. Empty accepts any host.
 #MARIONETTE_ALLOWED_HOSTS=pi.local:8080,192.168.1.10:8080
+# Access control: only paired devices can use the UI and API (on|off).
+# With no device paired yet, the pairing code is in `journalctl -u marionette`.
+#MARIONETTE_AUTH=on
+# Days a device may stay unused before it must pair again (1-400).
+#MARIONETTE_DEVICE_EXPIRY_DAYS=60
+# Secure attribute of the device cookie: auto (TLS connection), always
+# (behind a TLS reverse proxy) or never.
+#MARIONETTE_COOKIE_SECURE=auto
+# Paired devices file; defaults to devices.json next to MARIONETTE_CONFIG.
+#MARIONETTE_DEVICES=/var/lib/marionette/devices.json
 # Log format (text|json) and minimum level (debug|info|warn|error).
 #MARIONETTE_LOG_FORMAT=text
 #MARIONETTE_LOG_LEVEL=info

@@ -27,13 +27,17 @@ Every primary screen uses the same shell:
 
 - brand and current section in the top-left;
 - primary navigation: **Overview** (the card list is the dashboard; cards are
-  managed from their detail, see §7.1);
+  managed from their detail, see §7.1) and **Devices** (only when access
+  control is on and this browser is paired, §7.4);
 - right-side connection state: **Live** while the status stream is open,
   **Reconnecting** while REST polling covers for it; refresh and contextual
   actions live in the page header;
 - centered content with a maximum width of 1200 px;
 - mobile navigation collapses into a compact top bar without hiding the
   current section or the main action.
+
+The pairing screen uses the shell without navigation and without the
+connection state: nothing behind it is available yet.
 
 The active navigation item is visually and textually identifiable. Navigation
 is not available only as a link buried inside a card.
@@ -46,6 +50,8 @@ is not available only as a link buried inside a card.
 | `/cards/:id`      | Card detail | Current state, last result, runs, and transitions |
 | `/cards/new/edit` | New card    | Empty creation form                               |
 | `/cards/:id/edit` | Edit card   | Existing card configuration                       |
+| `/devices`        | Devices     | Paired browsers, removal, code for a new device   |
+| `/pair`           | Pair device | One-time code entry for an unpaired browser       |
 
 ## 3. Product language and vocabulary
 
@@ -213,6 +219,37 @@ environment variables are repeatable rows, not an opaque JSON editor.
 - After a confirmed delete, return to the overview and show **Card deleted**
   as a toast naming the card; a failed delete keeps the detail open with the
   error inline.
+
+### 7.4 Access: pairing and devices
+
+Only paired browsers use Marionette (FR-50..FR-56, ADR-0011). Pairing
+happens once per browser; there is no password and no sign-in screen after
+that.
+
+- **Pair this device** (`/pair`): every navigation of an unpaired browser,
+  and any API answer 401, leads here with the intended path in `next`; after
+  pairing the browser continues there (paths inside the app only).
+  - Fields: **Pairing code** (typed in any case, grouped as `XXXX-XXXX`,
+    filled in from `?code=`) and **Device name** (suggested from the browser
+    and system, e.g. "Chrome on Android"; required, up to 64 characters).
+  - While no device is paired at all, the screen shows the command that
+    reads the code from the service log; otherwise it points to **Devices →
+    Pair a new device** on a paired device.
+  - A wrong, used or expired code shows one message: **The pairing code is
+    invalid or has expired.** Success shows the toast **Device paired**.
+- **Devices** (`/devices`): the paired browsers, most recently used first,
+  each with name, paired and last used time, and **This device** on the
+  current one; the lede states the expiry in days.
+  - **Pair a new device** shows the code in large monospace type, the time
+    left, and a link that fills the code in (with **Copy link** when the
+    browser allows the clipboard, which plain HTTP does not). When the new
+    device pairs, the code disappears and the page says so inline; an
+    expired code offers **New code**.
+  - **Remove device** asks for confirmation naming the device. Removing
+    another device reports inline; removing this device signs it out, opens
+    the pairing screen and shows the toast **This device was removed**.
+  - With access control off (`MARIONETTE_AUTH=off`) the page explains that
+    instead of listing devices.
 
 ## 8. Design system
 

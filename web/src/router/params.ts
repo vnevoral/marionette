@@ -6,3 +6,9 @@ export function singleParam(value: RouteParamValue | RouteParamValue[] | undefin
 	if (Array.isArray(value)) return value[0] ?? "";
 	return value ?? "";
 }
+
+/** Where to continue after pairing: a path inside the app, never another
+ * origin ("//evil.example" or "https://…" fall back to the overview). */
+export function safeNext(next: unknown): string {
+	return typeof next === "string" && next.startsWith("/") && !next.startsWith("//") ? next : "/";
+}

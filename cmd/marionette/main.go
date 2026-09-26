@@ -12,6 +12,8 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"path/filepath"
+	"strconv"
 	"strings"
 	"syscall"
 	"time"
@@ -22,6 +24,8 @@ import (
 	"marionette/internal/execengine"
 	"marionette/internal/server"
 	"marionette/internal/status"
+
+	"marionette/internal/access"
 )
 
 // version is the release identifier reported by GET /api/health. It is set at
@@ -55,11 +59,23 @@ type environment struct {
 	LogFormat string
 	// LogLevel is the minimum level written to the log; default info.
 	LogLevel slog.Level
+	// AuthEnabled requires paired devices (FR-50, ADR-0011); on unless
+	// MARIONETTE_AUTH=off. The zero value (tests) leaves the API open.
+	AuthEnabled bool
+	// DevicesPath is the paired devices file; default devices.json next to
+	// the configuration file.
+	DevicesPath string
+	// DeviceExpiry is how long an unused device stays paired (FR-52).
+	DeviceExpiry time.Duration
+	// CookieSecure decides the Secure attribute of the device cookie.
+	CookieSecure server.CookieSecurity
 }
 
 // loadEnvironment reads MARIONETTE_CONFIG, MARIONETTE_ADDR,
-// MARIONETTE_SHUTDOWN_TIMEOUT, MARIONETTE_ALLOWED_HOSTS, MARIONETTE_LOG_FORMAT
-// and MARIONETTE_LOG_LEVEL with their defaults.
+// MARIONETTE_SHUTDOWN_TIMEOUT, MARIONETTE_ALLOWED_HOSTS, MARIONETTE_LOG_FORMAT,
+// MARIONETTE_LOG_LEVEL, MARIONETTE_AUTH, MARIONETTE_DEVICES,
+// MARIONETTE_DEVICE_EXPIRY_DAYS and MARIONETTE_COOKIE_SECURE with their
+// defaults.
 func loadEnvironment(getenv func(string) string) (environment, error) {
 	env := environment{
 		ConfigPath:      getenv("MARIONETTE_CONFIG"),
@@ -67,6 +83,9 @@ func loadEnvironment(getenv func(string) string) (environment, error) {
 		ShutdownTimeout: defaultShutdownTimeout,
 		LogFormat:       "text",
 		LogLevel:        slog.LevelInfo,
+		AuthEnabled:     true,
+		DeviceExpiry:    access.DefaultExpiry,
+		CookieSecure:    server.CookieSecureAuto,
 	}
 	if env.ConfigPath == "" {
 		env.ConfigPath = defaultConfigPath
@@ -101,7 +120,58 @@ func loadEnvironment(getenv func(string) string) (environment, error) {
 			return environment{}, fmt.Errorf("MARIONETTE_LOG_LEVEL %q: must be debug, info, warn or error", raw)
 		}
 	}
+	switch raw := strings.ToLower(strings.TrimSpace(getenv("MARIONETTE_AUTH"))); raw {
+	case "", "on":
+	case "off":
+		env.AuthEnabled = false
+	default:
+		return environment{}, fmt.Errorf("MARIONETTE_AUTH %q: must be on or off", raw)
+	}
+	env.DevicesPath = strings.TrimSpace(getenv("MARIONETTE_DEVICES"))
+	if env.DevicesPath == "" {
+		env.DevicesPath = filepath.Join(filepath.Dir(env.ConfigPath), "devices.json")
+	}
+	if raw := strings.TrimSpace(getenv("MARIONETTE_DEVICE_EXPIRY_DAYS")); raw != "" {
+		days, err := strconv.Atoi(raw)
+		maxDays := int(access.MaxExpiry / (24 * time.Hour))
+		if err != nil || days < 1 || days > maxDays {
+			return environment{}, fmt.Errorf("MARIONETTE_DEVICE_EXPIRY_DAYS %q: must be a whole number of days from 1 to %d", raw, maxDays)
+		}
+		env.DeviceExpiry = time.Duration(days) * 24 * time.Hour
+	}
+	switch raw := strings.ToLower(strings.TrimSpace(getenv("MARIONETTE_COOKIE_SECURE"))); raw {
+	case "", "auto":
+	case "always":
+		env.CookieSecure = server.CookieSecureAlways
+	case "never":
+		env.CookieSecure = server.CookieSecureNever
+	default:
+		return environment{}, fmt.Errorf("MARIONETTE_COOKIE_SECURE %q: must be auto, always or never", raw)
+	}
 	return env, nil
+}
+
+// openAccess opens the paired devices when access control is on and tells
+// the operator how to pair: with no device, a pairing code is written to the
+// log (FR-53). A devices file that cannot be read stops the start-up, so
+// access never silently opens up.
+func openAccess(env environment, logger *slog.Logger) (*access.Registry, error) {
+	if !env.AuthEnabled {
+		logger.Warn("access control is disabled (MARIONETTE_AUTH=off); anyone who can reach the service can use it")
+		return nil, nil
+	}
+	registry, err := access.Open(env.DevicesPath, access.Options{Expiry: env.DeviceExpiry, Logger: logger})
+	if err != nil {
+		return nil, err
+	}
+	if registry.Empty() {
+		if err := server.LogBootstrapCode(registry, logger); err != nil {
+			return nil, err
+		}
+		return registry, nil
+	}
+	logger.Info("access control enabled", "pairedDevices", len(registry.List()), "expiryDays", int(env.DeviceExpiry/(24*time.Hour)))
+	return registry, nil
 }
 
 // newLogger builds the process logger for the configured format and level.
@@ -152,6 +222,10 @@ func (app application) run(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("open config store: %w", err)
 	}
+	devices, err := openAccess(app.env, app.logger)
+	if err != nil {
+		return fmt.Errorf("open paired devices: %w", err)
+	}
 	broker := events.NewBroker()
 	store.OnStatusChange = broker.Publish
 
@@ -188,6 +262,7 @@ func (app application) run(ctx context.Context) error {
 		Version:      version,
 		StartedAt:    time.Now(),
 		Logger:       app.logger,
+		Access:       &server.Access{Registry: devices, Secure: app.env.CookieSecure},
 	})
 	srv := &http.Server{
 		Handler:           handler,
@@ -237,6 +312,9 @@ func (app application) run(ctx context.Context) error {
 	if !readOnly {
 		steps.saveHistory = func() error { return store.SaveFileWithHistory(app.env.ConfigPath) }
 	}
+	if devices != nil {
+		steps.saveDevices = devices.Save
+	}
 	return shutdown(shutdownContext, steps, app.logger)
 }
 
@@ -250,6 +328,9 @@ type shutdownSteps struct {
 	closeActions  func(context.Context) (dropped int, err error)
 	stopScheduler func() error
 	historyDirty  func() bool
+	// saveDevices writes the last use of paired devices; nil without access
+	// control.
+	saveDevices func() error
 }
 
 // shutdown runs the graceful shutdown sequence (FR-35): stop accepting HTTP
@@ -302,6 +383,9 @@ func shutdown(ctx context.Context, steps shutdownSteps, logger *slog.Logger) err
 
 	if steps.saveHistory != nil && steps.historyDirty() {
 		step("save history again", steps.saveHistory)
+	}
+	if steps.saveDevices != nil {
+		step("save devices", steps.saveDevices)
 	}
 	return errors.Join(failures...)
 }

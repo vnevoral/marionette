@@ -65,6 +65,9 @@ type Dependencies struct {
 	StartedAt time.Time
 	// Logger receives handler warnings; nil discards them.
 	Logger *slog.Logger
+	// Access enables device pairing; nil (or a nil Registry) leaves the API
+	// open (MARIONETTE_AUTH=off).
+	Access *Access
 }
 
 // NewRouter builds the top-level HTTP handler. Mutating API routes are
@@ -74,14 +77,23 @@ type Dependencies struct {
 func NewRouter(dependencies Dependencies) http.Handler {
 	routes := routeTable{}
 	routes.add(http.MethodGet, "/api/health", newHealthHandler(dependencies.Version, dependencies.StartedAt))
+	logger := dependencies.Logger
+	if logger == nil {
+		logger = slog.New(slog.NewTextHandler(io.Discard, nil))
+	}
+	var accessHandler *accessAPI
+	if dependencies.Access != nil && dependencies.Access.Registry != nil {
+		accessHandler = &accessAPI{registry: dependencies.Access.Registry, secure: dependencies.Access.Secure, logger: logger}
+		routes.add(http.MethodGet, "/api/session", accessHandler.session)
+		routes.add(http.MethodPost, "/api/pairing", accessHandler.pair)
+		routes.add(http.MethodGet, "/api/devices", accessHandler.listDevices)
+		routes.add(http.MethodPost, "/api/pairing/code", accessHandler.createPairingCode)
+		routes.add(http.MethodDelete, "/api/devices/{id}", accessHandler.removeDevice)
+	}
 	if dependencies.Store != nil {
 		eventSource := dependencies.Events
 		if eventSource == nil {
 			eventSource = events.NewBroker()
-		}
-		logger := dependencies.Logger
-		if logger == nil {
-			logger = slog.New(slog.NewTextHandler(io.Discard, nil))
 		}
 		handler := cardAPI{
 			store:       dependencies.Store,
@@ -90,6 +102,9 @@ func NewRouter(dependencies Dependencies) http.Handler {
 			reconciler:  dependencies.Reconciler,
 			eventSource: eventSource,
 			logger:      logger,
+		}
+		if accessHandler != nil {
+			handler.devices = accessHandler.registry
 		}
 		routes.add(http.MethodGet, "/api/cards", handler.listCards)
 		routes.add(http.MethodPost, "/api/cards", handler.createCard)
@@ -110,7 +125,11 @@ func NewRouter(dependencies Dependencies) http.Handler {
 	routes.register(mux)
 	mux.Handle("/", spaHandler(webui.Dist()))
 
-	return requireSameOrigin(dependencies.AllowedHosts, mux)
+	var handler http.Handler = mux
+	if accessHandler != nil {
+		handler = accessHandler.requireDevice(mux)
+	}
+	return requireSameOrigin(dependencies.AllowedHosts, handler)
 }
 
 // routeTable collects API routes so that each path can be registered with a
@@ -153,6 +172,8 @@ type cardAPI struct {
 	reconciler  CardReconciler
 	eventSource EventSource
 	logger      *slog.Logger
+	// devices ends event streams of removed devices; nil without access control.
+	devices interface{ Exists(string) bool }
 }
 
 // acceptedAction is the 202 body of the enqueue endpoints. CheckedAt is the

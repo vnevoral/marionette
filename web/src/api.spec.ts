@@ -11,7 +11,13 @@ import {
 	getRuns,
 	getStatus,
 	getStatusHistory,
+	createPairingCode,
+	getSession,
 	listCards,
+	listDevices,
+	pairDevice,
+	removeDevice,
+	setUnauthorizedHandler,
 	updateCard,
 	type ActionCard,
 	type StatusEvent,
@@ -287,5 +293,90 @@ describe("connectStatusEvents", () => {
 		fake.emit("status.changed", new MessageEvent("status.changed", { data: "{not json" }));
 		fake.emit("status.changed", new Event("status.changed"));
 		expect(received).toEqual([payload]);
+	});
+});
+
+describe("access API", () => {
+	let fetchMock: FetchMock;
+
+	beforeEach(() => {
+		fetchMock = vi.fn<typeof fetch>();
+		vi.stubGlobal("fetch", fetchMock);
+	});
+
+	afterEach(() => {
+		setUnauthorizedHandler(undefined);
+		vi.unstubAllGlobals();
+	});
+
+	const device = {
+		id: "d1",
+		name: "Laptop",
+		pairedAt: "2026-09-26T10:00:00Z",
+		lastSeenAt: "2026-09-26T10:00:00Z",
+		current: true,
+	};
+
+	it("reads the session as paired, unpaired (with bootstrap) or open", async () => {
+		fetchMock.mockResolvedValueOnce(jsonResponse(200, { device, expiryDays: 60 }));
+		await expect(getSession()).resolves.toEqual({ status: "paired", device, expiryDays: 60 });
+
+		fetchMock.mockResolvedValueOnce(
+			jsonResponse(401, { error: "not paired", code: "pairing_required", bootstrap: true }),
+		);
+		await expect(getSession()).resolves.toEqual({ status: "unpaired", bootstrap: true });
+
+		fetchMock.mockResolvedValueOnce(jsonResponse(401, { error: "not paired", bootstrap: false }));
+		await expect(getSession()).resolves.toEqual({ status: "unpaired", bootstrap: false });
+
+		// Without access control the route does not exist.
+		fetchMock.mockResolvedValueOnce(jsonResponse(404, { error: "not found" }));
+		await expect(getSession()).resolves.toEqual({ status: "open" });
+
+		fetchMock.mockResolvedValueOnce(jsonResponse(500, { error: "boom" }));
+		await expect(getSession()).rejects.toThrow("boom");
+	});
+
+	it("pairs, creates codes, lists and removes devices", async () => {
+		fetchMock.mockResolvedValueOnce(jsonResponse(201, { device }));
+		await expect(pairDevice("K7QM-3XRD", "Laptop")).resolves.toEqual(device);
+		let [url, init] = fetchMock.mock.calls.at(-1)!;
+		expect(url).toBe("/api/pairing");
+		expect(init?.method).toBe("POST");
+		expect(JSON.parse(String(init?.body))).toEqual({ code: "K7QM-3XRD", name: "Laptop" });
+
+		fetchMock.mockResolvedValueOnce(
+			jsonResponse(201, { code: "ABCD-EFGH", expiresAt: "2026-09-26T10:10:00Z" }),
+		);
+		await expect(createPairingCode()).resolves.toMatchObject({ code: "ABCD-EFGH" });
+		[url, init] = fetchMock.mock.calls.at(-1)!;
+		expect(url).toBe("/api/pairing/code");
+		expect((init?.headers as Record<string, string>)["Content-Type"]).toBe("application/json");
+
+		fetchMock.mockResolvedValueOnce(jsonResponse(200, [device]));
+		await expect(listDevices()).resolves.toEqual([device]);
+
+		fetchMock.mockResolvedValueOnce(new Response(null, { status: 204 }));
+		await removeDevice("a/b");
+		[url, init] = fetchMock.mock.calls.at(-1)!;
+		expect(url).toBe("/api/devices/a%2Fb");
+		expect(init?.method).toBe("DELETE");
+	});
+
+	it("reports a 401 from the API to the handler, but not from session or pairing", async () => {
+		const handler = vi.fn();
+		setUnauthorizedHandler(handler);
+		fetchMock.mockImplementation(async () =>
+			jsonResponse(401, { error: "this device is not paired", code: "pairing_required" }),
+		);
+
+		const failure = (await listCards().catch((error: unknown) => error)) as ApiError;
+		expect(failure.isUnauthorized).toBe(true);
+		expect(failure.envelope?.code).toBe("pairing_required");
+		expect(handler).toHaveBeenCalledTimes(1);
+
+		await getSession();
+		await pairDevice("x", "y").catch(() => {});
+		expect(handler).toHaveBeenCalledTimes(1);
 	});
 });
