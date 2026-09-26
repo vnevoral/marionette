@@ -134,5 +134,16 @@ Viz [Definition of Done](../../devops/definition-of-done.md) +:
   Poznámka: `systemd-analyze security` hodnotí unitu 8.6 „EXPOSED“; další
   zpřísnění (`ProtectKernelTunables`, `RestrictAddressFamilies`,
   `SystemCallFilter`…) je mimo rozsah bloku a vyžaduje test na hostu.
+- **Nález na Raspberry Pi (Ubuntu, 2026-09-26)**: referenční scénář
+  WoL + ping (FR-16) — `wakeonlan` ze služby funguje, status akce `ping`
+  ale vždy končí `socket: Operation not permitted` (exit 2). Příčina:
+  `NoNewPrivileges=true` ruší file capability `cap_net_raw` a host měl
+  `net.ipv4.ping_group_range = 1 0`. Ověřeno `systemd-run -p
+  User=marionette -p NoNewPrivileges=true … /usr/bin/ping`; náprava
+  `ping_group_range = 0 2147483647`. Unita se nemění; detekce v instalátoru
+  a dokumentace jsou v novém bloku
+  [0046](0046-install-unprivileged-ping-check.md) (FR-05), zobrazení výstupu
+  status kontroly v UI v bloku
+  [0047](0047-status-check-output-in-detail.md) (FR-21a).
 - **Dokumentace aktualizována**: README, `docs/devops/ci-cd.md`, requirements,
   testing strategy a roadmapa.

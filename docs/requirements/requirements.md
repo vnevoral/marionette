@@ -1,4 +1,4 @@
-# Požadavky na Marionette (SRS) — v0.7
+# Požadavky na Marionette (SRS) — v0.8
 
 > Stav: **zpřesněno** (fáze 1 a UX specifikace, 2026-09-25; doplněno o SSE stream
 > pro živé změny statusů, 2026-09-25; doplněno o dva polling intervaly a
@@ -6,7 +6,8 @@
 > při řízeném ukončení, 2026-09-25; řízení status akcí interním schedulerem,
 > 2026-09-25; doplněno o UX požadavky FR-24 až FR-29 a NFR-08 až NFR-10,
 > 2026-09-25; revize projektu a kódu 2026-09-26: NFR-12, upřesnění FR-18 a
-> NFR-01, viz [Rozhodnutí — revize 2026-09-26](#13-rozhodnutí-revize-projektu-2026-09-26)).
+> NFR-01, viz [Rozhodnutí — revize 2026-09-26](#13-rozhodnutí-revize-projektu-2026-09-26);
+> doplněno FR-05 a FR-21a po validaci na Raspberry Pi, 2026-09-26).
 > Otevřené otázky z v0.1 byly rozhodnuty
 > s vlastníkem projektu, viz [Rozhodnutí fáze 1](#7-rozhodnutí-fáze-1),
 > [Rozhodnutí — polling a terminace](#9-rozhodnutí-polling-a-terminace-2026-09-25)
@@ -47,6 +48,13 @@ spustitelný soubor.
   API, tak statický obsah UI ze stejného procesu.
 - **FR-04**: Podporované cílové platformy: linux/amd64 (vývoj/testy) a
   linux/arm64 (Raspberry Pi).
+- **FR-05** _(doplněno 2026-09-26)_: Referenční status akce `ping` (FR-16)
+  musí jít spustit pod servisním uživatelem v hardenované unitě
+  (`NoNewPrivileges=true` znemožní `ping` použít file capability
+  `cap_net_raw`, takže funguje jen neprivilegovaný ICMP podle
+  `net.ipv4.ping_group_range`). Instalátor zjistí, zda host neprivilegovaný
+  ICMP povoluje; pokud ne, vypíše srozumitelný návod na nápravu. Systémová
+  nastavení hostu sám nemění. Návod je i v dokumentaci instalace.
 
 ### 3.2 Akční karty a akce
 
@@ -113,6 +121,11 @@ spustitelný soubor.
   mřížku/seznam s aktuálním stavem (barevně odlišené: neznámý/OK/chyba/běží).
 - **FR-21**: Z karty lze jedním klikem spustit primární akci i status akci a
   sledovat průběžný/poslední výsledek.
+- **FR-21a** _(doplněno 2026-09-26)_: Detail karty zobrazuje u poslední
+  status kontroly kromě výsledku také exit kód, dobu běhu a zachycený výstup
+  (FR-13, na vyžádání rozbalitelný, s označením zkrácení), aby operátor
+  zjistil příčinu stavu **Problem** bez přístupu k API nebo k hostu.
+  Dashboard zůstává skenovatelný; výstup na kartě nezobrazuje.
 - **FR-22**: Existuje samostatná obrazovka pro správu (konfiguraci) karet a
   akcí (CRUD).
 - **FR-23**: UI je postaveno na Vue 3 + PrimeVue (viz

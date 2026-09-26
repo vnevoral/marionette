@@ -20,7 +20,7 @@ uloží do `docs/plans/blocks/NNNN-nazev.md`. Blok se implementuje promptem
 | 4    | Status/health-check engine (vč. volitelného pollingu)                                        | **Hotovo**                                       | FR-12, FR-15, FR-16, FR-17     |
 | 5    | REST API (CRUD karet/akcí, spuštění, čtení stavu)                                            | **Hotovo**                                       | FR-40, FR-41                   |
 | 6    | Dashboard UI (karty, stavové indikátory, formuláře správy)                                   | **Hotovo**                                       | FR-20..23                      |
-| 7    | Balíčkování a nasazení (systemd unit, install skript, arm64 release)                         | **Probíhá** (0023)                               | FR-01..04, NFR-02              |
+| 7    | Balíčkování a nasazení (systemd unit, install skript, arm64 release)                         | **Probíhá** (0023, 0046)                         | FR-01..04, NFR-02              |
 | 8    | Zpevnění (auth/access control, logování, chybové stavy, testy, dokumentace)                  | **Hotovo** (2026-09-26; bloky 0024–0045)         | NFR-01, NFR-04..06, NFR-12     |
 | 9    | UX redesign a sdílený design systém                                                          | **Hotovo**                                       | FR-24..29, NFR-08..10          |
 | 10   | Realtime doručování statusů přes SSE                                                         | **Hotovo**                                       | FR-42, NFR-11                  |
@@ -95,6 +95,11 @@ uloží do `docs/plans/blocks/NNNN-nazev.md`. Blok se implementuje promptem
   Na referenčním ARM64 hostu chybí jen reálné `systemctl` start/stop/restart,
   `Restart=on-failure`, náběh po rebootu a běh ARM64 artefaktu. Instalátor
   má od 2026-09-26 automatický staged test v `make test` a CI.
+  Validace na Raspberry Pi (2026-09-26) odhalila, že status akce `ping`
+  v hardenované unitě selže, pokud host zakazuje neprivilegovaný ICMP
+  (`net.ipv4.ping_group_range`). Řeší to blok
+  [0046 — Kontrola neprivilegovaného pingu při instalaci](blocks/0046-install-unprivileged-ping-check.md)
+  (FR-05) — **Návrh**, čeká na schválení.
 
 - Fáze 8 byla 2026-09-26 rozpracována na základě revize projektu a kódu do
   bloků 0024–0034 a téhož dne **schválena** vlastníkem. Jde převážně o opravy
@@ -184,6 +189,11 @@ uloží do `docs/plans/blocks/NNNN-nazev.md`. Blok se implementuje promptem
   3. [0045 — Návod na párování po instalaci](blocks/0045-install-pairing-hint.md)
      — **Hotovo** (2026-09-26); `install.sh` vypíše, kde najít první
      párovací kód, jen pokud ještě není spárované žádné zařízení.
+
+  **Diagnostika z validace na Raspberry Pi (2026-09-26):**
+  1. [0047 — Výstup poslední status kontroly v detailu karty](blocks/0047-status-check-output-in-detail.md)
+     — **Návrh**, čeká na schválení; FR-21a, UI ukazuje jen „Fail“ bez
+     exit kódu a výstupu.
 
   Otevřené otázky revize jsou rozhodnuté v
   [requirements.md, sekce 13](../requirements/requirements.md#13-rozhodnutí-revize-projektu-2026-09-26)
