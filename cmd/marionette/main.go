@@ -11,6 +11,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 	"time"
 
@@ -40,10 +41,13 @@ type environment struct {
 	ConfigPath      string
 	Addr            string
 	ShutdownTimeout time.Duration
+	// AllowedHosts restricts the Host header of mutating API requests
+	// (NFR-12); empty keeps every host accepted.
+	AllowedHosts []string
 }
 
-// loadEnvironment reads MARIONETTE_CONFIG, MARIONETTE_ADDR and
-// MARIONETTE_SHUTDOWN_TIMEOUT with their defaults.
+// loadEnvironment reads MARIONETTE_CONFIG, MARIONETTE_ADDR,
+// MARIONETTE_SHUTDOWN_TIMEOUT and MARIONETTE_ALLOWED_HOSTS with their defaults.
 func loadEnvironment(getenv func(string) string) (environment, error) {
 	env := environment{
 		ConfigPath:      getenv("MARIONETTE_CONFIG"),
@@ -65,6 +69,11 @@ func loadEnvironment(getenv func(string) string) (environment, error) {
 			return environment{}, fmt.Errorf("MARIONETTE_SHUTDOWN_TIMEOUT %q: must be positive", raw)
 		}
 		env.ShutdownTimeout = timeout
+	}
+	for _, host := range strings.Split(getenv("MARIONETTE_ALLOWED_HOSTS"), ",") {
+		if host = strings.TrimSpace(host); host != "" {
+			env.AllowedHosts = append(env.AllowedHosts, host)
+		}
 	}
 	return env, nil
 }
@@ -136,6 +145,7 @@ func (app application) run(ctx context.Context) error {
 		Notifier:     scheduler,
 		Reconciler:   scheduler,
 		StatusEvents: statusEvents,
+		AllowedHosts: app.env.AllowedHosts,
 	})
 	srv := &http.Server{
 		Handler:           handler,

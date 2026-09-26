@@ -108,7 +108,10 @@ export function updateCard(card: ActionCard): Promise<ActionCard> {
 }
 
 export function deleteCard(cardID: string): Promise<void> {
-	return request(`/api/cards/${encodeURIComponent(cardID)}`, { method: "DELETE" });
+	return request(`/api/cards/${encodeURIComponent(cardID)}`, {
+		method: "DELETE",
+		headers: { "Content-Type": "application/json" },
+	});
 }
 
 export function getStatus(cardID: string): Promise<StatusSnapshot> {
@@ -146,12 +149,18 @@ export function connectStatusEvents(
 	return source;
 }
 
+// Mutating calls always declare application/json, even without a body, so
+// they pass the server's cross-site protection (NFR-12).
 export function enqueuePrimary(cardID: string): Promise<void> {
-	return request(`/api/cards/${encodeURIComponent(cardID)}/actions/primary`, { method: "POST" });
+	return request(`/api/cards/${encodeURIComponent(cardID)}/actions/primary`, {
+		method: "POST",
+		headers: { "Content-Type": "application/json" },
+	});
 }
 
 export function enqueueStatus(cardID: string): Promise<void> {
 	return request(`/api/cards/${encodeURIComponent(cardID)}/actions/status/check`, {
 		method: "POST",
+		headers: { "Content-Type": "application/json" },
 	});
 }

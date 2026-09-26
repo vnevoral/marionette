@@ -36,9 +36,42 @@ flowchart LR
 Execution engine spouští procesy na hostu na základě uživatelské konfigurace.
 Návrh musí od začátku počítat s: absencí shell interpolace uživatelského
 vstupu (spouštět přes `exec.Command(name, args...)`, ne přes shell string),
-timeoutem pro každý běh, a omezením přístupu k UI/API (viz NFR-01 a otevřené
-otázky v requirements.md). Toto se doladí samostatným ADR před implementací
-fáze 3.
+timeoutem pro každý běh, a omezením přístupu k UI/API (viz NFR-01). Spouštění
+je popsáno v ADR-0005; ochrana API před cizími weby níže (NFR-12);
+autentizace zůstává mimo MVP.
+
+## Ochrana před cross-site požadavky
+
+NFR-01 předpokládá důvěryhodnou síť, ne důvěryhodný prohlížeč: cizí webová
+stránka otevřená operátorem by jinak mohla z jeho prohlížeče poslat
+`POST /api/cards/{id}/actions/primary` (tzv. simple request bez preflightu)
+nebo formulář `enctype=text/plain` na `POST /api/cards`. Proto middleware
+`requireSameOrigin` v `internal/server` (blok 0026, NFR-12) chrání všechny
+mutující API routy (`POST`, `PUT`, `PATCH`, `DELETE` pod `/api/`) v tomto
+pořadí:
+
+1. požadavek s tělem nebo s hlavičkou `Content-Type` musí deklarovat
+   `application/json` (jinak `415`) — HTML formulář tento typ nedokáže
+   poslat;
+2. `Sec-Fetch-Site: cross-site` → `403`;
+3. je-li přítomna hlavička `Origin`, její host (včetně portu, bez ohledu na
+   velikost písmen, chybějící port = výchozí port schématu) se musí shodovat
+   s `Host` požadavku, jinak `403`; `Origin: null` je odmítnut; požadavek bez
+   `Origin` i bez `Sec-Fetch-Site` projde, aby fungovali non-browser klienti
+   (`curl`);
+4. je-li nastaven `MARIONETTE_ALLOWED_HOSTS` (čárkou oddělený seznam hostů
+   včetně portu), musí být `Host` v seznamu, jinak `403`; prázdná proměnná
+   (výchozí) kontrolu vypíná.
+
+Read-only routy, `GET /api/events` (SSE) a SPA fallback zůstávají bez
+omezení. Chyby mají stejnou JSON obálku `{"error": "..."}` jako ostatní
+odpovědi API. SPA proto posílá `Content-Type: application/json` u všech
+mutujících volání včetně těch bez těla. Žádné CORS hlavičky se nevydávají
+(jiné originy se záměrně nepovolují). Schéma požadavku server zná jen z
+TLS stavu spojení; za TLS-terminující proxy se `Origin` porovnává jako
+`http`, což u výchozích portů (`443` vs `80`) vede k odmítnutí — v takovém
+nasazení je třeba proxy nastavit tak, aby `Host` obsahoval port, nebo
+nasadit TLS přímo (mimo rozsah MVP).
 
 ## Ochrana konfiguračního souboru
 

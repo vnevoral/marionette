@@ -118,10 +118,15 @@ func TestLoadEnvironmentDefaultsAndShutdownTimeout(t *testing.T) {
 		t.Fatalf("defaults = %#v", env)
 	}
 
+	if env.AllowedHosts != nil {
+		t.Fatalf("default AllowedHosts = %v, want none", env.AllowedHosts)
+	}
+
 	values := map[string]string{
 		"MARIONETTE_CONFIG":           "/tmp/x.json",
 		"MARIONETTE_ADDR":             "127.0.0.1:9090",
 		"MARIONETTE_SHUTDOWN_TIMEOUT": "1m30s",
+		"MARIONETTE_ALLOWED_HOSTS":    " pi.local:8080, ,192.168.1.10:8080 ",
 	}
 	env, err = loadEnvironment(func(key string) string { return values[key] })
 	if err != nil {
@@ -129,6 +134,9 @@ func TestLoadEnvironmentDefaultsAndShutdownTimeout(t *testing.T) {
 	}
 	if env.ConfigPath != "/tmp/x.json" || env.Addr != "127.0.0.1:9090" || env.ShutdownTimeout != 90*time.Second {
 		t.Fatalf("environment = %#v", env)
+	}
+	if strings.Join(env.AllowedHosts, "|") != "pi.local:8080|192.168.1.10:8080" {
+		t.Fatalf("AllowedHosts = %v", env.AllowedHosts)
 	}
 
 	for _, invalid := range []string{"soon", "0s", "-5s"} {

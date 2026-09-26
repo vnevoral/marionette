@@ -61,12 +61,21 @@ service. Runtime settings are read from `/etc/default/marionette`:
 | `MARIONETTE_CONFIG`           | `./marionette.json` | Path of the configuration file (cards, settings, saved history).                                          |
 | `MARIONETTE_ADDR`             | `:8080`             | HTTP listen address.                                                                                      |
 | `MARIONETTE_SHUTDOWN_TIMEOUT` | `20s`               | Total budget for a graceful stop (Go duration). Keep it below the unit's `TimeoutStopSec` (90 s default). |
+| `MARIONETTE_ALLOWED_HOSTS`    | empty               | Comma-separated `host:port` values accepted for mutating API requests; empty accepts any host.            |
 
 On `SIGTERM`/`SIGINT` Marionette stops accepting requests, closes the live
 status streams, saves the configuration and run history, discards queued
 actions, lets running actions finish within the remaining budget (minus a
 3 s reserve for terminating them), stops the status scheduler and saves the
 history again if it changed. A second signal terminates the process at once.
+
+Mutating API requests (creating, editing, deleting or running cards) are
+protected against cross-site requests from other websites open in the
+operator's browser: they must use `Content-Type: application/json`, and a
+browser-supplied `Origin` or `Sec-Fetch-Site: cross-site` that does not match
+the server is rejected with 403. Plain `curl -X POST` without those headers
+keeps working. There is no authentication; keep the service on a trusted
+network.
 
 If the configuration file cannot be parsed at startup, Marionette moves it to
 `marionette.json.corrupt-<timestamp>` (logged as a warning), starts with an

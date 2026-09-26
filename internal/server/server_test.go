@@ -120,6 +120,7 @@ func TestRouterRejectsInvalidJSONAndDuplicateCard(t *testing.T) {
 		t.Fatalf("unknown field response = %d", unknownResponse.Code)
 	}
 	trailing := httptest.NewRequest(http.MethodPost, "/api/cards", bytes.NewBufferString(`{"id":"x","name":"x","primary":{"command":"x","timeoutSec":1}} {}`))
+	trailing.Header.Set("Content-Type", "application/json")
 	trailingResponse := httptest.NewRecorder()
 	handler.ServeHTTP(trailingResponse, trailing)
 	if trailingResponse.Code != http.StatusBadRequest {

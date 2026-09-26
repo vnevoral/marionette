@@ -4,3 +4,6 @@ MARIONETTE_ADDR=:8080
 # Total budget for a graceful stop (Go duration). Must stay below the unit's
 # TimeoutStopSec (systemd default 90s); the default is 20s.
 #MARIONETTE_SHUTDOWN_TIMEOUT=20s
+# Optional allowlist of Host values (host:port, comma-separated) accepted by
+# mutating API requests. Empty accepts any host.
+#MARIONETTE_ALLOWED_HOSTS=pi.local:8080,192.168.1.10:8080

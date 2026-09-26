@@ -26,6 +26,9 @@ type RouterDependencies struct {
 	Notifier     PrimaryActionNotifier
 	Reconciler   CardReconciler
 	StatusEvents *StatusEventBroker
+	// AllowedHosts optionally restricts the Host header accepted by mutating
+	// API requests (NFR-12, MARIONETTE_ALLOWED_HOSTS). Empty disables the check.
+	AllowedHosts []string
 }
 
 // NewRouter builds the top-level HTTP handler for the application. A store
@@ -39,6 +42,7 @@ func NewRouter(stores ...*config.Store) http.Handler {
 }
 
 // NewRouterWithDependencies builds the HTTP handler with application services.
+// Mutating API routes are wrapped by the cross-site protection (NFR-12).
 func NewRouterWithDependencies(dependencies RouterDependencies) http.Handler {
 	mux := http.NewServeMux()
 
@@ -79,7 +83,7 @@ func NewRouterWithDependencies(dependencies RouterDependencies) http.Handler {
 
 	mux.Handle("/", spaHandler(webui.Dist()))
 
-	return mux
+	return requireSameOrigin(dependencies.AllowedHosts, mux)
 }
 
 type cardAPI struct {
