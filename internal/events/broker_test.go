@@ -24,6 +24,26 @@ func TestBrokerPublishesToSubscribers(t *testing.T) {
 	}
 }
 
+func TestBrokerPublishesRunsInTheSameSequence(t *testing.T) {
+	broker := NewBroker()
+	subscriber, unsubscribe := broker.Subscribe()
+	defer unsubscribe()
+
+	broker.Publish("card-a", config.StatusSnapshot{State: config.StatusStateOK})
+	run := config.Run{ActionKind: "primary", ExitCode: 3, Outcome: config.RunOutcomeFail}
+	broker.PublishRun("card-b", run)
+	run.ExitCode = 9 // the published event holds its own copy
+
+	status, recorded := <-subscriber, <-subscriber
+	if status.ID != 1 || status.Run != nil {
+		t.Fatalf("status event = %#v", status)
+	}
+	if recorded.ID != 2 || recorded.CardID != "card-b" || recorded.Run == nil ||
+		recorded.Run.ExitCode != 3 || recorded.Run.Outcome != config.RunOutcomeFail {
+		t.Fatalf("run event = %#v", recorded)
+	}
+}
+
 func TestBrokerKeepsNewestEventForSlowSubscriber(t *testing.T) {
 	broker := NewBroker()
 	subscriber, unsubscribe := broker.Subscribe()

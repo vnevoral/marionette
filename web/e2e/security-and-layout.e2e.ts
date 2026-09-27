@@ -5,6 +5,12 @@ test.beforeEach(async ({ request }) => {
 	await deleteAllCards(request);
 });
 
+test("the footer shows the version the server reports (FR-41a)", async ({ page, request }) => {
+	const { version } = (await (await request.get("/api/health")).json()) as { version: string };
+	await page.goto("/");
+	await expect(page.locator(".app-footer")).toHaveText(`Marionette ${version}`);
+});
+
 test("rejects mutating requests from another site (NFR-12)", async ({ request, baseURL }) => {
 	await createCard(request, { id: "target", name: "Target" });
 	const run = "/api/cards/target/actions/primary";

@@ -79,6 +79,11 @@ test("colours a card with a stripe that keeps the card height", async ({ page, r
 		((await card.locator(".card-title").boundingBox())?.y ?? 0) -
 		((await card.boundingBox())?.y ?? 0);
 	expect(await titleOffset(colored)).toBe(await titleOffset(plain));
+
+	// The detail shows the same colour on its icon tile (block 0055).
+	await colored.getByRole("link", { name: "View details" }).click();
+	await expect(page.getByRole("heading", { name: "Lamp A", level: 1 })).toBeVisible();
+	await expect(page.locator(".identity-tile")).toHaveAttribute("data-color", "teal");
 });
 
 test("runs actions from the dashboard", async ({ page, request }) => {
@@ -98,10 +103,48 @@ test("runs actions from the dashboard", async ({ page, request }) => {
 	await expect(card.getByRole("status")).toHaveText("Updated");
 	expect((await card.boundingBox())?.height).toBe(height);
 
+	// No automatic check follows, so the recorded run itself is reported
+	// (run.recorded, block 0058); a fast run may beat the "Accepted" answer.
 	await card.getByRole("button", { name: "Run action" }).click();
-	await expect(note).toHaveText("Accepted");
+	await expect(note).toHaveText("Action finished");
 	expect((await card.boundingBox())?.height).toBe(height);
 	await expect(page.getByText("1 action card · 1 healthy")).toBeVisible();
+});
+
+test("reports a failed run on the dashboard and shows the run in the detail at once", async ({
+	page,
+	request,
+}) => {
+	const response = await request.post("/api/cards", {
+		headers: { "Content-Type": "application/json" },
+		data: {
+			id: "broken",
+			name: "Broken",
+			primary: {
+				command: "sh",
+				args: ["-c", "exit 3"],
+				timeoutSec: 5,
+				rule: { type: "exit_code" },
+			},
+		},
+	});
+	expect(response.status()).toBe(201);
+	await page.goto("/");
+	await expect(page.getByText("Live")).toBeVisible();
+	const card = page.locator(".action-card").filter({ hasText: "Broken" });
+	await card.getByRole("button", { name: "Run action" }).click();
+	await expect(card.locator(".action-note-text")).toHaveText("Action failed · exit 3");
+	// It stays until the next action (unlike the brief outcomes).
+	await page.waitForTimeout(4500);
+	await expect(card.locator(".action-note-text")).toHaveText("Action failed · exit 3");
+
+	await card.getByRole("link", { name: "View details" }).click();
+	await expect(page.getByText("Live")).toBeVisible();
+	await expect(page.locator(".run-row")).toHaveCount(1);
+	await page.getByRole("button", { name: "Run action" }).click();
+	// With the stream live the first fallback read waits for the 5 s action
+	// timeout, so a run shown sooner came from the event.
+	await expect(page.locator(".run-row")).toHaveCount(2, { timeout: 3000 });
 });
 
 test("shows the output of a failed status check in the detail", async ({ page, request }) => {

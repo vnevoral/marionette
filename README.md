@@ -53,23 +53,32 @@ uptime in seconds.
 ## Installation on Linux with systemd
 
 Releases are versioned `vMAJOR.MINOR.PATCH` by git tags (rules in
-[docs/devops/ci-cd.md](docs/devops/ci-cd.md)). Create the ARM64 release
-archive on a build host from a clean, tagged commit; without a matching tag
-on `HEAD`, or with uncommitted changes, the target fails and explains how to
-tag:
+[docs/devops/ci-cd.md](docs/devops/ci-cd.md)). Pushing such a tag runs the
+full CI and then publishes a
+[GitHub Release](https://github.com/vnevoral/marionette/releases) with the
+ARM64 archive and its `.sha256` file. Download both on the target Linux host:
 
 ```bash
-git tag -a v1.0.0 -m "Marionette v1.0.0"
-make release-arm64
+v=v1.1.0
+base=https://github.com/vnevoral/marionette/releases/download/$v
+curl -LO "$base/marionette-$v-linux-arm64.tar.gz"
+curl -LO "$base/marionette-$v-linux-arm64.tar.gz.sha256"
 ```
 
-Copy `bin/marionette-v1.0.0-linux-arm64.tar.gz` and its `.sha256` file to the
-target Linux host, verify and extract the archive, and run the installer as
-root:
+Without GitHub, build the same archive on a build host from a clean, tagged
+commit and copy both files over; without a matching tag on `HEAD`, or with
+uncommitted changes, the target fails and explains how to tag:
 
 ```bash
-sha256sum -c marionette-v1.0.0-linux-arm64.tar.gz.sha256
-tar -xzf marionette-v1.0.0-linux-arm64.tar.gz
+git tag -a v1.1.0 -m "Marionette v1.1.0"
+make release-arm64      # bin/marionette-v1.1.0-linux-arm64.tar.gz + .sha256
+```
+
+Verify and extract the archive, and run the installer as root:
+
+```bash
+sha256sum -c marionette-v1.1.0-linux-arm64.tar.gz.sha256
+tar -xzf marionette-v1.1.0-linux-arm64.tar.gz
 sudo ./install.sh ./marionette-linux-arm64
 curl -s http://localhost:8080/api/health   # "version" reports the tag
 ```
@@ -179,8 +188,9 @@ Put your own unit changes in a drop-in (`sudo systemctl edit marionette`),
 not in the unit file itself, so an upgrade does not discard them.
 
 **Upgrade.** Keep each release in its own directory; the previous one is
-what you roll back to. On the host, next to the new archive and its
-`.sha256` file:
+what you roll back to (older releases stay downloadable from GitHub
+Releases). On the host, next to the new archive and its `.sha256` file
+(downloaded as above):
 
 ```bash
 sudo cp -a /var/lib/marionette /var/lib/marionette.bak-$(date +%F)   # backup

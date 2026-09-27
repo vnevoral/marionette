@@ -34,6 +34,20 @@ export function statusPresentation(state?: string): Presentation {
 	return STATUS[(state ?? "unknown") as StatusState] ?? STATUS.unknown;
 }
 
+/** The dashboard note for a recorded primary run (FR-42a, UX spec §5.2). */
+export function runOutcomeMessage(run: Pick<Run, "outcome" | "exitCode">): string {
+	switch (run.outcome) {
+		case "ok":
+			return FEEDBACK.actionFinished;
+		case "timeout":
+			return FEEDBACK.actionTimedOut;
+		case "canceled":
+			return FEEDBACK.actionCanceled;
+		default:
+			return `Action failed · exit ${run.exitCode}`;
+	}
+}
+
 export function outcomePresentation(outcome?: string): Presentation {
 	return OUTCOME[(outcome ?? "fail") as Run["outcome"]] ?? OUTCOME.fail;
 }
@@ -61,6 +75,9 @@ export const FEEDBACK = {
 	updated: "Updated",
 	statusUpdated: "Status updated",
 	resultUnavailable: "Result not available yet",
+	actionFinished: "Action finished",
+	actionTimedOut: "Action timed out",
+	actionCanceled: "Action canceled",
 	actionsAsync: "Actions are queued asynchronously and may take a moment to report a new status.",
 	statusUnavailable: "Status could not be refreshed",
 	cardSaved: "Card saved",

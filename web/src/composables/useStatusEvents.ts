@@ -1,9 +1,11 @@
 import { computed, getCurrentScope, onScopeDispose, readonly, ref, type Ref } from "vue";
-import { connectStatusEvents, type StatusEvent } from "@/api";
+import { connectStatusEvents, type RunEvent, type StatusEvent } from "@/api";
 
 export interface StatusListener {
 	/** Receives every `status.changed` event from the shared stream. */
-	onStatus(event: StatusEvent): void;
+	onStatus?(event: StatusEvent): void;
+	/** Receives every `run.recorded` event (FR-42a). */
+	onRun?(event: RunEvent): void;
 	/**
 	 * Called on each polling tick while the stream is down and once when it
 	 * (re)connects, so a view can catch up on checks it may have missed.
@@ -15,6 +17,7 @@ export type StatusEventsMode = "live" | "polling";
 
 export type StatusEventsConnector = (
 	onStatus: (event: StatusEvent) => void,
+	onRun: (event: RunEvent) => void,
 ) => EventSource | undefined;
 
 export interface StatusEvents {
@@ -61,9 +64,14 @@ export function createStatusEvents(
 	}
 
 	function open() {
-		source = connect((event) => {
-			for (const listener of listeners) listener.onStatus(event);
-		});
+		source = connect(
+			(event) => {
+				for (const listener of listeners) listener.onStatus?.(event);
+			},
+			(event) => {
+				for (const listener of listeners) listener.onRun?.(event);
+			},
+		);
 		startPolling();
 		if (!source) return;
 		source.addEventListener("open", () => {

@@ -34,10 +34,14 @@ Every primary screen uses the same shell:
   actions live in the page header;
 - centered content with a maximum width of 1200 px;
 - mobile navigation collapses into a compact top bar without hiding the
-  current section or the main action.
+  current section or the main action;
+- a quiet footer with the running version (`Marionette v1.1.0`, FR-41a)
+  from `/api/health`, read again when the status stream reconnects (a
+  service restart during an upgrade); it is hidden when the version cannot
+  be read.
 
-The pairing screen uses the shell without navigation and without the
-connection state: nothing behind it is available yet.
+The pairing screen uses the shell without navigation, connection state or
+footer: nothing behind it is available yet.
 
 The active navigation item is visually and textually identifiable. Navigation
 is not available only as a link buried inside a card.
@@ -109,6 +113,15 @@ Rules:
   enqueue error) stays visible for about 4 s. A card without a status
   action, or a primary action that no check follows, shows **Accepted**
   right after the request is queued.
+- When the server records the run of a primary action (`run.recorded`,
+  FR-42a), whoever started it, the dashboard card reports it in the same
+  line: a failed run (**Action failed · exit 2**, **Action timed out**,
+  **Action canceled**) stays until the next action on the card, a newer run
+  or a reload, because the badge never shows it; a successful run shows
+  **Action finished** for about 4 s, and is only announced when a status
+  check follows the action (the badge then shows its result). A run
+  recorded while the card's own request is still in flight keeps its note
+  over the request's **Accepted** or **Updated**.
 - The pending phases (**Queued**, **Running**) are shown by the badge and
   the button spinner only, never by a second line of text. Every phase and
   outcome, **Updated** included, is announced through a visually hidden
@@ -192,6 +205,8 @@ management views.
 ## 6. Card detail
 
 The detail header contains the card name, icon, current state, and last check.
+A card colour (FR-10a) is a 4 px stripe along the top of the icon tile, the
+same colour as the dashboard card; the header itself is not coloured.
 The body contains:
 
 - **Summary**: current state, state duration, and last check with its
@@ -204,11 +219,15 @@ The body contains:
   available yet**, an enqueue error, or **Action accepted** when no check
   follows, §4) replaces the panel's asynchronous note in place. The page-level
   line above the summary is used only for deleting the card;
-- **Recent runs**: time, outcome, duration, and expandable output. After
-  **Run action** is accepted the list is re-read at the card's fast polling
-  interval (2 s when the card has none) until the new run appears, at most
-  for the action's timeout plus the 30 s queue margin; the buttons do not
-  wait for it, and a failed read shows **Run history is unavailable** while
+- **Recent runs**: time, outcome, duration, and expandable output. A
+  `run.recorded` event for the card re-reads the list at once, also for a
+  run started elsewhere, and so does a reconnect of the stream. After
+  **Run action** is accepted the detail waits for the new run: the event
+  normally ends the wait; as a fallback the list is re-read at the card's
+  fast polling interval (2 s when the card has none), starting only after
+  the action's timeout while the stream is live (at once when it drops),
+  at most for the action's timeout plus the 30 s queue margin; the buttons
+  do not wait for it, and a failed read shows **Run history is unavailable** while
   the wait goes on;
 - **Status history**: chronological transition timeline with duration;
 - **Configuration**: link to edit, not inline configuration in diagnostics.

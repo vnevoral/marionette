@@ -1,0 +1,46 @@
+name: Release
+
+# A pushed vMAJOR.MINOR.PATCH tag (created by the project owner) becomes a
+# GitHub Release with the linux/arm64 archive and its .sha256 (block 0057).
+# The release is published only after the full CI workflow passes; the tag
+# rules themselves live in deploy/release_version.sh, which also rejects
+# tags such as v1.2.3-rc1 that the filter below lets through.
+on:
+  push:
+    tags: ["v*.*.*"]
+
+permissions:
+  contents: read
+
+jobs:
+  ci:
+    uses: ./.github/workflows/ci.yml
+
+  release:
+    needs: ci
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: web/.nvmrc
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - run: npm ci
+        working-directory: web
+      - run: make release-arm64
+      - name: Publish the GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          archive="bin/marionette-${TAG}-linux-arm64.tar.gz"
+          gh release create "$TAG" "$archive" "$archive.sha256" \
+            --verify-tag --title "Marionette $TAG" --generate-notes

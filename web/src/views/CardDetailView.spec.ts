@@ -15,6 +15,7 @@ import {
 	type Run,
 	type StatusSnapshot,
 } from "@/api";
+import CardIdentityTile from "@/components/CardIdentityTile.vue";
 import CardDetailView from "@/views/CardDetailView.vue";
 import { FEEDBACK } from "@/ui/vocabulary";
 import { fakeConfirm } from "@/test/fakeConfirm";
@@ -149,6 +150,14 @@ describe("CardDetailView", () => {
 
 	afterEach(() => {
 		vi.unstubAllGlobals();
+	});
+
+	it("shows the card colour on the icon tile in the header", async () => {
+		vi.mocked(getCard).mockResolvedValue({ ...cards.lamp, icon: "pi pi-bolt", color: "teal" });
+		const { wrapper } = await mountDetail("lamp");
+		const tile = wrapper.findComponent(CardIdentityTile);
+		expect(tile.props()).toEqual({ icon: "pi pi-bolt", color: "teal" });
+		wrapper.unmount();
 	});
 
 	it("blocks the buttons until a newer check arrives, then refetches runs and history (H2)", async () => {
@@ -495,6 +504,85 @@ describe("CardDetailView", () => {
 			wrapper.unmount();
 			await advance(10_000);
 			expect(getRuns).toHaveBeenCalledTimes(1);
+		});
+
+		describe("with the live stream (block 0058)", () => {
+			async function mountLive(id: string) {
+				const mounted = await mountDetail(id);
+				FakeEventSource.last().open();
+				await flushPromises();
+				return mounted;
+			}
+
+			async function runAction(wrapper: ReturnType<typeof mount>) {
+				await buttonByLabel(wrapper, "Run action").trigger("click");
+				await flushPromises();
+			}
+
+			it("shows the run from run.recorded without reading the runs while it runs", async () => {
+				vi.mocked(getRuns).mockResolvedValueOnce([oldRun]).mockResolvedValue([newRun, oldRun]);
+				const { wrapper } = await mountLive("lamp");
+				await runAction(wrapper);
+				await advance(4000);
+				expect(getRuns).toHaveBeenCalledTimes(1);
+
+				FakeEventSource.last().run({ cardId: "lamp", run: newRun });
+				await flushPromises();
+				expect(getRuns).toHaveBeenCalledTimes(2);
+				expect(wrapper.findAll(".run-row")).toHaveLength(2);
+				await advance(40_000);
+				expect(getRuns).toHaveBeenCalledTimes(2);
+				wrapper.unmount();
+			});
+
+			it("ignores a run of another card and falls back to reading after the action timeout", async () => {
+				vi.mocked(getRuns).mockResolvedValue([oldRun]);
+				const { wrapper } = await mountLive("lamp");
+				await runAction(wrapper);
+				FakeEventSource.last().run({ cardId: "printer", run: newRun });
+				await flushPromises();
+				await advance(4000);
+				expect(getRuns).toHaveBeenCalledTimes(1);
+				// Lamp: the first fallback read at its 5 s timeout, then every 2 s.
+				await advance(1000);
+				expect(getRuns).toHaveBeenCalledTimes(2);
+				await advance(2000);
+				expect(getRuns).toHaveBeenCalledTimes(3);
+				wrapper.unmount();
+			});
+
+			it("brings the first read forward when the stream drops", async () => {
+				vi.mocked(getRuns).mockResolvedValue([oldRun]);
+				const { wrapper } = await mountLive("lamp");
+				await runAction(wrapper);
+				await advance(1000);
+				FakeEventSource.last().fail();
+				await flushPromises();
+				await advance(2000);
+				expect(getRuns).toHaveBeenCalledTimes(2);
+				wrapper.unmount();
+			});
+
+			it("re-reads the runs after a reconnect, not on the first connect", async () => {
+				vi.mocked(getRuns).mockResolvedValue([oldRun]);
+				const { wrapper } = await mountLive("lamp");
+				expect(getRuns).toHaveBeenCalledTimes(1);
+				FakeEventSource.last().fail();
+				await flushPromises();
+				FakeEventSource.last().open();
+				await flushPromises();
+				expect(getRuns).toHaveBeenCalledTimes(2);
+				wrapper.unmount();
+			});
+
+			it("adds a run recorded without an action of its own (another device)", async () => {
+				vi.mocked(getRuns).mockResolvedValueOnce([oldRun]).mockResolvedValue([newRun, oldRun]);
+				const { wrapper } = await mountLive("lamp");
+				FakeEventSource.last().run({ cardId: "lamp", run: newRun });
+				await flushPromises();
+				expect(wrapper.findAll(".run-row")).toHaveLength(2);
+				wrapper.unmount();
+			});
 		});
 	});
 });

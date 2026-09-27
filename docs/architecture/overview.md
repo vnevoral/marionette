@@ -24,7 +24,7 @@ flowchart LR
 | Execution engine       | `internal/execengine` | Bezpečné spouštění akcí na hostu (procesní skupina, timeout, minimální prostředí), capture výstupu, limit souběžnosti | Implementováno — fáze 3, zpevněno 0024/0034 |
 | Status/health engine   | `internal/status` | Vyhodnocení stavu karty, transition historie, volitelný polling | Implementováno — fáze 4                     |
 | Fronta akcí            | `internal/actions` | Asynchronní běh přijatých akcí, omezená fronta, deduplikace, drain při shutdownu (FR-18, FR-35) | Implementováno — 0027, vyčleněno 0034      |
-| Broker událostí        | `internal/events` | Fan-out změn statusu pro SSE, uzavření při shutdownu (ADR-0008)  | Implementováno — 0022, vyčleněno 0034      |
+| Broker událostí        | `internal/events` | Fan-out změn statusu a zapsaných běhů pro SSE, uzavření při shutdownu (ADR-0008)  | Implementováno — 0022, vyčleněno 0034      |
 | REST API domény        | `internal/server` | CRUD karet/akcí, enqueue, čtení stavu, SSE zápis — čistě HTTP vrstva bez vlastních goroutin | Implementováno — fáze 5                     |
 
 ## Vztah k dokumentaci
@@ -230,6 +230,16 @@ je jen `{"state":"unknown"}` — `checkedAt` a `lastCheck` se vynechávají
 čas Go. Pole `duration` u běhů a přechodů stavu je v **nanosekundách**
 (Go `time.Duration`); frontend je převádí při zobrazení.
 
+Události SSE streamu `GET /api/events` (ADR-0008):
+
+| Událost          | Kdy                                                    | `data`                                         |
+| ---------------- | ------------------------------------------------------ | ---------------------------------------------- |
+| `status.changed` | změna interpretovaného stavu karty                     | `{"cardId": "…", "snapshot": StatusSnapshot}`  |
+| `run.recorded`   | běh primární akce zapsaný do historie (FR-42a, blok 0058) | `{"cardId": "…", "run": Run}`, `Run` jako položka `GET /api/cards/{id}/runs` |
+
+Obě události sdílejí jednu řadu `id`. Pomalý odběratel ztrácí nejstarší
+události, takže klient po znovupřipojení načítá stav a běhy přes REST.
+
 Limity hodnot karty (konstanty `config.Max*`, ADR-0004 „Limity hodnot“):
 
 | Pole                                  | Limit                                                              |
@@ -255,7 +265,8 @@ Statické soubory SPA: `index.html` a klientské cesty se vydávají s
 ## Kompozice a logování
 
 `cmd/marionette` je jediné místo, kde se služby skládají (blok 0034):
-`config.LoadFile` → `events.Broker` (`store.OnStatusChange = broker.Publish`)
+`config.LoadFile` → `events.Broker` (`store.OnStatusChange = broker.Publish`,
+`store.OnRunAppended = broker.PublishRun`)
 → `execengine.Runner` → `status.StatusCheckService` a `status.Scheduler` →
 `actions.Queue` → `server.NewRouter(server.Dependencies{…})`. Router
 předaný store nemutuje a `internal/server` nedrží žádné goroutiny mimo

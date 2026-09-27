@@ -1,5 +1,5 @@
-// Package events fans card status transitions out to in-process subscribers
-// (the SSE endpoint) without blocking the producer.
+// Package events fans card status transitions and recorded runs out to
+// in-process subscribers (the SSE endpoint) without blocking the producer.
 package events
 
 import (
@@ -11,16 +11,18 @@ import (
 // subscriberBuffer bounds how many events a slow subscriber may lag behind.
 const subscriberBuffer = 8
 
-// Event is one published status transition.
+// Event is one published status transition, or, when Run is set, a run
+// recorded in the card's history (ADR-0008, addendum 2026-09-27).
 type Event struct {
 	ID       uint64
 	CardID   string
 	Snapshot config.StatusSnapshot
+	Run      *config.Run
 }
 
-// Broker delivers status transitions to every current subscriber. Publish
-// never blocks: a subscriber that cannot keep up loses its oldest buffered
-// event, so it always ends with the newest snapshot.
+// Broker delivers events to every current subscriber. Publishing never
+// blocks: a subscriber that cannot keep up loses its oldest buffered event,
+// so it always ends with the newest one (clients catch up over REST).
 type Broker struct {
 	mu          sync.Mutex
 	nextID      uint64
@@ -41,13 +43,23 @@ func NewBroker() *Broker {
 // It has the signature of config.Store.OnStatusChange so the store can be
 // wired directly to the broker. Events published after Close are dropped.
 func (broker *Broker) Publish(cardID string, snapshot config.StatusSnapshot) {
+	broker.publish(Event{CardID: cardID, Snapshot: snapshot})
+}
+
+// PublishRun sends a recorded run to subscribers without waiting for any of
+// them. It has the signature of config.Store.OnRunAppended.
+func (broker *Broker) PublishRun(cardID string, run config.Run) {
+	broker.publish(Event{CardID: cardID, Run: &run})
+}
+
+func (broker *Broker) publish(event Event) {
 	broker.mu.Lock()
 	defer broker.mu.Unlock()
 	if broker.closed {
 		return
 	}
 	broker.nextID++
-	event := Event{ID: broker.nextID, CardID: cardID, Snapshot: snapshot}
+	event.ID = broker.nextID
 	for subscriber := range broker.subscribers {
 		select {
 		case subscriber <- event:

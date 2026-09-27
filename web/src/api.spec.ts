@@ -21,6 +21,7 @@ import {
 	setUnauthorizedHandler,
 	updateCard,
 	type ActionCard,
+	type RunEvent,
 	type StatusEvent,
 } from "@/api";
 
@@ -294,6 +295,35 @@ describe("connectStatusEvents", () => {
 		fake.emit("status.changed", new MessageEvent("status.changed", { data: "{not json" }));
 		fake.emit("status.changed", new Event("status.changed"));
 		expect(received).toEqual([payload]);
+	});
+
+	it("delivers run.recorded events with a run and drops malformed ones", () => {
+		FakeEventSource.instances = [];
+		vi.stubGlobal("EventSource", FakeEventSource);
+		const runs: RunEvent[] = [];
+		connectStatusEvents(
+			() => {},
+			(event) => runs.push(event),
+		);
+		const fake = FakeEventSource.instances[0];
+		const payload: RunEvent = {
+			cardId: "card-1",
+			run: {
+				actionKind: "primary",
+				startedAt: "2026-09-27T10:00:00Z",
+				duration: 1,
+				exitCode: 2,
+				output: "",
+				truncated: false,
+				outcome: "fail",
+			},
+		};
+		const emit = (data: string) =>
+			fake.emit("run.recorded", new MessageEvent("run.recorded", { data }));
+		emit(JSON.stringify(payload));
+		emit(JSON.stringify({ cardId: "card-1" }));
+		emit("{not json");
+		expect(runs).toEqual([payload]);
 	});
 });
 

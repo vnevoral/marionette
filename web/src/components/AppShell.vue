@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed } from "vue";
 import { RouterLink, useRoute } from "vue-router";
+import AppVersion from "@/components/AppVersion.vue";
 import ConnectionStatus from "@/components/ConnectionStatus.vue";
 import { useSession } from "@/composables/useSession";
 
@@ -36,11 +37,16 @@ const pairing = computed(() => Boolean(route.meta.pairing));
 		<div class="app-content">
 			<slot />
 		</div>
+		<footer v-if="!pairing" class="app-footer">
+			<AppVersion />
+		</footer>
 	</div>
 </template>
 
 <style scoped>
 .app-shell {
+	display: flex;
+	flex-direction: column;
 	min-height: 100vh;
 	background: var(--color-canvas);
 }
@@ -108,7 +114,13 @@ const pairing = computed(() => Boolean(route.meta.pairing));
 }
 
 .app-content {
+	flex: 1;
 	min-width: 0;
+}
+
+.app-footer {
+	padding: var(--space-4) clamp(var(--space-4), 5vw, 64px) var(--space-6);
+	text-align: center;
 }
 
 @media (max-width: 48rem) {

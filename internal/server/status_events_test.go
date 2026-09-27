@@ -3,6 +3,7 @@ package server
 import (
 	"bufio"
 	"context"
+	"encoding/json"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -19,11 +20,12 @@ func TestNewRouterDoesNotMutateStoreAndStreamsBrokerEvents(t *testing.T) {
 	card := createServerCard(t, store, "wired")
 	broker := events.NewBroker()
 	handler := NewRouter(Dependencies{Store: store, Events: broker})
-	if store.OnStatusChange != nil {
-		t.Fatal("NewRouter must not install Store.OnStatusChange; that is the composition root's job")
+	if store.OnStatusChange != nil || store.OnRunAppended != nil {
+		t.Fatal("NewRouter must not install store callbacks; that is the composition root's job")
 	}
 	// Composition root wiring, as done in cmd/marionette.
 	store.OnStatusChange = broker.Publish
+	store.OnRunAppended = broker.PublishRun
 
 	testServer := httptest.NewServer(handler)
 	defer testServer.Close()
@@ -50,6 +52,27 @@ func TestNewRouterDoesNotMutateStoreAndStreamsBrokerEvents(t *testing.T) {
 	body := strings.Join(lines, "")
 	if !strings.Contains(body, "id: 1\n") || !strings.Contains(body, "event: status.changed\n") ||
 		!strings.Contains(body, `"cardId":"wired"`) || !strings.Contains(body, `"state":"ok"`) {
+		t.Fatalf("SSE body = %q", body)
+	}
+
+	// A recorded primary run follows as run.recorded (FR-42a) with the run in
+	// the shape of GET /api/cards/{id}/runs.
+	run := config.Run{ActionKind: "primary", ExitCode: 2, Outcome: config.RunOutcomeFail, Output: "down"}
+	if err := store.AppendRun(card.ID, run); err != nil {
+		t.Fatalf("AppendRun() error = %v", err)
+	}
+	lines = nil
+	for len(lines) < 4 {
+		line, err := reader.ReadString('\n')
+		if err != nil {
+			t.Fatalf("reading SSE stream: %v (got %q)", err, lines)
+		}
+		lines = append(lines, line)
+	}
+	body = strings.Join(lines, "")
+	runJSON, _ := json.Marshal(run)
+	if !strings.Contains(body, "id: 2\n") || !strings.Contains(body, "event: run.recorded\n") ||
+		!strings.Contains(body, `data: {"cardId":"wired","run":`+string(runJSON)+"}\n") {
 		t.Fatalf("SSE body = %q", body)
 	}
 }

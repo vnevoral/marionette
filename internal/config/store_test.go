@@ -549,3 +549,39 @@ func TestStoreRollbackKeepsDirtyHonest(t *testing.T) {
 		t.Fatal("store reports unsaved changes although every mutation was rolled back")
 	}
 }
+
+func TestStoreRunAppendedCallbackRunsOutsideTheLock(t *testing.T) {
+	store := NewStore(validSettings())
+	card, err := store.CreateCard(validCard())
+	if err != nil {
+		t.Fatalf("CreateCard() error = %v", err)
+	}
+	type appended struct {
+		cardID string
+		run    Run
+		stored int
+	}
+	callbacks := make(chan appended, 2)
+	store.OnRunAppended = func(cardID string, run Run) {
+		// Reading the store from the callback must not deadlock.
+		runs, _ := store.GetRuns(cardID, run.ActionKind)
+		callbacks <- appended{cardID: cardID, run: run, stored: len(runs)}
+	}
+	run := Run{ActionKind: "primary", ExitCode: 2, Outcome: RunOutcomeFail, Output: "down"}
+	if err := store.AppendRun(card.ID, run); err != nil {
+		t.Fatalf("AppendRun() error = %v", err)
+	}
+	if err := store.AppendRun("missing", run); !errors.Is(err, ErrNotFound) {
+		t.Fatalf("AppendRun(missing) error = %v", err)
+	}
+
+	got := <-callbacks
+	if got.cardID != card.ID || got.run != run || got.stored != 1 {
+		t.Fatalf("callback = %#v", got)
+	}
+	select {
+	case extra := <-callbacks:
+		t.Fatalf("callback for a run that was not stored: %#v", extra)
+	default:
+	}
+}

@@ -4,6 +4,8 @@ on:
   push:
     branches: [main]
   pull_request:
+  # Reused by release.yml, so a release passes the same checks.
+  workflow_call:
 
 jobs:
   backend:

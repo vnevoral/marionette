@@ -228,6 +228,7 @@ func (app application) run(ctx context.Context) error {
 	}
 	broker := events.NewBroker()
 	store.OnStatusChange = broker.Publish
+	store.OnRunAppended = broker.PublishRun
 
 	executor := execengine.NewExecutor()
 	runner, err := execengine.NewRunner(store.GetSettings(), executor)

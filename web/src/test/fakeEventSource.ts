@@ -1,4 +1,4 @@
-import type { StatusEvent } from "@/api";
+import type { RunEvent, StatusEvent } from "@/api";
 
 // Minimal EventSource stand-in for unit tests: records instances, lets a test
 // emit named events and observe close().
@@ -49,5 +49,9 @@ export class FakeEventSource {
 			"status.changed",
 			new MessageEvent("status.changed", { data: JSON.stringify(payload) }),
 		);
+	}
+
+	run(payload: RunEvent) {
+		this.emit("run.recorded", new MessageEvent("run.recorded", { data: JSON.stringify(payload) }));
 	}
 }

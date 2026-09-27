@@ -222,6 +222,16 @@ uloží do `docs/plans/blocks/NNNN-nazev.md`. Blok se implementuje promptem
   5. [0054 — Barevný proužek karty](blocks/0054-card-color-stripe.md)
      — **Hotovo** (2026-09-27); FR-10a, volitelná barva karty z palety 8
      možností, na dashboardu jako horní hrana.
+  6. [0055 — Barva karty v detailu](blocks/0055-card-color-in-detail.md)
+     — **Hotovo** (2026-09-27); FR-10a, proužek na dlaždici ikony v hlavičce detailu.
+  7. [0056 — Verze aplikace v UI](blocks/0056-version-in-ui.md)
+     — **Hotovo** (2026-09-27); FR-41a, verze z `/api/health` v patičce.
+  8. [0057 — Release z CI po pushnutí tagu](blocks/0057-release-in-ci.md)
+     — **Hotovo** (2026-09-27); FR-06, workflow `release.yml`, GitHub Release
+     s archivem a `.sha256`.
+  9. [0058 — SSE událost po zapsání běhu primární akce](blocks/0058-run-recorded-event.md)
+     — **Hotovo** (2026-09-27); FR-42a, ADR-0008 doplněk, `run.recorded`
+     místo opakovaných dotazů na běhy.
 
   Otevřené otázky revize jsou rozhodnuté v
   [requirements.md, sekce 13](../requirements/requirements.md#13-rozhodnutí-revize-projektu-2026-09-26)

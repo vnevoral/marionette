@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"marionette/internal/config"
+	"marionette/internal/events"
 	"marionette/internal/execengine"
 )
 
@@ -85,6 +86,39 @@ func TestQueueRunAndDrainAcceptedWork(t *testing.T) {
 	}
 	if err := actions.EnqueuePrimary(card.ID, card.Primary); !errors.Is(err, ErrQueueClosed) {
 		t.Fatalf("enqueue after close error = %v", err)
+	}
+}
+
+// queue → store → broker, as wired in cmd/marionette: a finished primary
+// action reaches event subscribers as a recorded run (FR-42a).
+func TestFinishedPrimaryActionIsPublishedAsRecordedRun(t *testing.T) {
+	store := config.NewStore(config.Settings{HistorySize: 5, MaxConcurrentActions: 1})
+	card := createServerCard(t, store, "published")
+	broker := events.NewBroker()
+	store.OnRunAppended = broker.PublishRun
+	subscriber, unsubscribe := broker.Subscribe()
+	defer unsubscribe()
+	runner := &fakeBackgroundRunner{
+		called: make(chan config.Action, 1),
+		result: execengine.Result{Outcome: config.RunOutcomeFail, ExitCode: 2},
+	}
+	actions, err := New(store, runner, &fakeStatusChecker{called: make(chan string, 1)}, nil)
+	if err != nil {
+		t.Fatalf("New() error = %v", err)
+	}
+	defer func() { _, _ = actions.Close(context.Background()) }()
+	if err := actions.EnqueuePrimary(card.ID, card.Primary); err != nil {
+		t.Fatalf("EnqueuePrimary() error = %v", err)
+	}
+
+	select {
+	case event := <-subscriber:
+		if event.CardID != card.ID || event.Run == nil || event.Run.ActionKind != KindPrimary ||
+			event.Run.Outcome != config.RunOutcomeFail || event.Run.ExitCode != 2 {
+			t.Fatalf("event = %#v", event)
+		}
+	case <-time.After(5 * time.Second):
+		t.Fatal("no run.recorded event for the finished primary action")
 	}
 }
 

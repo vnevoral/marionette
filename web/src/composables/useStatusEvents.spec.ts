@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { StatusEvent } from "@/api";
+import type { RunEvent, StatusEvent } from "@/api";
 import { createStatusEvents, type StatusListener } from "@/composables/useStatusEvents";
 import { FakeEventSource } from "@/test/fakeEventSource";
 
@@ -23,6 +23,7 @@ const event: StatusEvent = {
 function listener() {
 	return {
 		onStatus: vi.fn<(event: StatusEvent) => void>(),
+		onRun: vi.fn<(event: RunEvent) => void>(),
 		onRefresh: vi.fn<() => void>(),
 	} satisfies StatusListener;
 }
@@ -38,10 +39,13 @@ describe("createStatusEvents", () => {
 	});
 
 	function connector() {
-		return (onStatus: (event: StatusEvent) => void) => {
+		return (onStatus: (event: StatusEvent) => void, onRun: (event: RunEvent) => void) => {
 			const source = new FakeEventSource("/api/events");
 			source.addEventListener("status.changed", (raw) => {
 				if (raw instanceof MessageEvent) onStatus(JSON.parse(raw.data) as StatusEvent);
+			});
+			source.addEventListener("run.recorded", (raw) => {
+				if (raw instanceof MessageEvent) onRun(JSON.parse(raw.data) as RunEvent);
 			});
 			return source as unknown as EventSource;
 		};
@@ -59,6 +63,10 @@ describe("createStatusEvents", () => {
 		FakeEventSource.last().status(event);
 		expect(first.onStatus).toHaveBeenCalledWith(event);
 		expect(second.onStatus).toHaveBeenCalledWith(event);
+		const run: RunEvent = { cardId: "card-1", run: event.snapshot.lastCheck! };
+		FakeEventSource.last().run(run);
+		expect(first.onRun).toHaveBeenCalledWith(run);
+		expect(second.onRun).toHaveBeenCalledWith(run);
 
 		leaveFirst();
 		leaveFirst();

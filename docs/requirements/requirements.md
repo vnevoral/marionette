@@ -1,4 +1,4 @@
-# Požadavky na Marionette (SRS) — v0.10
+# Požadavky na Marionette (SRS) — v0.11
 
 > Stav: **zpřesněno** (fáze 1 a UX specifikace, 2026-09-25; doplněno o SSE stream
 > pro živé změny statusů, 2026-09-25; doplněno o dva polling intervaly a
@@ -8,7 +8,8 @@
 > 2026-09-25; revize projektu a kódu 2026-09-26: NFR-12, upřesnění FR-18 a
 > NFR-01, viz [Rozhodnutí — revize 2026-09-26](#13-rozhodnutí-revize-projektu-2026-09-26);
 > doplněno FR-05, FR-21a a FR-22a po validaci na Raspberry Pi, 2026-09-26;
-> FR-57 přejmenování zařízení, 2026-09-27; FR-10a barva karty, 2026-09-27).
+> FR-57 přejmenování zařízení, 2026-09-27; FR-10a barva karty, 2026-09-27;
+> FR-06, FR-41a a FR-42a, 2026-09-27).
 > Otevřené otázky z v0.1 byly rozhodnuty
 > s vlastníkem projektu, viz [Rozhodnutí fáze 1](#7-rozhodnutí-fáze-1),
 > [Rozhodnutí — polling a terminace](#9-rozhodnutí-polling-a-terminace-2026-09-25)
@@ -56,6 +57,10 @@ spustitelný soubor.
   `net.ipv4.ping_group_range`). Instalátor zjistí, zda host neprivilegovaný
   ICMP povoluje; pokud ne, vypíše srozumitelný návod na nápravu. Systémová
   nastavení hostu sám nemění. Návod je i v dokumentaci instalace.
+- **FR-06** _(doplněno 2026-09-27)_: Release archiv pro linux/arm64 (verze
+  z git tagu `vMAJOR.MINOR.PATCH`, soubor `.sha256`) sestaví a zveřejní CI
+  automaticky po pushnutí tagu jako GitHub Release. Tag dál vytváří jen
+  vlastník projektu. Release se nezveřejní, pokud neprojdou testy.
 
 ### 3.2 Akční karty a akce
 
@@ -68,6 +73,7 @@ spustitelný soubor.
   v editoru textový název. Barva nenese žádný stav: stav karty dál ukazuje
   jen status badge (FR-20, FR-25) a paleta se nepřekrývá se stavovými
   barvami. Karta bez barvy (i z konfigurace starší verze) se chová jako dnes.
+  Barva je vidět i v detailu karty.
 - **FR-11**: Každá karta má právě jednu **primární akci** — definici příkazu
   spouštěného na hostu (příkaz, argumenty, pracovní adresář, proměnné
   prostředí, timeout). Timeout je závazná **maximální doba čekání na
@@ -212,6 +218,9 @@ spustitelný soubor.
   spouštění akcí a čtení historie/posledního výsledku.
 - **FR-41**: `GET /api/health` (již existuje) slouží jako liveness endpoint
   procesu samotného (odlišné od status akcí uživatelských karet).
+- **FR-41a** _(doplněno 2026-09-27)_: UI zobrazuje verzi běžící aplikace
+  (z `GET /api/health`) na každé obrazovce, aby operátor po upgradu ověřil
+  verzi bez příkazové řádky.
 - **FR-42**: Backend poskytuje Server-Sent Events stream pro živé změny stavů
   karet. Připojený klient se přihlásí k endpointu pro události a při každé
   změně status projekce obdrží událost obsahující identifikátor karty a novou
@@ -220,6 +229,14 @@ spustitelný soubor.
   klient při dočasné nedostupnosti streamu použije REST read-only API jako
   fallback. REST API zůstává zdrojem pro počáteční načtení obrazovky a
   synchronní načtení aktuální projekce.
+- **FR-42a** _(doplněno 2026-09-27)_: Stejný stream posílá událost po
+  **zapsání dokončeného běhu primární akce** do historie (FR-17), s
+  identifikátorem karty a zapsaným během. Spuštění akce zůstává asynchronní
+  (FR-15, `202`); událost klientovi oznámí, že akce doběhla, aniž by musel
+  historii opakovaně načítat. Běh, který se nezapíše (akce zrušená při
+  vypnutí služby dřív, než začala běžet, nebo karta mezitím smazaná),
+  událost nevytvoří. Klient proto dál počítá s REST
+  načtením po znovupřipojení a s časovým limitem čekání.
 
 ### 3.6 Přístup a párování zařízení _(přijato 2026-09-26, ADR-0011)_
 

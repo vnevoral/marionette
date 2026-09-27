@@ -17,6 +17,9 @@ Na každý push a pull request:
    `make e2e` (build binárky a Playwright testy proti ní, blok 0041); při
    selhání se nahraje report a trace jako artefakt `playwright-report`.
 
+Workflow `ci.yml` jde volat i z jiného workflow (`workflow_call`); používá
+ho release workflow níže, aby release prošel stejnými kontrolami.
+
 Stejnou sadu (kromě jobu `e2e`, lokálně `make e2e`) spouští lokálně
 `make verify`; CI ji pouze zrcadlí. CI běh
 musí projít čistě (lint warningy selhávají build, nepotlačují se) před
@@ -45,29 +48,39 @@ nesledovaných souborů). Ruční přepsání `VERSION=… make release-arm64` s
 ignoruje. Vývojové buildy (`make build`, `make build-arm64`) omezení nemají
 a verzi berou z `git describe`.
 
-### Postup
+### Postup (release z CI, blok 0057)
 
 1. Na čistém stromu vytvořit tag: `git tag -a vX.Y.Z -m "…"`.
-2. `make release-arm64` vyprodukuje archiv
-   `bin/marionette-vX.Y.Z-linux-arm64.tar.gz` s binárkou
-   (`marionette-linux-arm64`) a instalačními soubory a vedle něj
-   `bin/marionette-vX.Y.Z-linux-arm64.tar.gz.sha256`.
-3. `git push origin vX.Y.Z`.
-4. Archiv i `.sha256` se nahrají na cílový Linux host; referenční ověření
-   probíhá na Raspberry Pi ARM64 s Ubuntu 24.x. V adresáři s oběma soubory
-   se integrita ověří `sha256sum -c marionette-vX.Y.Z-linux-arm64.tar.gz.sha256`.
-5. Po rozbalení se spustí `sudo ./install.sh ./marionette-linux-arm64`.
+2. `git push origin vX.Y.Z`. Push tagu tvaru `v*.*.*` spustí
+   `.github/workflows/release.yml`:
+   - job `ci` zavolá celý `ci.yml` (backend, web, e2e); když neprojde,
+     release nevznikne;
+   - job `release` na čistém checkoutu s tagy spustí `make release-arm64`.
+     `deploy/release_version.sh` odmítne tag jiného tvaru (např.
+     `v1.2.3-rc1`, který filtr workflow propustí), takže release nevznikne;
+   - `gh release create` zveřejní GitHub Release pro tag s archivem
+     `marionette-vX.Y.Z-linux-arm64.tar.gz` a jeho `.sha256`. Poznámky
+     se vygenerují z commitů. Právo `contents: write` má jen tento job.
+3. Na cílovém hostu se archiv i `.sha256` stáhnou z GitHub Releases (README,
+   „Installation on Linux with systemd“); referenční ověření probíhá na
+   Raspberry Pi ARM64 s Ubuntu 24.x. V adresáři s oběma soubory se integrita
+   ověří `sha256sum -c marionette-vX.Y.Z-linux-arm64.tar.gz.sha256`.
+4. Po rozbalení se spustí `sudo ./install.sh ./marionette-linux-arm64`.
    Skript nainstaluje unit, zachová existující konfiguraci a provede
    `systemctl enable` + start/restart služby.
-6. Nasazená verze se ověří přes `curl -s http://localhost:8080/api/health`
-   (pole `version` musí odpovídat tagu).
-7. Aktualizace používá stejný skript s novou binárkou; data
+5. Nasazená verze se ověří přes `curl -s http://localhost:8080/api/health`
+   (pole `version` musí odpovídat tagu) nebo v patičce UI (FR-41a).
+6. Aktualizace používá stejný skript s novou binárkou; data
    (`marionette.json`, `devices.json`) i `/etc/default/marionette` zůstávají,
    přepíše se binárka a unit. Rollback spustí instalátor předchozího
-   releasu, který je proto potřeba si ponechat. Postup se zálohou, kontrolou
-   a rollbackem přes MAJOR verzi je v README, sekce „Upgrading and rolling
-   back“.
-8. Žádný krok nevyžaduje instalaci Go, Node.js ani jiného runtime na cíli.
+   releasu (předchozí releasy zůstávají v GitHub Releases). Postup se
+   zálohou, kontrolou a rollbackem přes MAJOR verzi je v README, sekce
+   „Upgrading and rolling back“.
+7. Žádný krok nevyžaduje instalaci Go, Node.js ani jiného runtime na cíli.
+
+Záložní ruční postup (bez GitHubu nebo při výpadku CI): po kroku 1 spustit
+lokálně `make release-arm64`. Archiv a `.sha256` vzniknou v `bin/` a na
+host se zkopírují ručně; dál se pokračuje krokem 3.
 
 ## Verzování závislostí
 

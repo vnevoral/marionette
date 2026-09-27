@@ -6,7 +6,7 @@ import { useStatusEvents } from "@/composables/useStatusEvents";
 // the header: "Live" while the stream is up, "Reconnecting" while REST
 // polling covers for it.
 const events = useStatusEvents();
-events.subscribe({ onStatus() {} });
+events.subscribe({});
 
 const label = computed(() => (events.connected.value ? "Live" : "Reconnecting"));
 const tone = computed(() => (events.connected.value ? "connected" : "disconnected"));

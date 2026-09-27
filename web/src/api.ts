@@ -48,6 +48,12 @@ export interface StatusEvent {
 	snapshot: StatusSnapshot;
 }
 
+/** `run.recorded`: a primary run was written to the card's history (FR-42a). */
+export interface RunEvent {
+	cardId: string;
+	run: Run;
+}
+
 /** 202 response of the enqueue endpoints. */
 export interface AcceptedAction {
 	cardId: string;
@@ -241,24 +247,47 @@ export interface StatusChange {
 	duration: number;
 }
 
+/** `GET /api/health`: liveness and the running version (FR-41, FR-41a). */
+export interface Health {
+	status: string;
+	/** Release tag such as `v1.1.0`, or `dev` for a development build. */
+	version: string;
+	uptimeSec: number;
+}
+
+export function getHealth(): Promise<Health> {
+	return request<Health>("/api/health");
+}
+
 export function getStatusHistory(cardID: string): Promise<StatusChange[]> {
 	return request<StatusChange[]>(`/api/cards/${encodeURIComponent(cardID)}/status/history`);
 }
 
 export function connectStatusEvents(
 	onStatusChange: (event: StatusEvent) => void,
+	onRunRecorded: (event: RunEvent) => void = () => {},
 ): EventSource | undefined {
 	if (typeof EventSource === "undefined") return undefined;
 	const source = new EventSource("/api/events");
+	// Malformed transient events are ignored; REST reads remain available.
 	source.addEventListener("status.changed", (event) => {
-		if (!(event instanceof MessageEvent)) return;
-		try {
-			onStatusChange(JSON.parse(event.data) as StatusEvent);
-		} catch {
-			// Ignore malformed transient events; REST polling remains available.
-		}
+		const data = eventData<StatusEvent>(event);
+		if (data?.cardId && data.snapshot) onStatusChange(data);
+	});
+	source.addEventListener("run.recorded", (event) => {
+		const data = eventData<RunEvent>(event);
+		if (data?.cardId && data.run?.startedAt) onRunRecorded(data);
 	});
 	return source;
+}
+
+function eventData<T>(event: Event): T | undefined {
+	if (!(event instanceof MessageEvent)) return undefined;
+	try {
+		return JSON.parse(event.data) as T;
+	} catch {
+		return undefined;
+	}
 }
 
 // Mutating calls always declare application/json, even without a body, so

@@ -9,6 +9,7 @@ import ActionControls from "@/components/ActionControls.vue";
 import ActionNote from "@/components/ActionNote.vue";
 import DetailErrorState from "@/components/DetailErrorState.vue";
 import DetailPanel from "@/components/DetailPanel.vue";
+import CardIdentityTile from "@/components/CardIdentityTile.vue";
 import PageHeader from "@/components/PageHeader.vue";
 import RequestState from "@/components/RequestState.vue";
 import RunTable from "@/components/RunTable.vue";
@@ -22,7 +23,6 @@ import { useNotify } from "@/composables/useNotify";
 import { useTransientMessage, useTransientResult } from "@/composables/useTransientMessage";
 import { singleParam } from "@/router/params";
 import type { ActionKind, PendingRequest } from "@/types";
-import { DEFAULT_CARD_ICON } from "@/ui/icons";
 import {
 	ACTIONS,
 	EMPTY,
@@ -196,9 +196,7 @@ onBeforeUnmount(() => {
 				:back-label="ACTIONS.backToOverview"
 			>
 				<template #identity>
-					<div class="detail-icon" aria-hidden="true">
-						<i :class="card.icon || DEFAULT_CARD_ICON" />
-					</div>
+					<CardIdentityTile :icon="card.icon" :color="card.color" />
 				</template>
 				<template #actions>
 					<Button v-slot="slotProps" as-child>
@@ -276,17 +274,6 @@ onBeforeUnmount(() => {
 </template>
 
 <style scoped>
-.detail-icon {
-	display: grid;
-	width: 64px;
-	height: 64px;
-	flex-shrink: 0;
-	place-items: center;
-	border-radius: var(--radius-md);
-	background: var(--color-accent-soft);
-	color: var(--color-accent);
-	font-size: 1.6rem;
-}
 .detail-feedback {
 	margin-bottom: var(--space-6);
 }

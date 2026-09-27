@@ -67,3 +67,23 @@ handler okamžitě; volá se z `http.Server.RegisterOnShutdown`, takže
 `Shutdown` na dlouhožijící SSE spojení nečeká. Události publikované po
 `Close()` se zahazují. Klient se po restartu služby připojí znovu díky
 nativnímu reconnectu `EventSource`.
+
+## Doplnění 2026-09-27: událost `run.recorded` (blok 0058)
+
+> Stav doplňku: **Přijato** (2026-09-27, schválením bloku 0058).
+
+Stream `/api/events` nese kromě `status.changed` i událost `run.recorded`
+(FR-42a). Posílá se po zapsání dokončeného běhu **primární akce** do
+historie (`Store.AppendRun`), s `cardId` a během ve stejném tvaru jako
+položka `GET /api/cards/{id}/runs`. Spuštění akce zůstává asynchronní
+(`202`); událost jen oznamuje, že běh doběhl a je zapsaný.
+
+Platí stejná pravidla jako pro `status.changed`: broker neblokuje
+producenta, pomalý odběratel ztrácí nejstarší události, event log ani
+replay nejsou. Klient proto událost bere jako zrychlení, ne jako jediný
+zdroj. Po znovupřipojení načte běhy přes REST a při čekání na běh má
+záložní dotazy a časový rozpočet (blok 0050). Běh, který se nezapíše
+(akce zrušená při vypnutí služby dřív, než dostala místo ke spuštění, nebo
+karta smazaná během běhu), událost nevytvoří; běh přerušený za chodu se
+zapíše jako `canceled`.
+Události pro zařazení a start akce se nezavádějí.

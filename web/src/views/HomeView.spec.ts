@@ -6,7 +6,10 @@ import {
 	enqueueStatus,
 	getStatus,
 	listCards,
+	type AcceptedAction,
 	type ActionCard,
+	type Run,
+	type RunEvent,
 	type StatusSnapshot,
 } from "@/api";
 import HomeView from "@/views/HomeView.vue";
@@ -218,6 +221,102 @@ describe("HomeView", () => {
 		expect(buttonByLabel(card, "Run action").attributes("disabled")).toBeUndefined();
 		expect(noteText(card)).toBe("Accepted");
 		wrapper.unmount();
+	});
+
+	describe("recorded runs (run.recorded, block 0058)", () => {
+		function recorded(cardId: string, outcome: Run["outcome"], exitCode = 0): RunEvent {
+			return {
+				cardId,
+				run: {
+					actionKind: "primary",
+					startedAt: after,
+					duration: 1,
+					exitCode,
+					output: "",
+					truncated: false,
+					outcome,
+				},
+			};
+		}
+
+		it("keeps a failed run in the card note until the next action", async () => {
+			vi.mocked(enqueuePrimary).mockResolvedValue({
+				cardId: "lamp",
+				actionKind: "primary",
+				status: "accepted",
+			});
+			const wrapper = mountHome();
+			await flushPromises();
+			const card = cardByName(wrapper, "Lamp");
+			FakeEventSource.last().run(recorded("lamp", "fail", 2));
+			await flushPromises();
+			expect(noteText(card)).toBe("Action failed · exit 2");
+			expect(card.find(".action-note").classes()).toContain("action-note-error");
+			vi.advanceTimersByTime(60_000);
+			await flushPromises();
+			expect(noteText(card)).toBe("Action failed · exit 2");
+
+			await buttonByLabel(card, "Run action").trigger("click");
+			await flushPromises();
+			expect(noteText(card)).toBe("Accepted");
+			wrapper.unmount();
+		});
+
+		it.each([
+			["timeout", "Action timed out"],
+			["canceled", "Action canceled"],
+		] as const)("names a %s run", async (outcome, message) => {
+			const wrapper = mountHome();
+			await flushPromises();
+			FakeEventSource.last().run(recorded("printer", outcome));
+			await flushPromises();
+			expect(noteText(cardByName(wrapper, "Printer"))).toBe(message);
+			wrapper.unmount();
+		});
+
+		it("shows success briefly and only announces it when a status check follows", async () => {
+			const wrapper = mountHome();
+			await flushPromises();
+			FakeEventSource.last().run(recorded("lamp", "ok"));
+			FakeEventSource.last().run(recorded("sensor", "ok"));
+			FakeEventSource.last().run(recorded("printer", "ok"));
+			await flushPromises();
+			const lamp = cardByName(wrapper, "Lamp");
+			const printer = cardByName(wrapper, "Printer");
+			expect(noteText(lamp)).toBe("Action finished");
+			// A status action without automatic checks: no check follows the run.
+			expect(noteText(cardByName(wrapper, "Sensor"))).toBe("Action finished");
+			expect(noteText(printer)).toContain("Last checked");
+			expect(announcement(printer)).toBe("Action finished");
+			vi.advanceTimersByTime(4000);
+			await flushPromises();
+			expect(noteText(lamp)).toBe("");
+			wrapper.unmount();
+		});
+
+		it("keeps the run's note when the run is recorded before the request settles", async () => {
+			let accept: (value: AcceptedAction) => void = () => {};
+			vi.mocked(enqueuePrimary).mockReturnValue(new Promise((resolve) => (accept = resolve)));
+			const wrapper = mountHome();
+			await flushPromises();
+			const card = cardByName(wrapper, "Lamp");
+			await buttonByLabel(card, "Run action").trigger("click");
+			await flushPromises();
+			FakeEventSource.last().run(recorded("lamp", "fail", 1));
+			accept({ cardId: "lamp", actionKind: "primary", status: "accepted" });
+			await flushPromises();
+			expect(noteText(card)).toBe("Action failed · exit 1");
+			wrapper.unmount();
+		});
+
+		it("ignores a run of a card that is not on the dashboard", async () => {
+			const wrapper = mountHome();
+			await flushPromises();
+			FakeEventSource.last().run(recorded("unknown", "fail", 1));
+			await flushPromises();
+			expect(wrapper.text()).not.toContain("Action failed");
+			wrapper.unmount();
+		});
 	});
 
 	it("reports acceptance immediately for a monitored card without automatic checks", async () => {

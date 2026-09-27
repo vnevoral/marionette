@@ -64,6 +64,11 @@ type Store struct {
 	// the composition root wires it to the event broker. StatusSnapshot is a
 	// value type without references, so callers receive an independent copy.
 	OnStatusChange func(string, StatusSnapshot)
+
+	// OnRunAppended is called after a run is added to the history (FR-42a).
+	// Like OnStatusChange it runs outside the store lock and receives a copy;
+	// the composition root wires it to the event broker.
+	OnRunAppended func(string, Run)
 }
 
 // NewStore creates an empty store. Invalid settings are replaced with the
@@ -240,9 +245,8 @@ func (store *Store) GetSettings() Settings {
 // newest Settings.HistorySize records.
 func (store *Store) AppendRun(cardID string, run Run) error {
 	store.mu.Lock()
-	defer store.mu.Unlock()
-
 	if _, exists := store.cards[cardID]; !exists {
+		store.mu.Unlock()
 		return ErrNotFound
 	}
 	if store.history[cardID] == nil {
@@ -253,6 +257,11 @@ func (store *Store) AppendRun(cardID string, run Run) error {
 	runs = append([]Run{run}, runs...)
 	store.history[cardID][run.ActionKind] = trimRuns(runs, store.settings.HistorySize)
 	store.changes++
+	onRunAppended := store.OnRunAppended
+	store.mu.Unlock()
+	if onRunAppended != nil {
+		onRunAppended(cardID, run)
+	}
 	return nil
 }
 

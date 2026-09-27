@@ -4,16 +4,22 @@ import { RouterLink } from "vue-router";
 import Button from "primevue/button";
 import Message from "primevue/message";
 import ProgressSpinner from "primevue/progressspinner";
-import { listCards, type ActionCard as Card, type StatusEvent, type StatusSnapshot } from "@/api";
+import {
+	listCards,
+	type ActionCard as Card,
+	type RunEvent,
+	type StatusEvent,
+	type StatusSnapshot,
+} from "@/api";
 import ActionCard from "@/components/ActionCard.vue";
 import EmptyState from "@/components/EmptyState.vue";
 import PageHeader from "@/components/PageHeader.vue";
 import { outcomeResult, requestAction } from "@/composables/useActionRequest";
-import { supersedes } from "@/composables/useCardStatus";
+import { expectsFollowUpCheck, supersedes } from "@/composables/useCardStatus";
 import { useStatusEvents } from "@/composables/useStatusEvents";
 import { messageVisibleMs } from "@/composables/useTransientMessage";
 import type { ActionKind, PendingRequest, RequestResult } from "@/types";
-import { ACTIONS, EMPTY, FEEDBACK, LOADING } from "@/ui/vocabulary";
+import { ACTIONS, EMPTY, FEEDBACK, LOADING, runOutcomeMessage } from "@/ui/vocabulary";
 
 const cards = ref<Card[]>([]);
 const statuses = ref<Record<string, StatusSnapshot>>({});
@@ -29,6 +35,9 @@ const error = ref("");
 
 const resultTimers = new Map<string, ReturnType<typeof setTimeout>>();
 const pendingWaits = new Map<string, AbortController>();
+// Cards whose run was recorded while their request was in flight; the run's
+// note then outlives the request's own outcome (block 0058).
+const runsDuringRequest = new Set<string>();
 
 const healthyCount = computed(
 	() => cards.value.filter((card) => statuses.value[card.id]?.state === "ok").length,
@@ -89,8 +98,23 @@ function applyStatusEvent(event: StatusEvent) {
 	applySnapshot(event.cardId, event.snapshot);
 }
 
+// A recorded run (FR-42a) is shown in the card's note whoever started it: a
+// failure stays until the next action on the card, a newer run or a reload;
+// success is shown briefly, and only announced when a status check follows
+// the action, since the badge then shows the result.
+function applyRunEvent({ cardId, run }: RunEvent) {
+	const card = cards.value.find((candidate) => candidate.id === cardId);
+	if (!card) return;
+	if (pendingWaits.has(cardId)) runsDuringRequest.add(cardId);
+	const message = runOutcomeMessage(run);
+	if (run.outcome !== "ok") showResult(cardId, { tone: "error", message }, true);
+	else
+		showResult(cardId, { tone: "success", message, quiet: expectsFollowUpCheck(card, "primary") });
+}
+
 useStatusEvents().subscribe({
 	onStatus: applyStatusEvent,
+	onRun: applyRunEvent,
 	onRefresh() {
 		if (cards.value.length) void refreshStatuses();
 	},
@@ -102,9 +126,13 @@ function withoutKey<T>(record: Record<string, T>, key: string): Record<string, T
 	return copy;
 }
 
-function showResult(cardID: string, result: RequestResult) {
-	lastResult.value = { ...lastResult.value, [cardID]: result };
+function showResult(cardID: string, result: RequestResult | null, persist = false) {
 	clearTimeout(resultTimers.get(cardID));
+	resultTimers.delete(cardID);
+	lastResult.value = result
+		? { ...lastResult.value, [cardID]: result }
+		: withoutKey(lastResult.value, cardID);
+	if (!result || persist) return;
 	resultTimers.set(
 		cardID,
 		setTimeout(() => {
@@ -123,6 +151,8 @@ async function runAction(card: Card, action: ActionKind) {
 	if (requests.value[card.id]) return;
 	const controller = new AbortController();
 	pendingWaits.set(card.id, controller);
+	runsDuringRequest.delete(card.id);
+	showResult(card.id, null);
 	try {
 		const outcome = await requestAction(card, action, {
 			signal: controller.signal,
@@ -134,8 +164,9 @@ async function runAction(card: Card, action: ActionKind) {
 			accepted: FEEDBACK.accepted,
 			updated: FEEDBACK.updated,
 		});
-		if (result) showResult(card.id, result);
+		if (result && !runsDuringRequest.has(card.id)) showResult(card.id, result);
 	} finally {
+		runsDuringRequest.delete(card.id);
 		pendingWaits.delete(card.id);
 		setPending(card.id, undefined);
 	}
