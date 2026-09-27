@@ -73,7 +73,7 @@ make e2e          # browser tests against the built binary (Playwright, Chromium
 
 The backend reads `./marionette.json`, which is git-ignored and created from
 `deploy/dev-fixture.json` on the first `make backend-dev` (or `make
-dev-config`). Go 1.23 or newer (`go.mod`) and Node 22 (`web/.nvmrc`) are
+dev-config`). Go 1.27 or newer (`go.mod`) and Node 22 (`web/.nvmrc`) are
 required; the dev container provides both.
 
 Access control is on in development too: the first start prints a pairing

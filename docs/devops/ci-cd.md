@@ -98,8 +98,16 @@ step 3.
 
 ## Dependency versioning
 
-- Go: `go.mod` sets the minimum version (currently Go 1.23, also stated in
-  the README); raise it cautiously and test the build on arm64.
+- Go: `go.mod` sets the version (currently Go 1.27, also stated in the
+  README); CI and the release build use the latest patch release of it
+  (`setup-go` with `go-version-file`). The dev container pins the same
+  version with its checksum (`.devcontainer/Dockerfile`, `GO_VERSION`).
+  Stay on a Go release that still receives security fixes (the two newest
+  major releases); raise it cautiously and test the build on arm64
+  (block 0060).
+- golangci-lint: v2, pinned to the same version in the dev container and
+  in `ci.yml` (`golangci/golangci-lint-action`); configuration in
+  `.golangci.yml`.
 - npm (`web/`): keep PrimeVue on the stable major branch (`v4-stable`
   dist-tag), see
   [ADR-0003](../architecture/decisions/0003-vue-primevue-frontend.md).
