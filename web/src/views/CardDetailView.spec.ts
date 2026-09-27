@@ -11,6 +11,7 @@ import {
 	getRuns,
 	getStatus,
 	getStatusHistory,
+	type AcceptedAction,
 	type ActionCard,
 	type Run,
 	type StatusSnapshot,
@@ -571,6 +572,21 @@ describe("CardDetailView", () => {
 				await flushPromises();
 				FakeEventSource.last().open();
 				await flushPromises();
+				expect(getRuns).toHaveBeenCalledTimes(2);
+				wrapper.unmount();
+			});
+
+			it("ends the wait at once when the run was recorded before the request settled", async () => {
+				let accept: (value: AcceptedAction) => void = () => {};
+				vi.mocked(enqueuePrimary).mockReturnValue(new Promise((resolve) => (accept = resolve)));
+				vi.mocked(getRuns).mockResolvedValueOnce([oldRun]).mockResolvedValue([newRun, oldRun]);
+				const { wrapper } = await mountLive("lamp");
+				await runAction(wrapper);
+				FakeEventSource.last().run({ cardId: "lamp", run: newRun });
+				await flushPromises();
+				accept({ cardId: "lamp", actionKind: "primary", status: "accepted" });
+				await flushPromises();
+				await advance(40_000);
 				expect(getRuns).toHaveBeenCalledTimes(2);
 				wrapper.unmount();
 			});

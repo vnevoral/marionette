@@ -174,6 +174,8 @@ export function useCardActivity(cardID: Ref<string>) {
 			const deadline = setTimeout(() => finish("timeout"), runWaitBudgetMs(card));
 			runWait = { baseline, controller, found: () => finish("found") };
 			controller.signal.addEventListener("abort", onAbort);
+			// A run event may have re-read the runs before the wait started.
+			if (runsCurrent && isNewerRun(runs.value[0], baseline)) return finish("found");
 			schedule(quiet ? Math.max(intervalMs, card.primary.timeoutSec * 1000) : intervalMs);
 		});
 	}

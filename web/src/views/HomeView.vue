@@ -14,7 +14,7 @@ import {
 import ActionCard from "@/components/ActionCard.vue";
 import EmptyState from "@/components/EmptyState.vue";
 import PageHeader from "@/components/PageHeader.vue";
-import { outcomeResult, requestAction } from "@/composables/useActionRequest";
+import { outcomeResult, requestAction, type ActionOutcome } from "@/composables/useActionRequest";
 import { expectsFollowUpCheck, supersedes } from "@/composables/useCardStatus";
 import { useStatusEvents } from "@/composables/useStatusEvents";
 import { messageVisibleMs } from "@/composables/useTransientMessage";
@@ -35,9 +35,10 @@ const error = ref("");
 
 const resultTimers = new Map<string, ReturnType<typeof setTimeout>>();
 const pendingWaits = new Map<string, AbortController>();
-// Cards whose run was recorded while their request was in flight; the run's
-// note then outlives the request's own outcome (block 0058).
-const runsDuringRequest = new Set<string>();
+// Cards with a primary request in flight whose run was recorded meanwhile, and
+// whether that run failed; the run may be the request's own, so its note can
+// outlive the request's outcome (block 0058, see keepsRunNote).
+const runsDuringRequest = new Map<string, boolean>();
 
 const healthyCount = computed(
 	() => cards.value.filter((card) => statuses.value[card.id]?.state === "ok").length,
@@ -105,7 +106,8 @@ function applyStatusEvent(event: StatusEvent) {
 function applyRunEvent({ cardId, run }: RunEvent) {
 	const card = cards.value.find((candidate) => candidate.id === cardId);
 	if (!card) return;
-	if (pendingWaits.has(cardId)) runsDuringRequest.add(cardId);
+	if (requests.value[cardId]?.action === "primary")
+		runsDuringRequest.set(cardId, run.outcome !== "ok");
 	const message = runOutcomeMessage(run);
 	if (run.outcome !== "ok") showResult(cardId, { tone: "error", message }, true);
 	else
@@ -142,6 +144,18 @@ function showResult(cardID: string, result: RequestResult | null, persist = fals
 	);
 }
 
+/**
+ * Whether a run recorded during the card's primary request keeps its note
+ * over the request's outcome: always over Accepted and Updated, which the run
+ * says better, and over Result not available yet when the run failed. An
+ * enqueue error is always shown: no run of this request can exist then.
+ */
+function keepsRunNote(cardID: string, outcome: ActionOutcome): boolean {
+	const failedRun = runsDuringRequest.get(cardID);
+	if (failedRun === undefined || outcome.kind === "failed") return false;
+	return outcome.kind !== "timeout" || failedRun;
+}
+
 function setPending(cardID: string, request: PendingRequest | undefined) {
 	const rest = withoutKey(requests.value, cardID);
 	requests.value = request ? { ...rest, [cardID]: request } : rest;
@@ -164,7 +178,7 @@ async function runAction(card: Card, action: ActionKind) {
 			accepted: FEEDBACK.accepted,
 			updated: FEEDBACK.updated,
 		});
-		if (result && !runsDuringRequest.has(card.id)) showResult(card.id, result);
+		if (result && !keepsRunNote(card.id, outcome)) showResult(card.id, result);
 	} finally {
 		runsDuringRequest.delete(card.id);
 		pendingWaits.delete(card.id);

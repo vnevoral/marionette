@@ -309,6 +309,62 @@ describe("HomeView", () => {
 			wrapper.unmount();
 		});
 
+		it("does not take another run for the result of a status check", async () => {
+			vi.mocked(enqueueStatus).mockResolvedValue({
+				cardId: "printer",
+				actionKind: "status",
+				status: "accepted",
+				checkedAt: before,
+			});
+			const wrapper = mountHome();
+			await flushPromises();
+			const card = cardByName(wrapper, "Printer");
+			await buttonByLabel(card, "Check status").trigger("click");
+			await flushPromises();
+			// A primary run started elsewhere finishes while the check is awaited.
+			FakeEventSource.last().run(recorded("printer", "ok"));
+			await flushPromises();
+			vi.advanceTimersByTime(35_000);
+			await flushPromises();
+			expect(noteText(card)).toBe("Result not available yet");
+			wrapper.unmount();
+		});
+
+		it("shows an enqueue error even when a run was recorded meanwhile", async () => {
+			let reject: (error: Error) => void = () => {};
+			vi.mocked(enqueuePrimary).mockReturnValue(new Promise((_, fail) => (reject = fail)));
+			const wrapper = mountHome();
+			await flushPromises();
+			const card = cardByName(wrapper, "Lamp");
+			await buttonByLabel(card, "Run action").trigger("click");
+			await flushPromises();
+			FakeEventSource.last().run(recorded("lamp", "ok"));
+			reject(new Error("queue is full"));
+			await flushPromises();
+			expect(noteText(card)).toBe("queue is full");
+			wrapper.unmount();
+		});
+
+		it("keeps a failed run over Result not available yet", async () => {
+			vi.mocked(enqueuePrimary).mockResolvedValue({
+				cardId: "printer",
+				actionKind: "primary",
+				status: "accepted",
+				checkedAt: before,
+			});
+			const wrapper = mountHome();
+			await flushPromises();
+			const card = cardByName(wrapper, "Printer");
+			await buttonByLabel(card, "Run action").trigger("click");
+			await flushPromises();
+			FakeEventSource.last().run(recorded("printer", "fail", 4));
+			await flushPromises();
+			vi.advanceTimersByTime(130_000);
+			await flushPromises();
+			expect(noteText(card)).toBe("Action failed · exit 4");
+			wrapper.unmount();
+		});
+
 		it("ignores a run of a card that is not on the dashboard", async () => {
 			const wrapper = mountHome();
 			await flushPromises();

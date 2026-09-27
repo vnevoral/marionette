@@ -169,3 +169,19 @@ Viz [Definition of Done](../../devops/definition-of-done.md) +:
 - **Dokumentace aktualizována**: ADR-0008 (doplněk 2026-09-27),
   requirements FR-42a, UX specifikace §4 a §6, `docs/architecture/overview.md`
   (tabulka událostí SSE, kompozice, broker).
+- **Opravy po code review (2026-09-27)**:
+  - dashboard bral jakýkoli běh zapsaný během rozpracovaného požadavku za
+    výsledek tohoto požadavku a zahodil vlastní výsledek požadavku. Běh
+    spuštěný jinde tak během **Check status** skryl **Result not available
+    yet** a při chybě zařazení skryl i chybovou hlášku. Běh se teď
+    přiřazuje jen k rozpracované **primární** akci. Chyba zařazení se
+    ukáže vždy. **Result not available yet** ustoupí jen neúspěšnému běhu
+    (`keepsRunNote`). Nové testy v `HomeView.spec.ts` (kontrola stavu
+    s cizím během, chyba zařazení se zapsaným během, neúspěšný běh proti
+    vypršení čekání); první dva na původní logice selžou;
+  - detail: když událost načetla nový běh ještě před odpovědí `202`,
+    čekání zbytečně dotazovalo až do rozpočtu. Teď na začátku zkontroluje
+    už načtený seznam a skončí hned (test v `CardDetailView.spec.ts`);
+  - ověření: `make verify` (206 testů Vitest) a `make e2e` (20 scénářů)
+    prošly.
+
