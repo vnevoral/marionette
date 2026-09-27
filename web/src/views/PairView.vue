@@ -127,6 +127,13 @@ onMounted(() => {
 .pair-page {
 	max-width: 560px;
 }
+/* minmax(0, 1fr): an input's intrinsic width (the monospace code field)
+   must not widen the column past a 320 px screen with a wide fallback font. */
+.pair-panel,
+.pair-form,
+.pair-field {
+	grid-template-columns: minmax(0, 1fr);
+}
 .pair-panel {
 	display: grid;
 	gap: var(--space-6);

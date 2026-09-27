@@ -232,6 +232,9 @@ uloží do `docs/plans/blocks/NNNN-nazev.md`. Blok se implementuje promptem
   9. [0058 — SSE událost po zapsání běhu primární akce](blocks/0058-run-recorded-event.md)
      — **Hotovo** (2026-09-27); FR-42a, ADR-0008 doplněk, `run.recorded`
      místo opakovaných dotazů na běhy.
+  10. [0059 — Obrazovka párování na 320 px s náhradním fontem](blocks/0059-pairing-screen-width-fix.md)
+     — **Hotovo** (2026-09-27); oprava selhání E2E v prvním release z CI
+     (`v1.2.0`), FR-29.
 
   Otevřené otázky revize jsou rozhodnuté v
   [requirements.md, sekce 13](../requirements/requirements.md#13-rozhodnutí-revize-projektu-2026-09-26)
