@@ -3,16 +3,25 @@ import InputText from "primevue/inputtext";
 import Select from "primevue/select";
 import Textarea from "primevue/textarea";
 import FormSection from "@/components/FormSection.vue";
+import { CARD_COLOR_OPTIONS, cardColorValue } from "@/ui/cardColors";
 import { CARD_ICON_OPTIONS } from "@/ui/icons";
 
-defineProps<{ errors: { name?: string; description?: string; icon?: string } }>();
+defineProps<{
+	errors: { name?: string; description?: string; icon?: string; color?: string };
+}>();
 
 const name = defineModel<string>("name", { required: true });
 const description = defineModel<string | undefined>("description", { required: true });
 const icon = defineModel<string | undefined>("icon", { required: true });
+// "" (None) and a missing colour are the same; the Select shows None for both.
+const color = defineModel<string | undefined>("color", { required: true });
 
 function iconLabel(value: unknown) {
 	return CARD_ICON_OPTIONS.find((option) => option.value === value)?.label;
+}
+
+function colorLabel(value: unknown) {
+	return CARD_COLOR_OPTIONS.find((option) => option.value === (value ?? ""))?.label;
 }
 </script>
 
@@ -58,6 +67,40 @@ function iconLabel(value: unknown) {
 				</Select>
 				<small v-if="errors.icon" class="field-error">{{ errors.icon }}</small>
 			</label>
+			<label class="col-12 md:col-6"
+				>Color
+				<Select
+					:model-value="color ?? ''"
+					:options="[...CARD_COLOR_OPTIONS]"
+					option-label="label"
+					option-value="value"
+					:invalid="Boolean(errors.color)"
+					aria-label="Color"
+					@update:model-value="color = $event"
+				>
+					<template #value="slotProps">
+						<div class="icon-option">
+							<span
+								class="color-swatch"
+								:style="{ background: cardColorValue(slotProps.value) }"
+								aria-hidden="true"
+							/>
+							<span>{{ colorLabel(slotProps.value) }}</span>
+						</div>
+					</template>
+					<template #option="slotProps">
+						<div class="icon-option">
+							<span
+								class="color-swatch"
+								:style="{ background: cardColorValue(slotProps.option.value) }"
+								aria-hidden="true"
+							/>
+							<span>{{ slotProps.option.label }}</span>
+						</div>
+					</template>
+				</Select>
+				<small v-if="errors.color" class="field-error">{{ errors.color }}</small>
+			</label>
 		</div>
 	</FormSection>
 </template>
@@ -70,5 +113,13 @@ label {
 	color: var(--color-muted);
 	font-size: 0.85rem;
 	font-weight: var(--font-weight-medium);
+}
+/* None has no background: an empty outlined square. */
+.color-swatch {
+	flex: none;
+	width: 1rem;
+	height: 1rem;
+	border: 1px solid var(--color-border-strong);
+	border-radius: 3px;
 }
 </style>

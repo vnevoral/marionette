@@ -238,6 +238,7 @@ Limity hodnot karty (konstanty `config.Max*`, ADR-0004 „Limity hodnot“):
 | `name`                                | 1–120 znaků                                                        |
 | `description`                         | ≤ 2000 znaků                                                       |
 | `icon`                                | prázdné nebo `pi pi-<název>` (malá písmena, číslice, `-`), ≤ 64 znaků |
+| `color`                               | prázdné nebo `black`, `blue`, `teal`, `purple`, `pink`, `orange`, `yellow` (FR-10a) |
 | `*.command`                           | 1–512 znaků                                                        |
 | `*.args`                              | ≤ 64 položek, každá ≤ 1024 znaků                                   |
 | `*.dir`                               | ≤ 1024 znaků                                                       |

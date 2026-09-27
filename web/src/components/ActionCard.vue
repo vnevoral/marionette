@@ -7,6 +7,7 @@ import ActionControls from "@/components/ActionControls.vue";
 import ActionNote from "@/components/ActionNote.vue";
 import StatusBadge from "@/components/StatusBadge.vue";
 import type { PendingRequest, RequestResult } from "@/types";
+import { cardColorValue } from "@/ui/cardColors";
 import { DEFAULT_CARD_ICON } from "@/ui/icons";
 import { lastCheckedLabel } from "@/ui/format";
 import {
@@ -44,11 +45,20 @@ const lastChecked = computed(() =>
 	props.card.status ? lastCheckedLabel(props.status?.checkedAt) : "",
 );
 
+// The colour stripe (FR-10a) is drawn by the border and an inset shadow, so a
+// coloured card has the same size as one without a colour.
+const stripe = computed(() => cardColorValue(props.card.color));
+
 const detailLink = computed(() => `/cards/${encodeURIComponent(props.card.id)}`);
 </script>
 
 <template>
-	<Card class="action-card">
+	<Card
+		class="action-card"
+		:class="{ 'has-color': stripe }"
+		:data-color="stripe ? card.color : undefined"
+		:style="stripe ? { '--card-stripe': stripe } : undefined"
+	>
 		<template #header>
 			<div class="card-banner">
 				<div class="card-icon" aria-hidden="true">
@@ -98,6 +108,12 @@ const detailLink = computed(() => `/cards/${encodeURIComponent(props.card.id)}`)
 	border: 1px solid var(--color-border);
 	background: var(--color-surface);
 	box-shadow: var(--shadow-subtle);
+}
+.action-card.has-color {
+	border-top-color: var(--card-stripe);
+	box-shadow:
+		inset 0 5px 0 var(--card-stripe),
+		var(--shadow-subtle);
 }
 .action-card :deep(.p-card-body) {
 	display: flex;

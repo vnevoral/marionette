@@ -31,6 +31,7 @@ export function emptyCard(): ActionCard {
 		name: "",
 		description: "",
 		icon: DEFAULT_CARD_ICON,
+		color: "",
 		primary: emptyAction(),
 	};
 }
@@ -93,6 +94,7 @@ export function fingerprint(state: EditorState): string {
 		name: form.name,
 		description: form.description,
 		icon: form.icon,
+		color: form.color || undefined,
 		primary: actionFrom(form.primary, state.primaryLine, state.primaryEnv),
 		status: state.statusEnabled
 			? actionFrom(form.status ?? emptyAction(), state.statusLine, state.statusEnv)
@@ -205,6 +207,7 @@ export function fieldErrorsFromServer(fields: Record<string, string>): {
 				"name",
 				"description",
 				"icon",
+				"color",
 				"pollingIntervalSeconds",
 				"fastPollingIntervalSeconds",
 				"fastPollingWindowSeconds",

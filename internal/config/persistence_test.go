@@ -194,6 +194,54 @@ func TestSaveFileRoundTripExcludesHistory(t *testing.T) {
 	}
 }
 
+// A card colour (FR-10a) survives a save and load; a card without one is
+// written without the key, as by versions that had no colours.
+func TestSaveFileRoundTripKeepsCardColor(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "config.json")
+	store := NewStore(validSettings())
+	colored := validCard()
+	colored.ID = "colored"
+	colored.Color = "teal"
+	plain := validCard()
+	plain.ID = "plain"
+	for _, card := range []ActionCard{colored, plain} {
+		if _, err := store.CreateCard(card); err != nil {
+			t.Fatalf("CreateCard(%s) error = %v", card.ID, err)
+		}
+	}
+	if err := store.SaveFile(path); err != nil {
+		t.Fatalf("SaveFile() error = %v", err)
+	}
+
+	loaded, err := LoadFile(path, nil)
+	if err != nil {
+		t.Fatalf("LoadFile() error = %v", err)
+	}
+	if card, _ := loaded.GetCard("colored"); card.Color != "teal" {
+		t.Fatalf("colored card loaded with color %q, want teal", card.Color)
+	}
+	if card, _ := loaded.GetCard("plain"); card.Color != "" {
+		t.Fatalf("plain card loaded with color %q, want none", card.Color)
+	}
+
+	var raw struct {
+		Cards []map[string]json.RawMessage `json:"cards"`
+	}
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("ReadFile() error = %v", err)
+	}
+	if err := json.Unmarshal(data, &raw); err != nil {
+		t.Fatalf("json.Unmarshal() error = %v", err)
+	}
+	for _, card := range raw.Cards {
+		_, hasColor := card["color"]
+		if id := string(card["id"]); hasColor != (id == `"colored"`) {
+			t.Fatalf("card %s written with color key = %v", id, hasColor)
+		}
+	}
+}
+
 func TestSaveFileWithHistoryRoundTrip(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "config.json")
 	store := NewStore(validSettings())

@@ -9,6 +9,7 @@
       "name": "Healthy test card",
       "description": "Deterministic test card with successful primary and status checks.",
       "icon": "pi pi-home",
+      "color": "blue",
       "primary": {
         "command": "/usr/bin/true",
         "args": [],

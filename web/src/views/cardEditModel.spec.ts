@@ -142,6 +142,17 @@ describe("fingerprint", () => {
 		expect(fingerprint(edited)).not.toBe(base);
 	});
 
+	it("changes with the card colour and treats none and a missing colour alike", () => {
+		const none = state();
+		none.form.color = "";
+		const missing = state();
+		delete missing.form.color;
+		expect(fingerprint(none)).toBe(fingerprint(missing));
+		const colored = state();
+		colored.form.color = "blue";
+		expect(fingerprint(colored)).not.toBe(fingerprint(none));
+	});
+
 	it("ignores the status action while the toggle is off", () => {
 		const withStatus = state();
 		withStatus.form.status = { ...emptyAction(), command: "ping" };
@@ -198,6 +209,7 @@ describe("fieldErrorsFromServer", () => {
 			"status.command": "action command is required",
 			"status.dir": "too long",
 			fastPollingIntervalSeconds: "fast polling interval must be less than polling interval",
+			color: "must be empty or one of: black, blue",
 			id: "must contain only letters, digits, '-' and '_'",
 			"primary.mystery": "unknown",
 		});
@@ -212,6 +224,7 @@ describe("fieldErrorsFromServer", () => {
 			statusCommand: "must have at most 64 items",
 			statusDir: "too long",
 			fastPollingIntervalSeconds: "fast polling interval must be less than polling interval",
+			color: "must be empty or one of: black, blue",
 		});
 		expect(unmapped).toEqual([
 			"id: must contain only letters, digits, '-' and '_'",

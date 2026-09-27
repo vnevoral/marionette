@@ -162,9 +162,64 @@ file and move it back to restore the cards. If the file exists but is not
 readable, the service starts read-only and rejects configuration changes
 until the permissions are fixed and the service is restarted.
 
-For an update, run the installer again with the new binary. It keeps the
-existing configuration and restarts the service. To roll back, run the
-installer with the previous binary; configuration data is not removed.
+### Upgrading and rolling back
+
+An upgrade is the same installer run with the new release. It keeps the data
+and settings and only replaces the program and the unit:
+
+| Path                                      | On upgrade                                  |
+| ----------------------------------------- | ------------------------------------------- |
+| `/var/lib/marionette/marionette.json`     | kept (cards, settings, run history)         |
+| `/var/lib/marionette/devices.json`        | kept (paired devices stay paired)           |
+| `/etc/default/marionette`                 | kept (created only when missing)            |
+| `/usr/local/bin/marionette`               | replaced by the new version                 |
+| `/etc/systemd/system/marionette.service`  | replaced by the unit from the release       |
+
+Put your own unit changes in a drop-in (`sudo systemctl edit marionette`),
+not in the unit file itself, so an upgrade does not discard them.
+
+**Upgrade.** Keep each release in its own directory; the previous one is
+what you roll back to. On the host, next to the new archive and its
+`.sha256` file:
+
+```bash
+sudo cp -a /var/lib/marionette /var/lib/marionette.bak-$(date +%F)   # backup
+sha256sum -c marionette-vX.Y.Z-linux-arm64.tar.gz.sha256
+mkdir vX.Y.Z && tar -xzf marionette-vX.Y.Z-linux-arm64.tar.gz -C vX.Y.Z
+cd vX.Y.Z && sudo ./install.sh ./marionette-linux-arm64
+```
+
+The installer restarts the service. Then check it:
+
+```bash
+curl -s http://localhost:8080/api/health          # "version" is the new tag
+systemctl status marionette --no-pager
+journalctl -u marionette -n 50 --no-pager
+```
+
+and open the UI: the cards and paired devices are still there.
+
+**Roll back.** Run the installer of the previous release (the installer
+does not keep the old binary, so keep the previous archive):
+
+```bash
+cd vA.B.C && sudo ./install.sh ./marionette-linux-arm64
+```
+
+Within the same MAJOR version the data needs nothing else. When rolling
+back across a MAJOR version (see [versioning](docs/devops/ci-cd.md)), the
+older version may not read data written by the newer one; restore the
+backup taken before the upgrade:
+
+```bash
+sudo systemctl stop marionette
+sudo rm -rf /var/lib/marionette
+sudo cp -a /var/lib/marionette.bak-YYYY-MM-DD /var/lib/marionette
+cd vA.B.C && sudo ./install.sh ./marionette-linux-arm64
+```
+
+The backup copies are not removed automatically; delete old ones once the
+new version runs well.
 
 ### Ping status check reports Problem
 

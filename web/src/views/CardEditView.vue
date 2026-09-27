@@ -74,6 +74,7 @@ function markClean() {
 function applyCard(card: ActionCard) {
 	Object.assign(form, {
 		...card,
+		color: card.color ?? "",
 		primary: copyAction(card.primary),
 		status: card.status ? copyAction(card.status) : undefined,
 	});
@@ -211,10 +212,12 @@ useUnsavedChangesGuard(isDirty, () => saving.value);
 					v-model:name="form.name"
 					v-model:description="form.description"
 					v-model:icon="form.icon"
+					v-model:color="form.color"
 					:errors="{
 						name: fieldErrors.name,
 						description: fieldErrors.description,
 						icon: fieldErrors.icon,
+						color: fieldErrors.color,
 					}"
 				/>
 

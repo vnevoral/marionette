@@ -3,6 +3,7 @@ import { h } from "vue";
 import { flushPromises, mount, type VueWrapper } from "@vue/test-utils";
 import { createMemoryHistory, createRouter, RouterView, type Router } from "vue-router";
 import PrimeVue from "primevue/config";
+import Select from "primevue/select";
 import { ApiError, createCard, getCard, updateCard, type ActionCard } from "@/api";
 import CardEditView from "@/views/CardEditView.vue";
 import { fakeConfirm } from "@/test/fakeConfirm";
@@ -161,6 +162,45 @@ describe("CardEditView", () => {
 		});
 		expect(wrapper.find("h1").text()).toBe("Edit card");
 		expect(confirm.require).not.toHaveBeenCalled();
+		wrapper.unmount();
+	});
+
+	it("shows the stored colour and saves a newly chosen one", async () => {
+		vi.mocked(getCard).mockResolvedValue({ ...printer, color: "blue" });
+		vi.mocked(updateCard).mockImplementation(async (card) => card);
+		const { wrapper } = await mountEdit("/cards/printer/edit");
+		const color = wrapper
+			.findAllComponents(Select)
+			.find((select) => select.props("ariaLabel") === "Color");
+		if (!color) throw new Error("Color select not rendered");
+		expect(color.text()).toContain("Blue");
+
+		color.vm.$emit("update:modelValue", "teal");
+		await flushPromises();
+		await wrapper
+			.findAll("button")
+			.find((b) => b.text().includes("Save card"))!
+			.trigger("click");
+		await flushPromises();
+		expect(vi.mocked(updateCard).mock.calls[0][0]).toMatchObject({ color: "teal" });
+		wrapper.unmount();
+	});
+
+	it("shows a colour rejected by the server beside the Color field", async () => {
+		vi.mocked(updateCard).mockRejectedValue(
+			new ApiError("validation failed: color: bad", 422, {
+				color: "must be empty or one of: black, blue",
+			}),
+		);
+		const { wrapper } = await mountEdit("/cards/printer/edit");
+		await inputInLabel(wrapper, "Name").setValue("Printer 2");
+		await wrapper
+			.findAll("button")
+			.find((b) => b.text().includes("Save card"))!
+			.trigger("click");
+		await flushPromises();
+		const label = wrapper.findAll("label").find((node) => node.text().startsWith("Color"));
+		expect(label?.find(".field-error").text()).toBe("must be empty or one of: black, blue");
 		wrapper.unmount();
 	});
 

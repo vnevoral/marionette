@@ -53,6 +53,34 @@ test("creates, runs, checks and deletes a card through the UI", async ({ page })
 	await expect(page.getByRole("heading", { name: "No action cards yet" })).toBeVisible();
 });
 
+test("colours a card with a stripe that keeps the card height", async ({ page, request }) => {
+	// Same content, so any height difference would come from the stripe.
+	await createCard(request, { id: "lamp-a", name: "Lamp A", withStatus: true });
+	await createCard(request, { id: "lamp-b", name: "Lamp B", withStatus: true });
+
+	await page.goto("/cards/lamp-a/edit");
+	await expect(page.getByRole("heading", { name: "Edit card", level: 1 })).toBeVisible();
+	await page.getByRole("combobox", { name: "Color" }).click();
+	await page.getByRole("option", { name: "Teal" }).click();
+	await page.getByRole("button", { name: "Save card" }).click();
+	await expect(page.getByRole("alert").filter({ hasText: "Card saved" })).toBeVisible();
+
+	await page.goto("/");
+	await page.reload();
+	const colored = page.locator(".action-card").filter({ hasText: "Lamp A" });
+	const plain = page.locator(".action-card").filter({ hasText: "Lamp B" });
+	await expect(colored).toHaveAttribute("data-color", "teal");
+	await expect(colored).toHaveCSS("border-top-color", "rgb(42, 157, 143)");
+	await expect(plain).not.toHaveAttribute("data-color");
+	const [coloredBox, plainBox] = [await colored.boundingBox(), await plain.boundingBox()];
+	expect(coloredBox?.height).toBe(plainBox?.height);
+	// The content starts at the same offset, so the stripe takes no layout space.
+	const titleOffset = async (card: typeof colored) =>
+		((await card.locator(".card-title").boundingBox())?.y ?? 0) -
+		((await card.boundingBox())?.y ?? 0);
+	expect(await titleOffset(colored)).toBe(await titleOffset(plain));
+});
+
 test("runs actions from the dashboard", async ({ page, request }) => {
 	await createCard(request, { id: "lamp", name: "Lamp", withStatus: true });
 	await page.goto("/");

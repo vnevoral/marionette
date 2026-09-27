@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"regexp"
+	"slices"
 	"sort"
 	"strings"
 	"time"
@@ -226,6 +227,7 @@ type ActionCard struct {
 	Name                       string  `json:"name"`
 	Description                string  `json:"description,omitempty"`
 	Icon                       string  `json:"icon,omitempty"`
+	Color                      string  `json:"color,omitempty"`
 	Primary                    Action  `json:"primary"`
 	Status                     *Action `json:"status,omitempty"`
 	PollingIntervalSeconds     int     `json:"pollingIntervalSeconds,omitempty"`
@@ -272,6 +274,9 @@ func (card ActionCard) validate(limits bool) fieldErrors {
 	if limits && !ValidIcon(card.Icon) {
 		fields.add("icon", fmt.Sprintf("must be empty or a %q class of at most %d characters", IconPrefix, MaxIconLength))
 	}
+	if limits && !ValidCardColor(card.Color) {
+		fields.add("color", "must be empty or one of: "+strings.Join(CardColors, ", "))
+	}
 	fields.merge("primary", card.Primary.validate(limits).err())
 	if card.Status != nil {
 		fields.merge("status", card.Status.validate(limits).err())
@@ -289,6 +294,18 @@ func (card ActionCard) validate(limits bool) fieldErrors {
 		fields.add("fastPollingIntervalSeconds", "fast polling interval must be less than polling interval")
 	}
 	return fields
+}
+
+// CardColors are the names of the card colours offered by the UI (FR-10a).
+// A card stores the name, not a colour value, so the UI can tune the shade
+// without touching the configuration; web/src/ui/cardColors.ts has the same
+// list.
+var CardColors = []string{"black", "blue", "teal", "purple", "pink", "orange", "yellow"}
+
+// ValidCardColor reports whether a colour is empty (no colour) or one of
+// CardColors.
+func ValidCardColor(color string) bool {
+	return color == "" || slices.Contains(CardColors, color)
 }
 
 // ValidIcon reports whether an icon value is empty or a PrimeIcons class

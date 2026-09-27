@@ -174,6 +174,11 @@ Every card has the same hierarchy:
 - secondary **Check status** button when a status action exists;
 - overflow menu with **View details** and **Edit**.
 
+A card with a colour (FR-10a) has a 6 px stripe of that colour along its
+top edge, drawn by the top border and an inset shadow so the card keeps
+the size of a card without a colour. The colour only groups cards; it never
+carries a state, which stays with the status badge.
+
 Commands and arguments are not the main card content. They belong in detail or
 management views.
 
@@ -218,7 +223,7 @@ standalone workflow and does not combine a card list with a configuration form.
 
 ### 7.2 Form sections
 
-1. **Card identity**: name, description, icon.
+1. **Card identity**: name, description, icon, colour (**None** by default).
 2. **Primary action**: command line, working directory, environment,
    timeout, and output rule.
 3. **Status check**: enable/disable switch and the same action editor.
@@ -341,6 +346,11 @@ Layout utilities (`grid`, `col-12`, `md:col-4`, `md:col-6`, `lg:col-4`,
 project's own classes in `web/src/styles/layout.css` with PrimeFlex-compatible
 values and breakpoints (768 px, 992 px); a new utility is added there only when
 a view needs it (ADR-0010).
+
+Card colours (FR-10a) are the tokens `--card-color-black`, `-blue`,
+`-teal`, `-purple`, `-pink`, `-orange` and `-yellow`; the card stores the
+name, `web/src/ui/cardColors.ts` lists the options. Red and green are left
+out because they mean **Problem** and **Healthy**.
 
 Views use semantic tokens rather than local hex values. PrimeVue components
 take the same palette from `web/src/theme/preset.ts` (`definePreset(Aura, …)`:

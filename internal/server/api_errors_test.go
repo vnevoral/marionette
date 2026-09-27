@@ -116,6 +116,7 @@ func TestRouterReturnsValidationFields(t *testing.T) {
 	handler := NewRouter(Dependencies{Store: store})
 	card := validServerCard("bad id")
 	card.Primary.TimeoutSec = config.MaxTimeoutSec + 1
+	card.Color = "red"
 	response := requestJSON(t, handler, http.MethodPost, "/api/cards", card)
 	if response.Code != http.StatusUnprocessableEntity {
 		t.Fatalf("status = %d, body %s", response.Code, response.Body.String())
@@ -125,7 +126,8 @@ func TestRouterReturnsValidationFields(t *testing.T) {
 	if err := json.Unmarshal(envelope["fields"], &fields); err != nil {
 		t.Fatalf("fields = %s, %v", envelope["fields"], err)
 	}
-	if fields["id"] == "" || fields["primary.timeoutSec"] != "must be between 1 and 3600" || len(fields) != 2 {
+	if fields["id"] == "" || fields["primary.timeoutSec"] != "must be between 1 and 3600" ||
+		!strings.HasPrefix(fields["color"], "must be empty or one of: black, blue") || len(fields) != 3 {
 		t.Fatalf("fields = %v", fields)
 	}
 }

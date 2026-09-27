@@ -14,6 +14,8 @@ export interface ActionCard {
 	name: string;
 	description?: string;
 	icon?: string;
+	/** A name from ui/cardColors.ts; empty or missing means no colour. */
+	color?: string;
 	primary: Action;
 	status?: Action;
 	pollingIntervalSeconds?: number;

@@ -61,8 +61,12 @@ a verzi berou z `git describe`.
    `systemctl enable` + start/restart služby.
 6. Nasazená verze se ověří přes `curl -s http://localhost:8080/api/health`
    (pole `version` musí odpovídat tagu).
-7. Aktualizace používá stejný skript s novou binárkou. Rollback používá
-   předchozí binárku a nemaže `/var/lib/marionette/marionette.json`.
+7. Aktualizace používá stejný skript s novou binárkou; data
+   (`marionette.json`, `devices.json`) i `/etc/default/marionette` zůstávají,
+   přepíše se binárka a unit. Rollback spustí instalátor předchozího
+   releasu, který je proto potřeba si ponechat. Postup se zálohou, kontrolou
+   a rollbackem přes MAJOR verzi je v README, sekce „Upgrading and rolling
+   back“.
 8. Žádný krok nevyžaduje instalaci Go, Node.js ani jiného runtime na cíli.
 
 ## Verzování závislostí

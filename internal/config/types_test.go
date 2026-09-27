@@ -3,6 +3,10 @@ package config
 import (
 	"encoding/json"
 	"errors"
+	"os"
+	"path/filepath"
+	"regexp"
+	"slices"
 	"strconv"
 	"strings"
 	"testing"
@@ -248,6 +252,11 @@ func TestValidateLimits(t *testing.T) {
 		{"icon empty name", func(c *ActionCard) { c.Icon = "pi pi-" }, "icon"},
 		{"icon with markup", func(c *ActionCard) { c.Icon = "pi pi-home\"><script>" }, "icon"},
 		{"icon over limit", func(c *ActionCard) { c.Icon = IconPrefix + long(MaxIconLength) }, "icon"},
+		{"color empty", func(c *ActionCard) { c.Color = "" }, ""},
+		{"color from palette", func(c *ActionCard) { c.Color = "teal" }, ""},
+		{"color unknown", func(c *ActionCard) { c.Color = "red" }, "color"},
+		{"color as hex", func(c *ActionCard) { c.Color = "#3b6fb6" }, "color"},
+		{"color wrong case", func(c *ActionCard) { c.Color = "Blue" }, "color"},
 		{"command at limit", func(c *ActionCard) { c.Primary.Command = long(MaxCommandLength) }, ""},
 		{"command over limit", func(c *ActionCard) { c.Primary.Command = long(MaxCommandLength + 1) }, "primary.command"},
 		{"args at limit", func(c *ActionCard) { c.Primary.Args = args(MaxArgs) }, ""},
@@ -337,6 +346,7 @@ func TestValidateEssentialIgnoresLimits(t *testing.T) {
 	card.ID = "legacy.card"
 	card.Name = long(MaxNameLength + 1)
 	card.Icon = "pi pi-Home"
+	card.Color = "red"
 	card.Primary.TimeoutSec = MaxTimeoutSec + 1
 	card.Primary.Args = []string{long(MaxArgLength + 1)}
 	card.PollingIntervalSeconds = 10
@@ -364,5 +374,20 @@ func TestValidateEssentialIgnoresLimits(t *testing.T) {
 		if err := broken.ValidateEssential(); !errors.Is(err, ErrValidation) {
 			t.Errorf("%s: ValidateEssential() error = %v, want ErrValidation", name, err)
 		}
+	}
+}
+
+// The UI offers exactly the colours the server accepts (FR-10a).
+func TestCardColorsMatchTheUIPalette(t *testing.T) {
+	source, err := os.ReadFile(filepath.Join("..", "..", "web", "src", "ui", "cardColors.ts"))
+	if err != nil {
+		t.Fatalf("ReadFile() error = %v", err)
+	}
+	var ui []string
+	for _, match := range regexp.MustCompile(`value: "([a-z]+)"`).FindAllStringSubmatch(string(source), -1) {
+		ui = append(ui, match[1])
+	}
+	if !slices.Equal(ui, CardColors) {
+		t.Fatalf("UI palette %v, server CardColors %v", ui, CardColors)
 	}
 }

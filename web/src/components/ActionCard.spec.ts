@@ -132,4 +132,18 @@ describe("ActionCard", () => {
 		expect(wrapper.emitted("check")).toHaveLength(1);
 		expect(wrapper.findComponent(RouterLinkStub).props("to")).toBe("/cards/printer");
 	});
+
+	it("draws the card colour as a stripe and nothing for none or an unknown colour", () => {
+		const colored = mountCard({ card: { ...card, color: "teal" } }).find(".action-card");
+		expect(colored.classes()).toContain("has-color");
+		expect(colored.attributes("data-color")).toBe("teal");
+		expect(colored.attributes("style")).toContain("--card-stripe: var(--card-color-teal)");
+
+		for (const color of [undefined, "", "red"]) {
+			const plain = mountCard({ card: { ...card, color } }).find(".action-card");
+			expect(plain.classes()).not.toContain("has-color");
+			expect(plain.attributes("data-color")).toBeUndefined();
+			expect(plain.attributes("style") ?? "").not.toContain("--card-stripe");
+		}
+	});
 });

@@ -22,6 +22,14 @@
 	--color-danger-soft: #f7e7e5;
 	--color-focus: #2f7181;
 	--color-on-accent: #ffffff;
+	/* Card colours (FR-10a, ui/cardColors.ts): labels only, never a state. */
+	--card-color-black: #26332f;
+	--card-color-blue: #3b6fb6;
+	--card-color-teal: #2a9d8f;
+	--card-color-purple: #7b5ea7;
+	--card-color-pink: #c95b8f;
+	--card-color-orange: #e07b39;
+	--card-color-yellow: #e0b53a;
 	--radius-sm: 6px;
 	--radius-md: 10px;
 	--shadow-subtle: 0 1rem 2.5rem rgb(36 75 57 / 8%);

@@ -219,6 +219,9 @@ uloží do `docs/plans/blocks/NNNN-nazev.md`. Blok se implementuje promptem
      — **Hotovo** (2026-09-27); víceřádkový argument se edituje v poli,
      které konec řádku zachová; čekání na běh bez výchozího bodu nebere
      starý běh za nový.
+  5. [0054 — Barevný proužek karty](blocks/0054-card-color-stripe.md)
+     — **Hotovo** (2026-09-27); FR-10a, volitelná barva karty z palety 8
+     možností, na dashboardu jako horní hrana.
 
   Otevřené otázky revize jsou rozhodnuté v
   [requirements.md, sekce 13](../requirements/requirements.md#13-rozhodnutí-revize-projektu-2026-09-26)
