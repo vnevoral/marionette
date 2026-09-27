@@ -14,13 +14,14 @@ one or more concrete implementation blocks (see the
 
 As of 2026-09-27 all phases below are **Done**, the last closed block is
 [0062](blocks/0062-card-color-on-status-panel.md) and the current release is
-**v1.2.2** (tags `v1.0.0`, `v1.1.0`, `v1.2.0`, `v1.2.1`, `v1.2.2`; `v1.2.0` has no
-GitHub Release because its CI run failed, fixed by block 0059). `v1.2.2`
-contains blocks 0060 and 0061 (Go 1.27, golangci-lint v2, SSE subscription
-order). The requirements are at v0.11. `v1.2.2` runs on the reference
-Raspberry Pi; the owner deployed it and verified it there on 2026-09-27
-(the upgrade and rollback procedure from the README was verified with
-`v1.2.1`). New work starts as a new requirement and block
+**v1.2.3** (tags `v1.0.0`, `v1.1.0`, `v1.2.0`, `v1.2.1`, `v1.2.2`, `v1.2.3`;
+`v1.2.0` has no GitHub Release because its CI run failed, fixed by block
+0059). `v1.2.2` contains blocks 0060 and 0061 (Go 1.27, golangci-lint v2,
+SSE subscription order), `v1.2.3` contains block 0062 (card color on the
+Current status panel). The requirements are at v0.11. `v1.2.3` runs on the
+reference Raspberry Pi; the owner deployed it and verified it there on
+2026-09-27 (the upgrade and rollback procedure from the README was
+verified with `v1.2.1`). New work starts as a new requirement and block
 per the development workflow.
 
 ## Phase overview
@@ -276,7 +277,8 @@ per the development workflow.
 
   3. [0062 — Card color on the Current status panel](blocks/0062-card-color-on-status-panel.md)
      — **Done** (2026-09-27); FR-10a, the detail stripe moves from
-     the icon tile to the Current status panel, same as the dashboard.
+     the icon tile to the Current status panel, same as the dashboard;
+     released as `v1.2.3`.
 
   The open questions from the review are decided in
   [requirements.md, section 13](../requirements/requirements.md#13-decisions--project-review-2026-09-26)
