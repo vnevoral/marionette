@@ -1,0 +1,63 @@
+name: Bug report
+description: Something does not work as described in the README or the requirements.
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for the report. Security problems must not be reported here;
+        see [SECURITY.md](https://github.com/vnevoral/marionette/blob/main/SECURITY.md).
+  - type: input
+    id: version
+    attributes:
+      label: Version
+      description: From the UI footer or `curl -s http://localhost:8080/api/health`.
+      placeholder: v1.2.3
+    validations:
+      required: true
+  - type: dropdown
+    id: platform
+    attributes:
+      label: Platform
+      options:
+        - Raspberry Pi (linux/arm64)
+        - Other Linux (arm64)
+        - Other Linux (amd64, built from source)
+        - Development (dev container)
+    validations:
+      required: true
+  - type: input
+    id: browser
+    attributes:
+      label: Browser
+      description: Only for UI problems.
+      placeholder: Firefox 131 on Android
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened
+      description: What you did, what you expected and what happened instead.
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Create a card with the primary action ...
+        2. Run it ...
+        3. ...
+    validations:
+      required: true
+  - type: textarea
+    id: config
+    attributes:
+      label: Card configuration
+      description: The affected card from `marionette.json`, with hosts, addresses and secrets removed.
+      render: json
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs
+      description: Relevant lines from `journalctl -u marionette`, without pairing codes or other secrets.
+      render: text

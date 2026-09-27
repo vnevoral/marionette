@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Report a security vulnerability
+    url: https://github.com/vnevoral/marionette/security/advisories/new
+    about: Please report security problems privately, not as a public issue.
+  - name: Installation and troubleshooting
+    url: https://github.com/vnevoral/marionette#installation-on-linux-with-systemd
+    about: Installation, upgrades, pairing devices and the ping status check.

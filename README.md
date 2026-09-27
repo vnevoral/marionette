@@ -1,5 +1,9 @@
 # Marionette
 
+[![CI](https://github.com/vnevoral/marionette/actions/workflows/ci.yml/badge.svg)](https://github.com/vnevoral/marionette/actions/workflows/ci.yml)
+[![Release](https://img.shields.io/github/v/release/vnevoral/marionette)](https://github.com/vnevoral/marionette/releases/latest)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+
 Marionette is a small self-hosted web dashboard for running predefined
 commands on a Linux host and watching the result. It ships as a single
 binary (Go backend with an embedded Vue 3 + PrimeVue single-page
@@ -10,6 +14,8 @@ database, no separate web server — is installed on the target.
 Released versions and their notes are on
 [GitHub Releases](https://github.com/vnevoral/marionette/releases). The
 running version is shown in the UI footer and in `GET /api/health`.
+
+![Marionette dashboard with one action card](docs/images/dashboard.png)
 
 ## Features
 
@@ -97,19 +103,20 @@ full CI and then publishes a
 [GitHub Release](https://github.com/vnevoral/marionette/releases) with the
 ARM64 archive and its `.sha256` file.
 
-The repository is private, so an anonymous `curl` of the release URL does
-not work. Download both files from the Releases page in a signed-in browser
-and copy them to the target host (for example with `scp`), or use the
-GitHub CLI on any machine signed in to GitHub. The commands below use the
-shell variable `v` for the release tag; set it to the version you install
-(`gh release list -R vnevoral/marionette` shows the available ones):
+Download both on the target Linux host. The commands below use the shell
+variable `v` for the release tag; set it to the version you install (the
+[latest release](https://github.com/vnevoral/marionette/releases/latest)
+unless you have a reason to pick another):
 
 ```bash
-v=vX.Y.Z   # the release to install, e.g. the latest one on GitHub Releases
-gh release download "$v" -R vnevoral/marionette \
-  -p "marionette-$v-linux-arm64.tar.gz*"
-scp marionette-$v-linux-arm64.tar.gz* pi@raspberrypi:
+v=vX.Y.Z   # the release to install
+base=https://github.com/vnevoral/marionette/releases/download/$v
+curl -LO "$base/marionette-$v-linux-arm64.tar.gz"
+curl -LO "$base/marionette-$v-linux-arm64.tar.gz.sha256"
 ```
+
+With the GitHub CLI, `gh release download "$v" -R vnevoral/marionette -p
+"marionette-$v-linux-arm64.tar.gz*"` does the same.
 
 Without GitHub, build the same archive on a build host from a clean, tagged
 commit and copy both files over; without a matching tag on `HEAD`, or with
@@ -321,6 +328,13 @@ The change takes effect immediately; no service restart is needed. The
 Granting `AmbientCapabilities=CAP_NET_RAW` to the unit instead is not
 recommended: every action process would inherit raw socket access, not just
 ping. Unprivileged ICMP sockets can only send echo requests.
+
+## Contributing
+
+Bug reports, ideas and pull requests are welcome; start with
+[CONTRIBUTING.md](CONTRIBUTING.md). Participation is covered by the
+[code of conduct](CODE_OF_CONDUCT.md). Report security problems privately
+as described in [SECURITY.md](SECURITY.md), not in a public issue.
 
 ## License
 

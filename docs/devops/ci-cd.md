@@ -19,6 +19,9 @@ On every push and pull request:
    block 0041); on failure the report and trace are uploaded as the
    `playwright-report` artifact.
 
+The workflow runs with a read-only `GITHUB_TOKEN` (`permissions: contents:
+read`), including for pull requests from forks.
+
 The `ci.yml` workflow can also be called from another workflow
 (`workflow_call`); the release workflow below uses it so that a release
 passes the same checks.

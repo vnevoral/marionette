@@ -22,6 +22,12 @@ the code.
 - [devops/definition-of-done.md](devops/definition-of-done.md) — exit check
   for when a block is done
 
+## Contributors
+
+How to report problems and contribute is in
+[CONTRIBUTING.md](../CONTRIBUTING.md); security reports follow
+[SECURITY.md](../SECURITY.md).
+
 ## How the repository works with AI agents
 
 See [AGENTS.md](../AGENTS.md) in the repository root — the main entry point

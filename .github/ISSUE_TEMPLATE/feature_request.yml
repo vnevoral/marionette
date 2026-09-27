@@ -1,0 +1,36 @@
+name: Feature request
+description: Suggest a new capability or a change of behavior.
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Marionette is developed spec-first: an accepted idea becomes a
+        requirement and an implementation block before it is built (see
+        [CONTRIBUTING.md](https://github.com/vnevoral/marionette/blob/main/CONTRIBUTING.md)).
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: What are you trying to do, and what stops you today?
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed behavior
+      description: How should Marionette behave? Screens, API or configuration changes you have in mind.
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+      description: Workarounds you use now, or other approaches.
+  - type: checkboxes
+    id: scope
+    attributes:
+      label: Scope
+      options:
+        - label: The change affects security (running commands, access, network exposure).
+        - label: The change affects the configuration file, the API or the installation.
