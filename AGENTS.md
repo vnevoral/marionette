@@ -35,12 +35,15 @@ only then change the code.
 - `internal/server` — pure HTTP layer: routes, request validation,
   cross-site protection, SSE writing, SPA fallback (no goroutines outside
   handlers)
+- `internal/access` — paired devices, pairing codes and device tokens
+  (`devices.json`, ADR-0011)
 - `internal/config` — domain model of cards, in-memory store, JSON persistence
 - `internal/execengine` — safe execution of actions (process group, timeout,
   minimal environment) and the concurrency limit
 - `internal/status` — card status evaluation and the polling scheduler
 - `internal/actions` — background action queue (bounded, deduplication, drain)
-- `internal/events` — status event broker for SSE
+- `internal/events` — event broker for SSE (status changes, recorded runs)
+- `internal/fsutil` — atomic file writes shared by the config and device stores
 - `internal/webui` — `go:embed` of the built `web/dist` into the binary
 - `web` — Vue 3 + PrimeVue 4 (Aura theme) SPA, built via Vite into
   `internal/webui/dist`
@@ -56,6 +59,8 @@ make ui-dev          # Vite dev server :5173 (proxy /api -> :8080)
 make backend-dev     # Go backend with hot-reload (air) on :8080
 make build           # build UI + embed + Go binary for the current platform
 make build-arm64     # cross-compile for Raspberry Pi (linux/arm64)
+make release-arm64   # release archive + .sha256; needs a clean tree and a vX.Y.Z tag on HEAD
+make e2e             # Playwright tests against the built binary (not part of verify)
 make test            # go test -race ./... + npm test (Vitest)
 make lint            # golangci-lint + eslint + vue-tsc + prettier --check
 make verify          # the single validation command: build UI + lint + test + go build/vet

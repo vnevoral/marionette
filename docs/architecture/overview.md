@@ -4,28 +4,36 @@
 
 ```mermaid
 flowchart LR
-    Operator["Operator / Administrator\n(browser)"] -->|HTTP/HTTPS| Marionette
+    Operator["Operator / Administrator\n(paired browser)"] -->|HTTP/HTTPS: REST + SSE| Marionette
     subgraph Host["Host (Raspberry Pi / Ubuntu)"]
-        Marionette["Marionette\n(single Go process)"]
-        ConfigFile[("marionette.json\n(card configuration)")]
+        Marionette["Marionette\n(single Go process, systemd service)"]
+        ConfigFile[("marionette.json\n(cards, settings, history)")]
+        DevicesFile[("devices.json\n(paired devices)")]
         Marionette -->|reads/writes| ConfigFile
+        Marionette -->|reads/writes| DevicesFile
         Marionette -->|runs commands| OS["OS commands / host processes\n(wakeonlan, ping, ...)"]
     end
 ```
 
-## Components (current state + planned)
+## Components
+
+State as of release v1.2.1 (2026-09-27): all components are implemented;
+the Status column names the phase or block that introduced or last
+reshaped each one.
 
 | Component              | Location          | Responsibility                                                  | Status                                      |
 | ---------------------- | ----------------- | --------------------------------------------------------------- | ------------------------------------------- |
-| HTTP server / routing  | `internal/server` | API routes, SPA fallback                                        | Implemented (CRUD, enqueue, status read)    |
+| HTTP server / routing  | `internal/server` | API routes, SPA fallback with cache headers                     | Implemented — phase 5, 0028                 |
 | Embedded UI            | `internal/webui`  | `go:embed` `web/dist`                                           | Implemented                                 |
-| SPA (Vue 3 + PrimeVue) | `web/src`         | Dashboard, card detail and card editor; shared SSE stream with REST fallback (`composables/`), status vocabulary and formatting (`ui/`), shared components (`components/`), PrimeVue preset (`theme/`) | Implemented — phases 5–8 (0029, 0032, 0033) |
+| SPA (Vue 3 + PrimeVue) | `web/src`         | Dashboard, card detail, card editor, pairing and Devices screens, version footer; shared SSE stream with REST fallback (`composables/`), status vocabulary and formatting (`ui/`), shared components (`components/`), PrimeVue preset (`theme/`) | Implemented — phases 6, 8, 9 (0029–0059)    |
+| Device access          | `internal/access` | Paired devices, pairing codes, device tokens, `devices.json` persistence (ADR-0011) | Implemented — 0043, 0052                    |
 | Config store           | `internal/config` | In-memory cards, Settings, JSON persistence and history (see [Protecting the configuration file](#protecting-the-configuration-file)) | Implemented — phase 2                       |
 | Execution engine       | `internal/execengine` | Safe execution of actions on the host (process group, timeout, minimal environment), output capture, concurrency limit | Implemented — phase 3, hardened 0024/0034   |
 | Status/health engine   | `internal/status` | Card status evaluation, transition history, optional polling    | Implemented — phase 4                       |
 | Action queue           | `internal/actions` | Asynchronous execution of accepted actions, bounded queue, deduplication, drain on shutdown (FR-18, FR-35) | Implemented — 0027, extracted 0034         |
 | Event broker           | `internal/events` | Fan-out of status changes and recorded runs for SSE, closing on shutdown (ADR-0008)  | Implemented — 0022, extracted 0034         |
-| Domain REST API        | `internal/server` | Card/action CRUD, enqueue, status reads, SSE writing — a pure HTTP layer with no goroutines of its own | Implemented — phase 5                       |
+| Domain REST API        | `internal/server` | Card/action CRUD, enqueue, status and run reads, SSE writing, same-origin and device checks — a pure HTTP layer with no goroutines of its own | Implemented — phase 5, 0026, 0043           |
+| Atomic file writes     | `internal/fsutil` | `WriteFileAtomic` (unique temp file, `fsync`, rename) shared by the config and device stores | Implemented — 0038, 0043                    |
 
 ## Relation to the documentation
 

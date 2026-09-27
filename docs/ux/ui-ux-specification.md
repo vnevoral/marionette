@@ -35,7 +35,7 @@ Every primary screen uses the same shell:
 - centered content with a maximum width of 1200 px;
 - mobile navigation collapses into a compact top bar without hiding the
   current section or the main action;
-- a quiet footer with the running version (`Marionette v1.1.0`, FR-41a)
+- a quiet footer with the running version (`Marionette v1.2.1`, FR-41a)
   from `/api/health`, read again when the status stream reconnects (a
   service restart during an upgrade); it is hidden when the version cannot
   be read.

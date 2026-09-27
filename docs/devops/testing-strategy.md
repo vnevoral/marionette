@@ -51,7 +51,9 @@
   `src/test/fakeConfirm.ts` (provide instead of `ConfirmationService`, the
   test calls `accept`/`reject`).
   Coverage: `npm run test:coverage` (v8); the goal for `api.ts` and pure
-  modules is ~80 %+, the remaining views are covered in blocks 0032 and 0033.
+  modules is ~80 %+. Every view (including `PairView` and `DevicesView`)
+  has its own spec; `useCardActivity` is covered through
+  `CardDetailView.spec.ts`.
 
 ## End-to-end (Playwright)
 
@@ -60,12 +62,16 @@
   (`web/e2e/start-server.sh`) and runs `web/e2e/*.e2e.ts` in headless
   Chromium (`web/playwright.config.ts`, one worker — the specs share the
   server and each starts by deleting all cards via the API).
+- The specs are `card-lifecycle.e2e.ts` (cards, actions, runs, editor),
+  `security-and-layout.e2e.ts` (NFR-12, 320 px layout) and
+  `pairing.e2e.ts` (pairing, Devices page, renaming).
 - It covers what unit tests cannot see: a real browser, embed, SSE
-  (the **Live** indicator, check result), 202 → waiting → result, 422 all
+  (the **Live** indicator, check result, a recorded run in the detail),
+  202 → waiting → result, 422 all
   the way to the form field, confirmation dialogs, NFR-12 with the headers
   the browser sends (a page on a different origin does not run an action),
-  and the absence of horizontal scrolling at 320 px on the overview, detail
-  and forms (UX spec §9, §10 scenarios 1, 3, 5, 6, 7 and 2 partially).
+  and the absence of horizontal scrolling at 320 px on the overview, detail,
+  forms and the pairing screen (UX spec §9, §10 scenarios 1, 3, 5, 6, 7 and 2 partially).
 - The server runs with authentication enabled (block 0044): the `setup`
   project (`e2e/pair.setup.ts`) pairs the browser using the code from the
   server log (`E2E_SERVER_LOG`) through the pairing screen and saves the
@@ -75,7 +81,7 @@
 - Locators find elements by roles and accessible names (like a user),
   CSS classes only where a role is missing (badge, `.field-error`).
 - It is not part of `make verify` (requires a browser, ~15 s); it runs as a
-  separate CI job `e2e` and is run manually for blocks that change the UI
+  separate CI job `e2e` (also before every release) and is run manually for blocks that change the UI
   flow. The browser is installed with
   `npx playwright install --with-deps chromium` (in the devcontainer by
   `post-create.sh`).

@@ -10,6 +10,15 @@ one or more concrete implementation blocks (see the
 `docs/plans/blocks/NNNN-name.md`. A block is implemented with the
 `/implement-block` prompt.
 
+## Current state
+
+As of 2026-09-27 all phases below are **Done**, the last closed block is
+[0059](blocks/0059-pairing-screen-width-fix.md) and the current release is
+**v1.2.1** (tags `v1.0.0`, `v1.1.0`, `v1.2.0`, `v1.2.1`; `v1.2.0` has no
+GitHub Release because its CI run failed, fixed by block 0059). The
+requirements are at v0.11. New work starts as a new requirement and block
+per the development workflow.
+
 ## Phase overview
 
 | Phase | Name                                                                                          | Status                                             | Requirements                   |
@@ -28,8 +37,8 @@ one or more concrete implementation blocks (see the
 
 ## Planning notes
 
-- Phase 1 is closed: `docs/requirements/requirements.md` is at v0.5 (open
-  questions resolved, see section 7 of the document) and
+- Phase 1 is closed: `docs/requirements/requirements.md` was at v0.5 at
+  that point (now v0.11; open questions resolved, see section 7 of the document) and
   [ADR-0004](../architecture/decisions/0004-action-card-domain-model.md) is
   accepted, including run history, output rules, polling and the
   concurrency limit.

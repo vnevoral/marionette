@@ -1,18 +1,55 @@
 # Marionette
 
-Go backend with an embedded Vue 3 + PrimeVue single-page application. The
-production target is a Raspberry Pi running Ubuntu (linux/arm64); development
-happens in this repo's dev container on any host.
+Marionette is a small self-hosted web dashboard for running predefined
+commands on a Linux host and watching the result. It ships as a single
+binary (Go backend with an embedded Vue 3 + PrimeVue single-page
+application) that runs as a systemd service; the reference target is a
+Raspberry Pi running Ubuntu (linux/arm64). Nothing else — no Node.js, no
+database, no separate web server — is installed on the target.
+
+Released versions and their notes are on
+[GitHub Releases](https://github.com/vnevoral/marionette/releases). The
+running version is shown in the UI footer and in `GET /api/health`.
+
+## Features
+
+- **Action cards.** Each card has a name, description, icon and an optional
+  color stripe, a **primary action** (for example Wake-on-LAN) and an
+  optional **status action** (for example `ping`) that decides whether the
+  card is Healthy, Problem or Unknown.
+- **Safe execution.** Actions are run directly (no shell) with a timeout,
+  in their own process group, with a minimal environment and a global limit
+  of concurrent actions. Success is decided by the exit code or by a
+  regular expression over the output.
+- **Status checks.** Status actions run on a schedule (a standard interval
+  and a faster interval for a while after the primary action) or on demand.
+- **Live updates.** Status changes and finished primary action runs reach
+  the browser over Server-Sent Events, with REST polling as a fallback; the
+  dashboard shows the outcome of each run on the card.
+- **History.** The card detail lists recent primary action runs (exit code,
+  duration, output), the status timeline and the output of the last status
+  check.
+- **Card editor.** Create, edit and delete cards in the UI; each command is
+  entered as a single command line with a preview of the parsed arguments.
+- **Device pairing.** Only paired browsers can use the API; a device pairs
+  once with a one-time code and can be renamed or removed on the Devices
+  page. There are no passwords.
+- **Single JSON file.** Cards, settings and run history live in one
+  configuration file; a corrupted file is quarantined, never overwritten.
+- **Responsive and accessible UI** from 320 px wide, usable with a keyboard
+  and on touch screens.
 
 ## Layout
 
 - `cmd/marionette` — application entrypoint (composition, logging, lifecycle)
 - `internal/server` — HTTP layer (API routes, SSE, SPA fallback)
+- `internal/access` — paired devices, pairing codes and device tokens
 - `internal/config` — card domain model, in-memory store, JSON persistence
 - `internal/execengine` — action execution (process groups, timeouts, minimal environment)
 - `internal/status` — status checks and polling scheduler
 - `internal/actions` — background action queue
-- `internal/events` — status event broker feeding SSE
+- `internal/events` — event broker feeding SSE (status changes, recorded runs)
+- `internal/fsutil` — atomic file writes
 - `internal/webui` — embeds `web/dist` (the built SPA) into the Go binary via `go:embed`
 - `web` — Vue 3 + PrimeVue SPA source (built with Vite)
 
@@ -30,7 +67,8 @@ make e2e          # browser tests against the built binary (Playwright, Chromium
 
 The backend reads `./marionette.json`, which is git-ignored and created from
 `deploy/dev-fixture.json` on the first `make backend-dev` (or `make
-dev-config`). Node 22 is required for the UI (`web/.nvmrc`).
+dev-config`). Go 1.23 or newer (`go.mod`) and Node 22 (`web/.nvmrc`) are
+required; the dev container provides both.
 
 Access control is on in development too: the first start prints a pairing
 code in the backend output; enter it on the pairing screen once (the paired
@@ -40,8 +78,9 @@ pairing while developing.
 ## Production build
 
 ```bash
-make build         # builds UI, embeds it, builds a binary for the host platform
-make build-arm64   # cross-compiles for Raspberry Pi (Ubuntu, linux/arm64)
+make build          # builds UI, embeds it, builds a binary for the host platform
+make build-arm64    # cross-compiles for Raspberry Pi (Ubuntu, linux/arm64)
+make release-arm64  # release archive + .sha256 from a clean, tagged commit
 ```
 
 The resulting binary in `bin/` serves the UI and API from a single process —
@@ -56,13 +95,20 @@ Releases are versioned `vMAJOR.MINOR.PATCH` by git tags (rules in
 [docs/devops/ci-cd.md](docs/devops/ci-cd.md)). Pushing such a tag runs the
 full CI and then publishes a
 [GitHub Release](https://github.com/vnevoral/marionette/releases) with the
-ARM64 archive and its `.sha256` file. Download both on the target Linux host:
+ARM64 archive and its `.sha256` file.
+
+The repository is private, so an anonymous `curl` of the release URL does
+not work. Download both files from the Releases page in a signed-in browser
+and copy them to the target host (for example with `scp`), or use the
+GitHub CLI on any machine signed in to GitHub. The commands below use the
+shell variable `v` for the release tag; set it to the version you install
+(`gh release list -R vnevoral/marionette` shows the available ones):
 
 ```bash
-v=v1.1.0
-base=https://github.com/vnevoral/marionette/releases/download/$v
-curl -LO "$base/marionette-$v-linux-arm64.tar.gz"
-curl -LO "$base/marionette-$v-linux-arm64.tar.gz.sha256"
+v=vX.Y.Z   # the release to install, e.g. the latest one on GitHub Releases
+gh release download "$v" -R vnevoral/marionette \
+  -p "marionette-$v-linux-arm64.tar.gz*"
+scp marionette-$v-linux-arm64.tar.gz* pi@raspberrypi:
 ```
 
 Without GitHub, build the same archive on a build host from a clean, tagged
@@ -70,15 +116,16 @@ commit and copy both files over; without a matching tag on `HEAD`, or with
 uncommitted changes, the target fails and explains how to tag:
 
 ```bash
-git tag -a v1.1.0 -m "Marionette v1.1.0"
-make release-arm64      # bin/marionette-v1.1.0-linux-arm64.tar.gz + .sha256
+git tag -a "$v" -m "Marionette $v"
+make release-arm64      # bin/marionette-$v-linux-arm64.tar.gz + .sha256
 ```
 
-Verify and extract the archive, and run the installer as root:
+Verify and extract the archive on the target host (with `v` set to the
+same tag), and run the installer as root:
 
 ```bash
-sha256sum -c marionette-v1.1.0-linux-arm64.tar.gz.sha256
-tar -xzf marionette-v1.1.0-linux-arm64.tar.gz
+sha256sum -c "marionette-$v-linux-arm64.tar.gz.sha256"
+tar -xzf "marionette-$v-linux-arm64.tar.gz"
 sudo ./install.sh ./marionette-linux-arm64
 curl -s http://localhost:8080/api/health   # "version" reports the tag
 ```
@@ -102,6 +149,12 @@ the fix (see [Ping status check reports Problem](#ping-status-check-reports-prob
 | `MARIONETTE_DEVICES`          | next to the config  | Path of the paired devices file (`devices.json` in the directory of `MARIONETTE_CONFIG`).                 |
 | `MARIONETTE_DEVICE_EXPIRY_DAYS` | `60`              | A device unused for this many days must pair again (1–400). Devices in use are renewed automatically.     |
 | `MARIONETTE_COOKIE_SECURE`    | `auto`              | `Secure` attribute of the device cookie: `auto` (when the connection uses TLS), `always` (behind a TLS proxy) or `never`. |
+
+Cards are normally managed in the UI. The configuration file is plain
+JSON; [deploy/marionette.example.json](deploy/marionette.example.json) is an
+empty starting point and [deploy/dev-fixture.json](deploy/dev-fixture.json)
+shows complete cards (primary and status actions, output rules, polling
+intervals, color).
 
 Global settings (`historySize`, `maxConcurrentActions`) live in the
 `settings` object of the configuration file. There is no API for them: edit
@@ -190,13 +243,13 @@ not in the unit file itself, so an upgrade does not discard them.
 **Upgrade.** Keep each release in its own directory; the previous one is
 what you roll back to (older releases stay downloadable from GitHub
 Releases). On the host, next to the new archive and its `.sha256` file
-(downloaded as above):
+(downloaded as above, with `v` set to the new tag):
 
 ```bash
 sudo cp -a /var/lib/marionette /var/lib/marionette.bak-$(date +%F)   # backup
-sha256sum -c marionette-vX.Y.Z-linux-arm64.tar.gz.sha256
-mkdir vX.Y.Z && tar -xzf marionette-vX.Y.Z-linux-arm64.tar.gz -C vX.Y.Z
-cd vX.Y.Z && sudo ./install.sh ./marionette-linux-arm64
+sha256sum -c "marionette-$v-linux-arm64.tar.gz.sha256"
+mkdir "$v" && tar -xzf "marionette-$v-linux-arm64.tar.gz" -C "$v"
+cd "$v" && sudo ./install.sh ./marionette-linux-arm64
 ```
 
 The installer restarts the service. Then check it:
@@ -210,10 +263,12 @@ journalctl -u marionette -n 50 --no-pager
 and open the UI: the cards and paired devices are still there.
 
 **Roll back.** Run the installer of the previous release (the installer
-does not keep the old binary, so keep the previous archive):
+does not keep the old binary, so keep the previous archive). `prev` is the
+tag of the release you return to:
 
 ```bash
-cd vA.B.C && sudo ./install.sh ./marionette-linux-arm64
+prev=vA.B.C   # the previously installed release
+cd "$prev" && sudo ./install.sh ./marionette-linux-arm64
 ```
 
 Within the same MAJOR version the data needs nothing else. When rolling
@@ -225,7 +280,7 @@ backup taken before the upgrade:
 sudo systemctl stop marionette
 sudo rm -rf /var/lib/marionette
 sudo cp -a /var/lib/marionette.bak-YYYY-MM-DD /var/lib/marionette
-cd vA.B.C && sudo ./install.sh ./marionette-linux-arm64
+cd "$prev" && sudo ./install.sh ./marionette-linux-arm64
 ```
 
 The backup copies are not removed automatically; delete old ones once the

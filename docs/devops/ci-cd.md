@@ -95,8 +95,8 @@ step 3.
 
 ## Dependency versioning
 
-- Go: `go.mod` — keep on the current stable Go version (see the README for
-  the minimum version); raise it cautiously and test the build on arm64.
+- Go: `go.mod` sets the minimum version (currently Go 1.23, also stated in
+  the README); raise it cautiously and test the build on arm64.
 - npm (`web/`): keep PrimeVue on the stable major branch (`v4-stable`
   dist-tag), see
   [ADR-0003](../architecture/decisions/0003-vue-primevue-frontend.md).
