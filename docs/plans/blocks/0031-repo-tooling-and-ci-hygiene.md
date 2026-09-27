@@ -1,115 +1,120 @@
-# Implementační blok: Hygiena repozitáře, lint a CI
+# Implementation block: Repository hygiene, lint and CI
 
-- **Fáze**: 8 — Zpevnění
-- **Vazba na požadavky**: NFR-05, NFR-06
-- **Vazba na ADR**: ADR-0002, ADR-0003
-- **Stav**: Hotovo
-- **Závislosti**: žádné (lze implementovat jako první)
+- **Phase**: 8 — Hardening
+- **Requirements**: NFR-05, NFR-06
+- **ADRs**: ADR-0002, ADR-0003
+- **Status**: Done
+- **Dependencies**: none (can be implemented first)
 
-## Cíl bloku
+## Goal
 
-Po dokončení jsou validační příkazy jednotné napříč Makefile, CI, DoD a
-prompty, lint skutečně selhává při nálezech, generované soubory nejsou
-verzované a `go test ./...` netestuje `node_modules`.
+Once done, the validation commands are unified across the Makefile, CI, DoD
+and prompts, lint actually fails on findings, generated files are not
+versioned and `go test ./...` does not test `node_modules`.
 
-## Rozsah
+## Scope
 
-- **Uvnitř**:
-  - `web/go.mod` s `module marionette-web-ignore` (bez závislostí), aby
-    `./...` nesahalo do `web/node_modules`; ověřit `go list ./...`;
-  - `tsconfig.node.json`: `noEmit: true`, `tsBuildInfoFile` do
+- **In scope**:
+  - `web/go.mod` with `module marionette-web-ignore` (no dependencies), so
+    that `./...` does not reach into `web/node_modules`; verify `go list ./...`;
+  - `tsconfig.node.json`: `noEmit: true`, `tsBuildInfoFile` into
     `node_modules/.tmp`; `git rm --cached web/vite.config.js
-    web/vite.config.d.ts web/tsconfig.node.tsbuildinfo`; `.gitignore`
-    doplnit `web/*.tsbuildinfo`, `web/vite.config.js`, `web/vite.config.d.ts`;
-  - ESLint: `eslint-config-prettier` jako poslední položka, odstranit
-    `vue/html-indent`, `lint` script `eslint . --max-warnings 0`, nový
-    `format:check` (`prettier --check .`) a `lint:types`
-    (`vue-tsc --noEmit -p tsconfig.app.json`); opravit `tone` prop v
+    web/vite.config.d.ts web/tsconfig.node.tsbuildinfo`; add
+    `web/*.tsbuildinfo`, `web/vite.config.js`, `web/vite.config.d.ts` to
+    `.gitignore`;
+  - ESLint: `eslint-config-prettier` as the last entry, remove
+    `vue/html-indent`, `lint` script `eslint . --max-warnings 0`, new
+    `format:check` (`prettier --check .`) and `lint:types`
+    (`vue-tsc --noEmit -p tsconfig.app.json`); fix the `tone` prop in
     `StatusBadge.vue` (required + default);
-  - `.golangci.yml` s výchozí sadou + `gofumpt`, `errcheck`, `unused`,
-    `staticcheck`, `govet`, `revive` (exported doc); opravit tři dnešní
-    nálezy (nepoužitý `actionQueueDependencies`, nekontrolované
-    `scheduler.Stop()` v testech, gofumpt formát `actions.go`);
-  - Makefile `test` = `go test -race ./...` + `npm test` (po 0030),
+  - `.golangci.yml` with the default set + `gofumpt`, `errcheck`, `unused`,
+    `staticcheck`, `govet`, `revive` (exported doc); fix the three current
+    findings (unused `actionQueueDependencies`, unchecked
+    `scheduler.Stop()` in tests, gofumpt formatting of `actions.go`);
+  - Makefile `test` = `go test -race ./...` + `npm test` (after 0030),
     `lint` = `golangci-lint run ./...` + `npm run lint` + `format:check`;
     `verify` = `build + lint + test`;
-  - CI: `make lint` v obou jobech, `go test -race`, `npm audit --omit=dev
-    --audit-level=high`; přidat `.github/dependabot.yml` (gomod, npm,
-    github-actions, týdně);
-  - sjednocení Node verze: `web/.nvmrc` = 22, `engines.node >=22`,
+  - CI: `make lint` in both jobs, `go test -race`, `npm audit --omit=dev
+    --audit-level=high`; add `.github/dependabot.yml` (gomod, npm,
+    github-actions, weekly);
+  - unify the Node version: `web/.nvmrc` = 22, `engines.node >=22`,
     devcontainer feature `node: 22`;
-  - `.editorconfig` (tab, LF, trailing whitespace) — devcontainer už
-    doporučuje extension;
-  - `CLAUDE.md` v kořeni s jediným řádkem odkazujícím na `AGENTS.md` (Claude
-    Code mimo VS Code integraci AGENTS.md nenačítá automaticky);
-  - AGENTS.md a `go-backend.instructions.md`: `gofumpt` místo `gofmt`
-    (devcontainer ho už používá), odkaz na `make verify` jako jediný
-    validační příkaz; DoD, workflow a prompt `implement-block` odkazují na
-    `make verify` místo vlastních seznamů příkazů;
-  - `marionette.json` v kořeni přesunout do `deploy/dev-fixture.json`
-    (bez sekcí `status`/`history`), Makefile/air/launch.json ho kopírují do
-    ignorovaného `./marionette.json` při prvním spuštění;
-  - `LICENSE` (MIT, rozhodnuto 2026-09-26) a `CODEOWNERS`.
-- **Mimo rozsah**:
-  - release workflow do GitHub Releases (blok 0023 / samostatný blok);
-  - změny aplikačního kódu nad rámec oprav lint nálezů.
+  - `.editorconfig` (tab, LF, trailing whitespace) — the devcontainer already
+    recommends the extension;
+  - `CLAUDE.md` in the root with a single line pointing to `AGENTS.md`
+    (Claude Code outside the VS Code integration does not load AGENTS.md
+    automatically);
+  - AGENTS.md and `go-backend.instructions.md`: `gofumpt` instead of `gofmt`
+    (the devcontainer already uses it), a reference to `make verify` as the
+    single validation command; the DoD, workflow and the `implement-block`
+    prompt reference `make verify` instead of their own command lists;
+  - move `marionette.json` in the root to `deploy/dev-fixture.json`
+    (without the `status`/`history` sections), the Makefile/air/launch.json
+    copy it to the ignored `./marionette.json` on first run;
+  - `LICENSE` (MIT, decided 2026-09-26) and `CODEOWNERS`.
+- **Out of scope**:
+  - a release workflow to GitHub Releases (block 0023 / a separate block);
+  - application code changes beyond fixing lint findings.
 
-## Schválení
+## Approval
 
-- **Schválil**: projektový vlastník
-- **Datum schválení**: 2026-09-26
-- **Poznámky k rozhodnutí**: Schváleno jako narovnání stavu repozitáře;
-  licence MIT. Nález revize 2026-09-26 (L-1, H4, M5, sekce „Struktura a
-  nastavení agentů“). Doporučeno implementovat jako první blok fáze 8.
+- **Approved by**: project owner
+- **Approval date**: 2026-09-26
+- **Decision notes**: Approved as a straightening out of the repository
+  state; MIT license. Finding of the 2026-09-26 review (L-1, H4, M5, section
+  "Structure and agent setup"). Recommended to implement as the first block
+  of phase 8.
 
-## Návrh řešení
+## Proposed solution
 
-Změny jsou konfigurační; jediné zásahy do kódu jsou tři lint opravy a
-`tone?` v `StatusBadge`. `make verify` se stane jediným místem definice
-validace, ostatní dokumenty na něj odkazují (workflow zakazuje paralelní
-metodiku, proto se seznamy příkazů centralizují).
+The changes are configuration only; the only code changes are three lint
+fixes and `tone?` in `StatusBadge`. `make verify` becomes the single place
+where validation is defined, the other documents reference it (the workflow
+forbids a parallel methodology, so the command lists are centralized).
 
-## Testovací plán
+## Test plan
 
-- `go list ./...` nevrací žádný balíček pod `web/`;
-- `git status` po `npm run build` a `make backend-dev` je čistý;
-- `npm run lint` selže na jednom uměle přidaném warningu; po `npm run
-  format` je počet warningů 0;
-- `golangci-lint run ./...` prochází bez nálezů;
-- CI běh na PR je zelený; Dependabot otevře první PR.
+- `go list ./...` returns no package under `web/`;
+- `git status` after `npm run build` and `make backend-dev` is clean;
+- `npm run lint` fails on one artificially added warning; after `npm run
+  format` the warning count is 0;
+- `golangci-lint run ./...` passes without findings;
+- the CI run on a PR is green; Dependabot opens its first PR.
 
-## Kritérium hotovosti
+## Done criteria
 
-Viz [Definition of Done](../../devops/definition-of-done.md) +:
+See [Definition of Done](../../devops/definition-of-done.md) plus:
 
-- `make verify` je zdokumentován v README, AGENTS.md, DoD a promptech;
-- žádný generovaný soubor není v `git ls-files`;
-- Node verze je shodná v devcontaineru, CI a `.nvmrc`.
+- `make verify` is documented in the README, AGENTS.md, the DoD and the
+  prompts;
+- no generated file is in `git ls-files`;
+- the Node version is the same in the devcontainer, CI and `.nvmrc`.
 
-## Uzavření
+## Closure
 
-- **Stav po implementaci**: Hotovo (2026-09-26)
-- **Ověření**: `make verify` (build UI, `golangci-lint run ./...`,
+- **Status after implementation**: Done (2026-09-26)
+- **Verification**: `make verify` (UI build, `golangci-lint run ./...`,
   `npm run lint --max-warnings 0`, `npm run lint:types`, `npm run
   format:check`, `go test -race -count=1 ./...`, `go build ./...`,
-  `go vet ./...`) prošel za 12 s bez nálezů; `go list ./...` vrací pouze
-  balíčky pod `cmd/` a `internal/` (žádný z `web/node_modules`); po
-  `npm run build` nevznikají `vite.config.js`, `vite.config.d.ts` ani
-  `tsconfig.node.tsbuildinfo`; `git check-ignore marionette.json` potvrzuje
-  ignorování lokální dev konfigurace; negativní test — uměle přidaný soubor s
-  nepoužitou proměnnou shodí `npm run lint` (exit 1), po odstranění exit 0;
-  `npm audit --omit=dev --audit-level=high` bez zranitelností; `git diff
-  --check` čistý. Počet ESLint warningů klesl ze 176 na 0 bez přeformátování
-  `.vue` souborů (řešeno `eslint-config-prettier`).
-- **Neověřeno lokálně**: zelený běh CI na PR a první Dependabot PR (vyžadují
-  push do GitHubu); devcontainer s Node 22 vyžaduje rebuild kontejneru
-  (lokálně stále běží Node 20, `engines` pouze varuje).
-- **Odchylky od návrhu**: `make test` zatím spouští jen Go testy — `npm test`
-  se doplní blokem 0030; revive pravidlo `exported` běží s vypnutou kontrolou
-  stutteringu (`StatusCheckService`), přejmenování řeší blok 0034; doplněny
-  chybějící godoc komentáře u exportovaných chyb a typů (původně L-12 pro
-  0034), protože je lint vyžaduje.
-- **Dokumentace aktualizována**: ano — `AGENTS.md`, `CLAUDE.md`,
+  `go vet ./...`) passed in 12 s without findings; `go list ./...` returns
+  only packages under `cmd/` and `internal/` (none from `web/node_modules`);
+  after `npm run build` no `vite.config.js`, `vite.config.d.ts` or
+  `tsconfig.node.tsbuildinfo` is created; `git check-ignore marionette.json`
+  confirms the local dev configuration is ignored; negative test — an
+  artificially added file with an unused variable breaks `npm run lint`
+  (exit 1), after removal exit 0; `npm audit --omit=dev --audit-level=high`
+  without vulnerabilities; `git diff --check` clean. The number of ESLint
+  warnings dropped from 176 to 0 without reformatting the `.vue` files
+  (solved by `eslint-config-prettier`).
+- **Not verified locally**: a green CI run on a PR and the first Dependabot
+  PR (they require a push to GitHub); the devcontainer with Node 22 requires
+  a container rebuild (Node 20 still runs locally, `engines` only warns).
+- **Deviations from the plan**: `make test` so far runs only the Go tests —
+  `npm test` will be added by block 0030; the revive rule `exported` runs
+  with the stuttering check disabled (`StatusCheckService`), the renaming is
+  handled by block 0034; missing godoc comments on exported errors and types
+  were added (originally L-12 for 0034), because lint requires them.
+- **Documentation updated**: yes — `AGENTS.md`, `CLAUDE.md`,
   `.github/instructions/*`, `.github/prompts/implement-block.prompt.md`,
   `docs/devops/definition-of-done.md`, `development-workflow.md`, `ci-cd.md`,
-  `testing-strategy.md`, `README.md`, roadmapa.
+  `testing-strategy.md`, `README.md`, roadmap.

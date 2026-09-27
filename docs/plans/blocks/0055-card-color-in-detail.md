@@ -1,74 +1,83 @@
-# Implementační blok: Barva karty v detailu
+# Implementation block: Card color in the detail
 
-- **Fáze**: 8 — Zpevnění (dodatek po uzavření fáze), oblast UI
-- **Vazba na požadavky**: FR-10a, FR-25, FR-29
-- **Vazba na ADR**: nové ADR není potřeba
-- **Stav**: Hotovo
-- **Závislosti**: Blok 0054 (barva karty, `cardColors.ts`, tokeny)
+- **Phase**: 8 — Hardening (addendum after the phase was closed), UI area
+- **Requirements**: FR-10a, FR-25, FR-29
+- **ADRs**: no new ADR needed
+- **Status**: Done
+- **Dependencies**: Block 0054 (card color, `cardColors.ts`, tokens)
 
-## Cíl bloku
+## Goal
 
-Barvu karty dnes ukazuje jen dashboard. Z dashboardu se ale jedním klikem
-přechází do detailu, a bez barvy tam operátor ztrácí vodítko, na jaké kartě
-je. Po dokončení bloku detail karty zobrazí stejnou barvu jako dashboard.
+Today only the dashboard shows the card color. But one click takes you
+from the dashboard to the detail, and without the color the operator
+loses the cue about which card they are on. After this block the card
+detail shows the same color as the dashboard.
 
-## Rozsah
+## Scope
 
-- **Uvnitř**:
-  - `CardDetailView`: dlaždice ikony v hlavičce (`detail-icon`, slot
-    `identity` v `PageHeader`) dostane u karty s barvou proužek 4 px
-    v barvě karty podél horní hrany dlaždice. Použije se stejná technika
-    jako na dashboardu (`box-shadow: inset` a barva okraje), takže se
-    rozměry hlavičky nezmění. Karta bez barvy nebo s barvou mimo paletu
-    vypadá jako dnes (`cardColorValue`);
-  - aby `CardDetailView.vue` zůstal pod 300 řádky (dnes 298), vyčlení se
-    dlaždice ikony do malé komponenty `CardIdentityTile.vue` (ikona + barva).
-    Dashboard ji nepoužívá, protože tam proužek patří celé kartě;
-  - UX specifikace §6 (hlavička detailu);
-  - testy: Vitest (`CardIdentityTile` s barvou, bez barvy a s neznámou
-    barvou; `CardDetailView` předá barvu karty), E2E (detail karty s barvou
-    má proužek; rozšíření scénáře z bloku 0054).
-- **Mimo rozsah**:
-  - barva na stránce úprav karty (tam je vidět ve výběru **Color**);
-  - barevné pozadí nebo orámování celé hlavičky detailu (hlavička není
-    karta a barevná plocha by soupeřila se stavovým badge).
+- **In scope**:
+  - `CardDetailView`: the icon tile in the header (`detail-icon`, the
+    `identity` slot in `PageHeader`) of a card with a color gets a 4 px
+    stripe in the card color along the top edge of the tile. The same
+    technique as on the dashboard is used (`box-shadow: inset` and the
+    border color), so the header dimensions do not change. A card without
+    a color or with a color outside the palette looks as it does today
+    (`cardColorValue`);
+  - to keep `CardDetailView.vue` under 300 lines (298 today), the icon
+    tile is extracted into a small component `CardIdentityTile.vue`
+    (icon + color). The dashboard does not use it, because there the
+    stripe belongs to the whole card;
+  - UX specification §6 (detail header);
+  - tests: Vitest (`CardIdentityTile` with a color, without a color and
+    with an unknown color; `CardDetailView` passes the card color), E2E
+    (the detail of a card with a color has the stripe; extending the
+    scenario from block 0054).
+- **Out of scope**:
+  - the color on the card edit page (it is visible there in the **Color**
+    picker);
+  - a colored background or border of the whole detail header (the header
+    is not a card and a colored area would compete with the status
+    badge).
 
-## Schválení
+## Approval
 
-- **Schválil**: projektový vlastník
-- **Datum schválení**: 2026-09-27
-- **Poznámky k rozhodnutí**: Schváleno vlastníkem („souhlas se vším“): proužek na dlaždici ikony podle návrhu.
+- **Approved by**: project owner
+- **Approval date**: 2026-09-27
+- **Decision notes**: Approved by the owner ("agree with everything"): stripe on the icon tile as proposed.
 
-## Návrh řešení
+## Proposed solution
 
-Proužek na dlaždici ikony, ne na celé hlavičce: dlaždice je jediný
-„kartový“ prvek v hlavičce detailu, barva se tak váže ke stejnému místu,
-kde je ikona, a nezmění rozložení na 320 px. Alternativa, levý okraj celé
-hlavičky, je stejně jednoduchá, pokud ji vlastník preferuje.
+A stripe on the icon tile, not on the whole header: the tile is the only
+"card-like" element in the detail header, so the color is tied to the
+same place as the icon and does not change the layout at 320 px. The
+alternative, a left border of the whole header, is equally simple if the
+owner prefers it.
 
-## Testovací plán
+## Test plan
 
 - `cd web && npx vitest run`.
 - `make e2e`.
 - `make verify`.
 
-## Kritérium hotovosti
+## Done criteria
 
-Viz [Definition of Done](../../devops/definition-of-done.md) +:
+See [Definition of Done](../../devops/definition-of-done.md) plus:
 
-- detail karty s barvou ukazuje stejnou barvu jako dashboard; detail karty
-  bez barvy se nezměnil.
+- the detail of a card with a color shows the same color as the
+  dashboard; the detail of a card without a color is unchanged.
 
-## Uzavření
+## Closure
 
-- **Stav po implementaci**: Hotovo (2026-09-27)
-- **Ověření**: `make verify` prošel (202 testů Vitest, `go test -race`,
-  lint, `install_test`, `release_version_test`); `make e2e` prošel
-  (20 scénářů). Nové testy: Vitest `CardIdentityTile.spec.ts` (proužek
-  pro barvu z palety; bez barvy, prázdná a neznámá barva bez proužku,
-  výchozí ikona), `CardDetailView` (hlavička předá ikonu a barvu karty);
-  E2E scénář barvy z bloku 0054 rozšířen o detail (`.identity-tile`
-  s `data-color`).
-- **Odchylky od návrhu**: žádné. Komponenta `CardIdentityTile.vue`
-  převzala i styl dlaždice; `CardDetailView.vue` má 285 řádků.
-- **Dokumentace aktualizována**: UX specifikace §6 (hlavička detailu).
+- **Status after implementation**: Done (2026-09-27)
+- **Verification**: `make verify` passed (202 Vitest tests,
+  `go test -race`, lint, `install_test`, `release_version_test`);
+  `make e2e` passed (20 scenarios). New tests: Vitest
+  `CardIdentityTile.spec.ts` (stripe for a palette color; no color, empty
+  and unknown color without a stripe, default icon), `CardDetailView`
+  (the header passes the card icon and color); the color E2E scenario
+  from block 0054 extended to the detail (`.identity-tile` with
+  `data-color`).
+- **Deviations from the plan**: none. The `CardIdentityTile.vue`
+  component also took over the tile styling; `CardDetailView.vue` has
+  285 lines.
+- **Documentation updated**: UX specification §6 (detail header).

@@ -1,118 +1,122 @@
-# Implementační blok: Opravy z code review 2 — backend (WaitDelay, lenientní load, atomický zápis, store)
+# Implementation block: Code review 2 fixes — backend (WaitDelay, lenient load, atomic write, store)
 
-- **Fáze**: 8 — Zpevnění (dodatek po uzavření fáze)
-- **Vazba na požadavky**: FR-11, FR-13, FR-30..33, FR-35, NFR-04, NFR-05
-- **Vazba na ADR**: ADR-0004, ADR-0005
-- **Stav**: Hotovo
-- **Závislosti**: Bloky 0003, 0025, 0028, 0036
+- **Phase**: 8 — Hardening (addendum after the phase was closed)
+- **Requirements**: FR-11, FR-13, FR-30..33, FR-35, NFR-04, NFR-05
+- **ADRs**: ADR-0004, ADR-0005
+- **Status**: Done
+- **Dependencies**: Blocks 0003, 0025, 0028, 0036
 
-## Cíl bloku
+## Goal
 
-Po dokončení se úspěšná akce, jejíž potomek drží rouru s výstupem, zapíše jako
-`ok`; konfigurace zapsaná před zpřísněním limitů se načte místo karantény;
-souběžný zápis konfigurace nemůže poškodit soubor; chyba fsync adresáře po
-úspěšném `rename` nevede k rollbacku v paměti; tři mutace store sdílí jeden
-protokol rollbacku.
+After this block, a successful action whose child process holds the
+output pipe is recorded as `ok`; a configuration written before the limits
+were tightened is loaded instead of quarantined; concurrent configuration
+writes cannot corrupt the file; a directory fsync error after a
+successful `rename` does not cause an in-memory rollback; the three store
+mutations share one rollback protocol.
 
-## Rozsah
+## Scope
 
-- **Uvnitř** (nálezy code review 2026-09-26, druhé kolo):
-  1. `internal/execengine/executor.go`: `exec.ErrWaitDelay` (proces skončil
-     0, jen osiřelý potomek držel rouru) se vyhodnotí jako exit 0 podle
-     pravidla výstupu; `ProcessErr` zůstává pro diagnostiku.
-  2. `internal/config/types.go` + `persistence.go`: dvouúrovňová validace.
-     `ValidateEssential()` (Action i ActionCard) kontroluje, co engine
-     potřebuje: neprázdné ID a příkaz, `timeoutSec ≥ 1`, platné pravidlo
-     výstupu, nezáporný polling. `Validate()` = essential + limity (délky,
-     znaky ID, ikona, `MaxTimeoutSec`, vztah intervalů) a zůstává na API
-     hranici (`CreateCard`/`UpdateCard`). `LoadFile` karantenuje soubor jen
-     při selhání essential validace; karta porušující jen limity se načte
-     s varováním (`card violates current limits`) a opraví se při první
-     editaci. Executor validuje `ValidateEssential()`.
-  3. `writePersistedFile`: unikátní temp soubor (`os.CreateTemp(dir,
-     "<název>.*.tmp")`) při zachování práv (chmod na režim cílového
-     souboru); `SaveFileWithHistory` bere `persistMu`, takže se serializuje
-     s `OnChange` mutací.
-  4. Chyba `syncDirectory` po úspěšném `rename` se vrací jako
-     `ErrDirectorySync`; `SaveFileWithHistory` přesto označí snapshot jako
-     uložený; `openStore` ji v `OnChange` zaloguje jako varování a
-     nerollbackuje (soubor už obsahuje změnu).
-  5. `internal/config/store.go`: společný `store.mutate(operation, apply)`
-     pro `CreateCard`/`UpdateCard`/`DeleteCard` — lock, apply, `changes++`,
-     `notifyChange`, při chybě undo + `changes--` + `PersistenceError`.
-- **Mimo rozsah**:
-  - migrace formátu konfigurace; změny API; frontend (blok 0039).
+- **In scope** (code review findings 2026-09-26, second round):
+  1. `internal/execengine/executor.go`: `exec.ErrWaitDelay` (the process
+     exited 0, only an orphaned child held the pipe) is evaluated as exit 0
+     according to the output rule; `ProcessErr` remains for diagnostics.
+  2. `internal/config/types.go` + `persistence.go`: two-level validation.
+     `ValidateEssential()` (both Action and ActionCard) checks what the
+     engine needs: non-empty ID and command, `timeoutSec ≥ 1`, a valid
+     output rule, non-negative polling. `Validate()` = essential + limits
+     (lengths, ID characters, icon, `MaxTimeoutSec`, interval relation) and
+     stays at the API boundary (`CreateCard`/`UpdateCard`). `LoadFile`
+     quarantines the file only when essential validation fails; a card
+     that violates only the limits is loaded with a warning
+     (`card violates current limits`) and gets fixed on the first edit.
+     The executor validates with `ValidateEssential()`.
+  3. `writePersistedFile`: a unique temp file (`os.CreateTemp(dir,
+     "<name>.*.tmp")`) while preserving permissions (chmod to the target
+     file's mode); `SaveFileWithHistory` takes `persistMu`, so it is
+     serialized with the `OnChange` mutation.
+  4. A `syncDirectory` error after a successful `rename` is returned as
+     `ErrDirectorySync`; `SaveFileWithHistory` still marks the snapshot as
+     saved; `openStore` logs it in `OnChange` as a warning and does not
+     roll back (the file already contains the change).
+  5. `internal/config/store.go`: a common `store.mutate(operation, apply)`
+     for `CreateCard`/`UpdateCard`/`DeleteCard` — lock, apply, `changes++`,
+     `notifyChange`, on error undo + `changes--` + `PersistenceError`.
+- **Out of scope**:
+  - configuration format migration; API changes; frontend (block 0039).
 
-## Schválení
+## Approval
 
-- **Schválil**: projektový vlastník
-- **Datum schválení**: 2026-09-26
-- **Poznámky k rozhodnutí**: Schváleno („oprav všechny nálezy“). Bod 3 mění
-  rozhodnutí bloku 0025 (pevný `<cesta>.tmp`): důvod pevného názvu — ztráta
-  práv při `CreateTemp` — je pokryt explicitním `chmod`, který kód už má;
-  unikátní název vrací ochranu před dvěma zapisovateli.
+- **Approved by**: project owner
+- **Approval date**: 2026-09-26
+- **Decision notes**: Approved ("fix all findings"). Item 3 changes the
+  decision of block 0025 (fixed `<path>.tmp`): the reason for the fixed
+  name — losing permissions with `CreateTemp` — is covered by the explicit
+  `chmod` the code already has; a unique name restores protection against
+  two writers.
 
-## Návrh řešení
+## Proposed solution
 
 - `executor.go`: `if errors.Is(processErr, exec.ErrWaitDelay) { … evaluate
-  as exit 0 }` před stávajícím `switch`.
+  as exit 0 }` before the existing `switch`.
 - `types.go`: `func (action Action) validate(strict bool) fieldErrors`,
   `Validate()` = `validate(true)`, `ValidateEssential()` = `validate(false)`;
-  totéž pro `ActionCard`.
-- `persistence.go`: `ErrDirectorySync`; `LoadFile` loguje
-  `card violates current limits` s `fields`.
+  the same for `ActionCard`.
+- `persistence.go`: `ErrDirectorySync`; `LoadFile` logs
+  `card violates current limits` with `fields`.
 - `main.go` `openStore`: `OnChange` wrapper — `ErrDirectorySync` → `Warn`,
   return nil.
 
-## Testovací plán
+## Test plan
 
-- `TestExecutorTreatsWaitDelayAsSuccess` (fake proces vrací
-  `exec.ErrWaitDelay`, výstup se vyhodnotí pravidlem; s `match` pravidlem a
-  nesedícím výstupem → `fail`).
-- `TestLoadFileKeepsCardOverCurrentLimits` (ID s tečkou, `timeoutSec`
-  7200, ikona `pi pi-Home` → načteno, varování v logu), stávající
-  `TestLoadFileInvalidCardReturnsErrorAndEmptyStore` (prázdný příkaz →
-  stále `ErrConfigCorrupt`).
+- `TestExecutorTreatsWaitDelayAsSuccess` (a fake process returns
+  `exec.ErrWaitDelay`, the output is evaluated by the rule; with a `match`
+  rule and non-matching output → `fail`).
+- `TestLoadFileKeepsCardOverCurrentLimits` (ID with a dot, `timeoutSec`
+  7200, icon `pi pi-Home` → loaded, warning in the log), the existing
+  `TestLoadFileInvalidCardReturnsErrorAndEmptyStore` (empty command →
+  still `ErrConfigCorrupt`).
 - `TestValidateEssentialIgnoresLimits`.
-- `TestWritePersistedFileConcurrentWritersKeepFileValid` (N goroutin
-  `SaveFile`/`SaveFileWithHistory`, výsledný soubor je platný JSON).
-- `TestSaveFilePreservesExistingPermissions` zůstává zelený (chmod).
-- `TestStoreKeepsMutationWhenOnlyDirectorySyncFails` (OnChange vrací
-  `ErrDirectorySync` → karta zůstává, žádný `PersistenceError`) — přes
-  wrapper v `openStore`: test v `cmd/marionette`.
+- `TestWritePersistedFileConcurrentWritersKeepFileValid` (N goroutines
+  `SaveFile`/`SaveFileWithHistory`, the resulting file is valid JSON).
+- `TestSaveFilePreservesExistingPermissions` stays green (chmod).
+- `TestStoreKeepsMutationWhenOnlyDirectorySyncFails` (OnChange returns
+  `ErrDirectorySync` → the card stays, no `PersistenceError`) — via the
+  wrapper in `openStore`: a test in `cmd/marionette`.
 - `make verify`.
 
-## Kritérium hotovosti
+## Done criteria
 
-Viz [Definition of Done](../../devops/definition-of-done.md) +:
+See [Definition of Done](../../devops/definition-of-done.md) plus:
 
-- `grep -n 'changes--' internal/config/store.go` najde právě jeden výskyt
-  (v `mutate`);
-- `docs/architecture/overview.md` popisuje lenientní load.
+- `grep -n 'changes--' internal/config/store.go` finds exactly one
+  occurrence (in `mutate`);
+- `docs/architecture/overview.md` describes the lenient load.
 
-## Uzavření
+## Closure
 
-- **Stav po implementaci**: Hotovo (2026-09-26)
-- **Ověření**: `make verify` prošel (lint, `vue-tsc`, Prettier, Vitest,
-  `vite build`, `go test -race`, `go vet`). Nové testy:
-  `TestExecutorTreatsWaitDelayAsSuccess` (výstup se dál hodnotí pravidlem),
-  `TestExecutorRunsActionOverCurrentLimits` (timeout nad `MaxTimeoutSec`
-  běží, nulový ne), `TestLoadFileKeepsCardOverCurrentLimits` (ID s tečkou,
-  ikona `pi pi-Home`, timeout 3601 → načteno s varováním, `UpdateCard`
-  stále odmítne), `TestValidateEssentialIgnoresLimits` (8 essential
-  porušení), `TestWritePersistedFileConcurrentWritersKeepFileValid` (8 × 2
-  souběžných uložení, soubor načitatelný, žádné `*.tmp`),
-  `TestPersistOnChangeSavesAndReportsWriteFailures`. Stávající
-  `TestLoadFileInvalidCardReturnsErrorAndEmptyStore` (prázdný příkaz →
-  `ErrConfigCorrupt`) a `TestSaveFilePreservesExistingPermissions` zůstávají
-  zelené. `grep -c 'changes--' store.go` = 1.
-- **Odchylky od návrhu**: (1) Větev `ErrDirectorySync` v `persistOnChange`
-  není pokrytá testem — selhání `fsync` adresáře po úspěšném `rename` nelze
-  v testu vyvolat bez injektování souborového systému; pokryto je, že běžná
-  chyba zápisu prochází a není klasifikována jako `ErrDirectorySync`. (2)
-  Rozhodnutí bloku 0025 o pevném názvu `<cesta>.tmp` je tímto blokem
-  nahrazeno (důvod — ztráta práv — řeší explicitní `chmod`); blok 0025 se
-  zpětně nemění.
-- **Dokumentace aktualizována**: ano — `docs/architecture/overview.md`
-  (sekce „Ochrana konfiguračního souboru“: essential vs. plná validace,
-  unikátní temp soubor, `persistMu`, `ErrDirectorySync`), roadmapa.
+- **Status after implementation**: Done (2026-09-26)
+- **Verification**: `make verify` passed (lint, `vue-tsc`, Prettier, Vitest,
+  `vite build`, `go test -race`, `go vet`). New tests:
+  `TestExecutorTreatsWaitDelayAsSuccess` (the output is still evaluated by
+  the rule), `TestExecutorRunsActionOverCurrentLimits` (a timeout above
+  `MaxTimeoutSec` runs, zero does not), `TestLoadFileKeepsCardOverCurrentLimits`
+  (ID with a dot, icon `pi pi-Home`, timeout 3601 → loaded with a warning,
+  `UpdateCard` still rejects), `TestValidateEssentialIgnoresLimits` (8
+  essential violations), `TestWritePersistedFileConcurrentWritersKeepFileValid`
+  (8 × 2 concurrent saves, file loadable, no `*.tmp`),
+  `TestPersistOnChangeSavesAndReportsWriteFailures`. The existing
+  `TestLoadFileInvalidCardReturnsErrorAndEmptyStore` (empty command →
+  `ErrConfigCorrupt`) and `TestSaveFilePreservesExistingPermissions` stay
+  green. `grep -c 'changes--' store.go` = 1.
+- **Deviations from the plan**: (1) The `ErrDirectorySync` branch in
+  `persistOnChange` is not covered by a test — a directory `fsync` failure
+  after a successful `rename` cannot be triggered in a test without
+  injecting a filesystem; what is covered is that an ordinary write error
+  passes through and is not classified as `ErrDirectorySync`. (2) The
+  decision of block 0025 about the fixed name `<path>.tmp` is superseded
+  by this block (the reason — losing permissions — is handled by the
+  explicit `chmod`); block 0025 is not changed retroactively.
+- **Documentation updated**: yes — `docs/architecture/overview.md`
+  ("Protecting the configuration file" section: essential vs. full
+  validation, unique temp file, `persistMu`, `ErrDirectorySync`), roadmap.

@@ -1,86 +1,90 @@
-# Implementační blok: JSON perzistence konfigurace, historie a načtení při startu
+# Implementation block: JSON persistence of configuration and history, and loading at startup
 
-- **Fáze**: 2 — Doménový model + config store (in-memory + JSON perzistence)
-- **Vazba na požadavky**: FR-30, FR-31, FR-33, FR-34, FR-35
-- **Vazba na ADR**: ADR-0004
-- **Stav**: Hotovo
+- **Phase**: 2 — Domain model + config store (in-memory + JSON persistence)
+- **Requirements**: FR-30, FR-31, FR-33, FR-34, FR-35
+- **ADRs**: ADR-0004
+- **Status**: Done
 
-## Cíl bloku
+## Goal
 
-Po dokončení se konfigurace (`Settings` + seznam `ActionCard`) persistuje do
-jednoho JSON souboru při každé mutační operaci a načítá se z něj při startu
-aplikace. Cesta k souboru je konfigurovatelná přes `MARIONETTE_CONFIG`.
-Navíc: při **řízeném ukončení** aplikace (SIGINT/SIGTERM) se do téhož
-souboru jednorázově uloží i aktuální historie běhů (FR-35) a při příštím
-startu se načte spolu s konfigurací. `cmd/marionette` store při startu
-vytvoří/načte a při shutdownu uloží.
+When done, the configuration (`Settings` + the list of `ActionCard`) is
+persisted to a single JSON file on every mutating operation and loaded
+from it at application startup. The file path is configurable via
+`MARIONETTE_CONFIG`. In addition: on a **graceful shutdown** of the
+application (SIGINT/SIGTERM) the current run history (FR-35) is also saved
+once to the same file and loaded together with the configuration on the
+next start. `cmd/marionette` creates/loads the store at startup and saves
+it on shutdown.
 
-## Rozsah
+## Scope
 
-- **Uvnitř**:
-  - Formát souboru: `{"settings": Settings, "cards": []ActionCard,
-"history": {cardID: {"primary": []Run, "status": []StatusChange}}}` — klíč
-    `history` je volitelný při čtení (chybí-li, historie je prázdná).
-  - `LoadFile(path string) (*Store, error)` — pokud soubor neexistuje,
-    vrátí prázdný `Store` s výchozím `Settings` (`DefaultHistorySize`,
-    `DefaultMaxConcurrentActions`) a `nil` chybou (FR-33: chybějící soubor
-    není chyba). Pokud soubor existuje, ale obsahuje neplatný JSON nebo
-    nevaliduje se (`ActionCard.Validate()`), vrátí prázdný `Store` a chybu
-    (volající — `cmd/marionette` — chybu zaloguje, ale pokračuje se startem,
-    dle FR-33). Pokud jsou validní `settings`/`cards`, ale `history` chybí
-    nebo je poškozená, načtení pokračuje s prázdnou historií (loguje se jen
-    varování, ne chyba, viz FR-35).
-  - `(*Store) SaveFile(path string) error` — uloží **jen** `settings` +
-    `cards` (volá se po každé mutační operaci, viz persist hook níže).
-  - `(*Store) SaveFileWithHistory(path string) error` — uloží `settings` +
-    `cards` + `history`; volá se výhradně z graceful-shutdown cesty v
-    `cmd/marionette`, ne po běžných mutacích ani po `AppendRun`.
-  - Obě metody zapisují atomicky: do dočasného souboru ve stejném adresáři
-    (`*.tmp`) a `os.Rename` na cílovou cestu.
-  - `Store` z bloku 0002 rozšířen o volitelný "persist hook": po každé
-    úspěšné mutaci (`CreateCard`, `UpdateCard`, `DeleteCard`,
-    `UpdateSettings`) store zavolá nakonfigurovanou funkci pro uložení přes
-    `SaveFile` (např. `Store.OnChange func(*Store) error`, nastavenou po
-    `LoadFile`) — `AppendRun` tento hook **nevolá** (historie se
-    nepersistuje průběžně, jen při shutdownu, viz ADR-0004).
-  - `cmd/marionette/main.go`: čtení `MARIONETTE_CONFIG` (default
-    `./marionette.json`), volání `config.LoadFile`, log chyby při
-    poškozeném souboru/historii, propojení store s persist hookem na
-    stejnou cestu. V existující obsluze `SIGINT`/`SIGTERM` (po zastavení
-    HTTP serveru, `srv.Shutdown`) se navíc zavolá `store.SaveFileWithHistory`
-    před ukončením procesu.
-- **Mimo rozsah**: HTTP endpointy pro CRUD (fáze 5) — store je zatím jen
-  interně vytvořený v `main.go`, bez napojení na `internal/server`
-  (přidání proměnné/pole pro pozdější use lze, ale bez routování).
+- **In scope**:
+  - File format: `{"settings": Settings, "cards": []ActionCard,
+"history": {cardID: {"primary": []Run, "status": []StatusChange}}}` — the
+    `history` key is optional when reading (if missing, history is empty).
+  - `LoadFile(path string) (*Store, error)` — if the file does not exist,
+    returns an empty `Store` with default `Settings` (`DefaultHistorySize`,
+    `DefaultMaxConcurrentActions`) and a `nil` error (FR-33: a missing
+    file is not an error). If the file exists but contains invalid JSON or
+    does not validate (`ActionCard.Validate()`), returns an empty `Store`
+    and an error (the caller — `cmd/marionette` — logs the error but
+    continues starting, per FR-33). If `settings`/`cards` are valid but
+    `history` is missing or corrupted, loading continues with an empty
+    history (only a warning is logged, not an error, see FR-35).
+  - `(*Store) SaveFile(path string) error` — saves **only** `settings` +
+    `cards` (called after every mutating operation, see the persist hook
+    below).
+  - `(*Store) SaveFileWithHistory(path string) error` — saves `settings` +
+    `cards` + `history`; called exclusively from the graceful-shutdown
+    path in `cmd/marionette`, not after regular mutations nor after
+    `AppendRun`.
+  - Both methods write atomically: to a temporary file in the same
+    directory (`*.tmp`) and `os.Rename` to the target path.
+  - The `Store` from block 0002 is extended with an optional "persist
+    hook": after every successful mutation (`CreateCard`, `UpdateCard`,
+    `DeleteCard`, `UpdateSettings`) the store calls a configured function
+    to save via `SaveFile` (e.g. `Store.OnChange func(*Store) error`, set
+    after `LoadFile`) — `AppendRun` does **not** call this hook (history
+    is not persisted continuously, only on shutdown, see ADR-0004).
+  - `cmd/marionette/main.go`: reading `MARIONETTE_CONFIG` (default
+    `./marionette.json`), calling `config.LoadFile`, logging the error on
+    a corrupted file/history, wiring the store with the persist hook to
+    the same path. In the existing `SIGINT`/`SIGTERM` handling (after the
+    HTTP server stops, `srv.Shutdown`) `store.SaveFileWithHistory` is also
+    called before the process exits.
+- **Out of scope**: HTTP endpoints for CRUD (phase 5) — for now the store
+  is only created internally in `main.go`, without being wired to
+  `internal/server` (adding a variable/field for later use is fine, but
+  without routing).
 
-## Návrh řešení
+## Proposed solution
 
-Nový soubor `internal/config/persistence.go` s `LoadFile`/`SaveFile`.
-Atomický zápis: `os.CreateTemp(dir, "marionette-*.json")`, zapsat, `Sync`,
+A new file `internal/config/persistence.go` with `LoadFile`/`SaveFile`.
+Atomic write: `os.CreateTemp(dir, "marionette-*.json")`, write, `Sync`,
 `Close`, `os.Rename(tmp.Name(), path)`.
 
-## Testovací plán
+## Test plan
 
-- `LoadFile` na neexistující cestě → prázdný store, žádná chyba.
-- `LoadFile` na poškozeném JSON → chyba + prázdný store (ne panic).
-- Round-trip `SaveFile` → `LoadFile`: karty a settings shodné, historie
-  prázdná (protože `SaveFile` historii neukládá).
-  - Round-trip `SaveFileWithHistory` → `LoadFile`: karty, settings, primární
-    historie běhů i historie přechodů statusu shodné.
-- `LoadFile` na souboru s validními `settings`/`cards`, ale poškozeným
-  `history` → načte se konfigurace, historie zůstane prázdná, zaloguje se
-  varování (ne fatální chyba).
-- Zápis do souboru, ke kterému chybí oprávnění / neexistující adresář →
-  čitelná chyba, aplikace nevolá `panic`.
-- `MARIONETTE_CONFIG` override: test na `main.go` úrovni není nutný
-  (jednoduché čtení env), stačí unit test na `LoadFile`/`SaveFile`/
-  `SaveFileWithHistory` s explicitní cestou v `t.TempDir()`.
+- `LoadFile` on a nonexistent path → empty store, no error.
+- `LoadFile` on corrupted JSON → error + empty store (no panic).
+- Round-trip `SaveFile` → `LoadFile`: cards and settings identical,
+  history empty (because `SaveFile` does not save history).
+  - Round-trip `SaveFileWithHistory` → `LoadFile`: cards, settings,
+    primary run history and status transition history identical.
+- `LoadFile` on a file with valid `settings`/`cards` but corrupted
+  `history` → the configuration loads, history stays empty, a warning is
+  logged (not a fatal error).
+- Writing to a file without permission / to a nonexistent directory →
+  a readable error, the application does not call `panic`.
+- `MARIONETTE_CONFIG` override: a test at the `main.go` level is not
+  necessary (simple env read), a unit test on `LoadFile`/`SaveFile`/
+  `SaveFileWithHistory` with an explicit path in `t.TempDir()` is enough.
 
-## Kritérium hotovosti
+## Done criteria
 
-Viz [Definition of Done](../../devops/definition-of-done.md). Specificky:
-manuální ověření, že `make backend-run` s prázdným/chybějícím
-`marionette.json` naběhne bez pádu, že `Ctrl+C` (SIGINT) uloží soubor vč.
-historie a že opětovný start historii načte zpět — do doby, než existuje
-API (fáze 5), lze historii do store dostat jen testem/dočasným voláním
-`AppendRun`, ne end-to-end přes UI.
+See [Definition of Done](../../devops/definition-of-done.md). Specifically:
+manual verification that `make backend-run` with an empty/missing
+`marionette.json` starts without crashing, that `Ctrl+C` (SIGINT) saves
+the file incl. history and that a restart loads the history back — until
+the API exists (phase 5), history can only get into the store via a
+test/temporary call to `AppendRun`, not end-to-end through the UI.

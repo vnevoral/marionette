@@ -1,43 +1,44 @@
-# Implementační blok: Doménové typy a validace konfigurace
+# Implementation block: Domain types and configuration validation
 
-- **Fáze**: 2 — Doménový model + config store (in-memory + JSON perzistence)
-- **Vazba na požadavky**: FR-10, FR-11, FR-12, FR-13, FR-14, FR-15, FR-15a, FR-17, FR-18, FR-19
-- **Vazba na ADR**: ADR-0004
-- **Stav**: Hotovo
+- **Phase**: 2 — Domain model + config store (in-memory + JSON persistence)
+- **Requirements**: FR-10, FR-11, FR-12, FR-13, FR-14, FR-15, FR-15a, FR-17, FR-18, FR-19
+- **ADRs**: ADR-0004
+- **Status**: Done
 
-## Cíl bloku
+## Goal
 
-Po dokončení existuje balíček `internal/config` s doménovými typy
-(`Action`, `OutputRule`, `ActionCard`, `Run`, `Settings`) a jejich validací,
-bez jakékoli in-memory správy (store) nebo I/O na disk — to řeší až bloky
-0002 a 0003.
+When done, there is an `internal/config` package with domain types
+(`Action`, `OutputRule`, `ActionCard`, `Run`, `Settings`) and their
+validation, without any in-memory management (store) or disk I/O — that is
+handled by blocks 0002 and 0003.
 
-## Rozsah
+## Scope
 
-- **Uvnitř**:
-  - Typy `Action`, `OutputRule`, `ActionCard`, `Run`, `Settings` v
-    `internal/config` vč. JSON tagů pro budoucí (de)serializaci.
-  - `OutputRule.Type` jako `"exit_code" | "match" | "not_match"` (výchozí
-    `"exit_code"` při prázdné hodnotě); u `match`/`not_match` povinný
-    `Pattern` platný jako `regexp`.
-  - Validační metoda (např. `(ActionCard) Validate() error` a obdobně pro
-    `Action`, `Settings`) pokrývající: povinná pole (id, název, primární
-    akce, příkaz), kladný timeout, kompilovatelnost regexu u `OutputRule`,
-    `Settings.HistorySize > 0`, `Settings.MaxConcurrentActions > 0`,
-    nezáporné `PollingIntervalSeconds`/`FastPollingIntervalSeconds`/
-    `FastPollingWindowSeconds` a `FastPollingIntervalSeconds <
-PollingIntervalSeconds`, pokud je standardní polling zapnutý.
-  - Konstantní výchozí hodnoty (`DefaultHistorySize = 20`,
+- **In scope**:
+  - Types `Action`, `OutputRule`, `ActionCard`, `Run`, `Settings` in
+    `internal/config`, including JSON tags for future (de)serialization.
+  - `OutputRule.Type` as `"exit_code" | "match" | "not_match"` (default
+    `"exit_code"` for an empty value); for `match`/`not_match` a mandatory
+    `Pattern` valid as a `regexp`.
+  - A validation method (e.g. `(ActionCard) Validate() error` and similarly
+    for `Action`, `Settings`) covering: mandatory fields (id, name, primary
+    action, command), positive timeout, compilability of the regex in
+    `OutputRule`, `Settings.HistorySize > 0`,
+    `Settings.MaxConcurrentActions > 0`, non-negative
+    `PollingIntervalSeconds`/`FastPollingIntervalSeconds`/
+    `FastPollingWindowSeconds` and `FastPollingIntervalSeconds <
+PollingIntervalSeconds` if standard polling is enabled.
+  - Constant default values (`DefaultHistorySize = 20`,
     `DefaultMaxConcurrentActions = 4`, `DefaultPollingIntervalSeconds = 60`,
     `DefaultFastPollingIntervalSeconds = 10`,
-    `DefaultFastPollingWindowSeconds = 120`) jako doporučené hodnoty pro
-    nově vytvářené karty (nastavuje volající, např. API vrstva ve fázi 5),
-    ne vynucené uvnitř `Validate()`.
-- **Mimo rozsah** (řeší jiné bloky): in-memory store/CRUD (0002), JSON
-  load/save a atomický zápis (0003), spouštění příkazů (fáze 3), HTTP API
-  (fáze 5).
+    `DefaultFastPollingWindowSeconds = 120`) as recommended values for
+    newly created cards (set by the caller, e.g. the API layer in Phase 5),
+    not enforced inside `Validate()`.
+- **Out of scope** (handled by other blocks): in-memory store/CRUD (0002),
+  JSON load/save and atomic write (0003), command execution (Phase 3), HTTP
+  API (Phase 5).
 
-## Návrh řešení
+## Proposed solution
 
 ```go
 package config
@@ -100,31 +101,32 @@ type Settings struct {
 }
 ```
 
-Přesné názvy/rozložení polí může implementace mírně upravit, ale musí
-zůstat kompatibilní s JSON strukturou popsanou v ADR-0004 (`settings` +
-`cards` na top-level, viz blok 0003). `FastPollingIntervalSeconds`/
-`FastPollingWindowSeconds` mají efekt jen když `PollingIntervalSeconds > 0`
-(FR-15a) — validace to nevynucuje jako chybu, jen dokumentuje chování pro
-scheduler (fáze 4). `RunOutcome` je třístavový (`ok`/`fail`/`timeout`)
-namísto booleovského `Success`, aby šlo v historii odlišit vynucenou
-terminaci (FR-19) od běžného neúspěchu.
+The implementation may slightly adjust the exact names/layout of the fields,
+but it must stay compatible with the JSON structure described in ADR-0004
+(`settings` + `cards` at the top level, see block 0003).
+`FastPollingIntervalSeconds`/`FastPollingWindowSeconds` only take effect
+when `PollingIntervalSeconds > 0` (FR-15a) — validation does not enforce
+this as an error, it only documents the behavior for the scheduler
+(Phase 4). `RunOutcome` has three states (`ok`/`fail`/`timeout`) instead of
+a boolean `Success`, so that the history can distinguish enforced
+termination (FR-19) from an ordinary failure.
 
-## Testovací plán
+## Test plan
 
-- Validace `ActionCard`: chybějící název/primární akce/příkaz → chyba.
-- `OutputRule`: `match`/`not_match` bez patternu → chyba; neplatný regex →
-  chyba; `exit_code` bez patternu → OK.
-- `Settings`: nula/záporné `HistorySize`/`MaxConcurrentActions` → chyba;
-  kladné hodnoty → OK.
-- Polling pole: záporné hodnoty → chyba; `FastPollingIntervalSeconds >=
-PollingIntervalSeconds` při zapnutém standardním pollingu → chyba;
-  `PollingIntervalSeconds == 0` s libovolnými fast-polling hodnotami → OK
-  (bez efektu, viz FR-15a).
-- Validní minimální `ActionCard` (jen primární akce, bez status akce, bez
-  pollingu) → OK.
+- `ActionCard` validation: missing name/primary action/command → error.
+- `OutputRule`: `match`/`not_match` without a pattern → error; invalid
+  regex → error; `exit_code` without a pattern → OK.
+- `Settings`: zero/negative `HistorySize`/`MaxConcurrentActions` → error;
+  positive values → OK.
+- Polling fields: negative values → error; `FastPollingIntervalSeconds >=
+PollingIntervalSeconds` with standard polling enabled → error;
+  `PollingIntervalSeconds == 0` with any fast-polling values → OK
+  (no effect, see FR-15a).
+- A valid minimal `ActionCard` (only a primary action, no status action, no
+  polling) → OK.
 
-## Kritérium hotovosti
+## Done criteria
 
-Viz [Definition of Done](../../devops/definition-of-done.md). Specificky:
-`go build ./...`, `go vet ./...`, `go test ./...` procházejí; nový balíček
-nemá žádné side-effecty (žádné I/O, žádné globální mutable state).
+See [Definition of Done](../../devops/definition-of-done.md). Specifically:
+`go build ./...`, `go vet ./...`, `go test ./...` pass; the new package has
+no side effects (no I/O, no global mutable state).

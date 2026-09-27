@@ -1,58 +1,63 @@
-# ADR-0005: Bezpečné spouštění akcí a limit souběžnosti
+# ADR-0005: Safe action execution and concurrency limit
 
-- **Stav**: Přijato
-- **Datum**: 2026-09-25
+- **Status**: Accepted
+- **Date**: 2026-09-25
 
-## Kontext
+## Context
 
-Fáze 3 musí spouštět příkazy definované v `config.Action` na hostiteli bez
-shellové interpolace, s povinným timeoutem, omezením výstupu a globálním
-limitem souběžných procesů. Výsledek se následně uloží jako `config.Run`.
+Phase 3 must run the commands defined in `config.Action` on the host
+without shell interpolation, with a mandatory timeout, output limiting and
+a global limit on concurrent processes. The result is then stored as a
+`config.Run`.
 
-## Rozhodnutí
+## Decision
 
-- Execution engine bude v balíčku `internal/exec` (název balíčku v Go bude
-  `execengine`, aby se nepletl se standardním `os/exec`).
-- Příkaz se spouští přes `os/exec.CommandContext(ctx, action.Command,
-action.Args...)`; `Dir` a `Env` se nastaví přímo na `exec.Cmd`. Nebude se
-  používat shell ani skládání příkazového řetězce.
-- Každé spuštění vytvoří `context.WithTimeout` z `Action.TimeoutSec`.
-  Po vypršení timeoutu se proces ukončí přes `CommandContext` a výsledek bude
-  `RunOutcomeTimeout`; proces nesmí zůstat běžet na pozadí.
-- Stdout a stderr se zachytí do jednoho společného limitovaného writeru o
-  velikosti 4096 bajtů. Překročení limitu nastaví `Run.Truncated`, ale samo o
-  sobě nezpůsobí chybu spuštění.
-- Exit kód, výstup, čas startu a duration budou součástí výsledku. Selhání
-  startu nebo běhu procesu se převede na `RunOutcomeFail`; chyba API bude
-  vyhrazena neplatnému vstupu nebo interní chybě engine.
-- Globální limit souběžnosti bude řešen buffered-channel semaforem. Každé
-  ruční i budoucí polling spuštění musí získat slot a po dokončení ho uvolnit;
-  akce nad limit čekají, nezahazují se.
-- Engine bude závislý na úzkém rozhraní/factory pro vytvoření procesu, aby
-  jednotkové testy nemusely spouštět reálné příkazy. Malý počet integračních
-  testů ověří skutečný `echo` a timeout.
+- The execution engine will live in the `internal/exec` package (the Go
+  package name will be `execengine` so it is not confused with the
+  standard `os/exec`).
+- The command is run via `os/exec.CommandContext(ctx, action.Command,
+action.Args...)`; `Dir` and `Env` are set directly on `exec.Cmd`. No
+  shell and no command-string assembly will be used.
+- Each run creates a `context.WithTimeout` from `Action.TimeoutSec`.
+  When the timeout expires, the process is terminated via `CommandContext`
+  and the result is `RunOutcomeTimeout`; the process must not keep running
+  in the background.
+- Stdout and stderr are captured into one shared limited writer of
+  4096 bytes. Exceeding the limit sets `Run.Truncated` but does not by
+  itself cause a run error.
+- Exit code, output, start time and duration are part of the result.
+  A failure to start or run the process is converted to `RunOutcomeFail`;
+  an API error is reserved for invalid input or an internal engine error.
+- The global concurrency limit is handled by a buffered-channel
+  semaphore. Every manual and future polling run must acquire a slot and
+  release it when finished; actions over the limit wait, they are not
+  dropped.
+- The engine will depend on a narrow interface/factory for creating the
+  process, so that unit tests do not have to run real commands. A small
+  number of integration tests will verify a real `echo` and a timeout.
 
-## Důsledky
+## Consequences
 
-- Uživatelský vstup se nikdy neinterpretuje jako shellový program.
-- Timeout a limit výstupu jsou vynuceny na jednom místě pro primární i status
-  akce.
-- Engine nebude řešit konfiguraci karet, polling ani HTTP API; ty patří do
-  config store, fáze 4 a fáze 5.
+- User input is never interpreted as a shell program.
+- Timeout and output limit are enforced in one place for both primary and
+  status actions.
+- The engine will not deal with card configuration, polling or the HTTP
+  API; those belong to the config store, phase 4 and phase 5.
 
-> Doplněno 2026-09-26 (blok 0024): terminace po timeoutu zabíjí celou
-> **procesní skupinu** akce (`Setpgid` + `SIGKILL` na `-pgid`), ne jen přímého
-> potomka, a `Cmd.WaitDelay` (2 s) ohraničuje čekání na uzavření výstupního
-> pipe drženého případnými přeživšími procesy. `Executor.Execute` a
-> `Runner.Run` přijímají kontext volajícího; jeho zrušení (shutdown,
-> rekonfigurace karty) ukončí proces s výsledkem `RunOutcomeCanceled`, který
-> se od `RunOutcomeTimeout` liší tím, že ho nevyvolal timeout akce. Status
-> check zrušený volajícím nemění poslední známý stav karty.
+> Added 2026-09-26 (block 0024): termination after a timeout kills the
+> action's whole **process group** (`Setpgid` + `SIGKILL` on `-pgid`), not
+> just the direct child, and `Cmd.WaitDelay` (2 s) bounds the wait for the
+> output pipe held by any surviving processes to close. `Executor.Execute`
+> and `Runner.Run` accept the caller's context; canceling it (shutdown,
+> card reconfiguration) terminates the process with the result
+> `RunOutcomeCanceled`, which differs from `RunOutcomeTimeout` in that it
+> was not caused by the action's timeout. A status check canceled by the
+> caller does not change the card's last known status.
 
-> Doplněno 2026-09-26 (blok 0034): adresář balíčku byl přejmenován na
-> `internal/execengine`, aby odpovídal názvu balíčku. Spouštěný proces
-> **nedědí prostředí služby**: dostane jen `PATH`, `HOME`, `LANG` a `TZ`
-> (pokud jsou nastavené) a proměnné z `Action.Env`, které mají přednost
-> (NFR-01 c). Dopad pro uživatele: proměnné definované v
-> `/etc/default/marionette` nebo v systemd jednotce nejsou akcím dostupné;
-> co akce potřebuje, musí mít v `env` karty.
+> Added 2026-09-26 (block 0034): the package directory was renamed to
+> `internal/execengine` to match the package name. The spawned process
+> **does not inherit the service environment**: it gets only `PATH`,
+> `HOME`, `LANG` and `TZ` (if set) and the variables from `Action.Env`,
+> which take precedence (NFR-01 c). Impact on users: variables defined in
+> `/etc/default/marionette` or in the systemd unit are not available to
+> actions; whatever an action needs must be in the card's `env`.

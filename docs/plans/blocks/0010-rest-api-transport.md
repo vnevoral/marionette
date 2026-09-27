@@ -1,71 +1,72 @@
-# Implementační blok: REST API kontrakt a HTTP transport
+# Implementation block: REST API contract and HTTP transport
 
-- **Fáze**: 5 — REST API
-- **Vazba na požadavky**: FR-40, FR-41, NFR-01
-- **Vazba na ADR**: ADR-0004, ADR-0005, ADR-0006
-- **Stav**: Hotovo
-- **Závislosti**: Bloky 0001–0009; schválený vývojový workflow
+- **Phase**: 5 — REST API
+- **Requirements**: FR-40, FR-41, NFR-01
+- **ADRs**: ADR-0004, ADR-0005, ADR-0006
+- **Status**: Done
+- **Dependencies**: Blocks 0001–0009; approved development workflow
 
-## Cíl bloku
+## Goal
 
-Backend poskytne stabilní REST/JSON transport pro health check, CRUD karet a
-read-only čtení běhů a posledního statusu. Čtení statusu je synchronní pouze
-jako rychlé načtení uložené projekce; nikdy nespouští status akci. Samostatné
-enqueue endpointy pro primární i ruční status akci vracejí potvrzení zařazení
-bez čekání na dokončení.
+The backend provides a stable REST/JSON transport for the health check,
+card CRUD and read-only reads of runs and the latest status. The status
+read is synchronous only as a fast load of the stored projection; it never
+runs the status action. Separate enqueue endpoints for the primary and the
+manual status action return an enqueue confirmation without waiting for
+completion.
 
-## Rozsah
+## Scope
 
-- **Uvnitř**:
-  - `GET /api/health` jako liveness endpoint;
+- **In scope**:
+  - `GET /api/health` as a liveness endpoint;
   - `GET/POST /api/cards`;
   - `GET/PUT/DELETE /api/cards/{id}`;
   - `GET /api/cards/{id}/runs`;
   - `GET /api/cards/{id}/status`;
   - `GET /api/cards/{id}/status/history`;
-  - dependency injection pro store a read-only aplikační služby;
-  - jednotný JSON error response a mapování HTTP stavů;
-  - bounded JSON body, odmítnutí neplatného JSON a neočekávaných trailing dat.
-- **Mimo rozsah**:
-  - akční enqueue endpointy a background execution manager (0011);
-  - scheduler lifecycle a reconcile (0012);
-  - autentizace, stránkování, async joby a settings endpoint;
-  - změny Vue UI.
+  - dependency injection for the store and read-only application services;
+  - a uniform JSON error response and HTTP status mapping;
+  - bounded JSON body, rejection of invalid JSON and unexpected trailing data.
+- **Out of scope**:
+  - action enqueue endpoints and the background execution manager (0011);
+  - scheduler lifecycle and reconcile (0012);
+  - authentication, pagination, async jobs and a settings endpoint;
+  - Vue UI changes.
 
-## Schválení
+## Approval
 
-- **Schválil**: čeká
-- **Datum schválení**: čeká
-- **Poznámky k rozhodnutí**: API používá existující JSON typy domény bez nové DTO vrstvy.
+- **Approved by**: pending
+- **Approval date**: pending
+- **Decision notes**: The API uses the existing domain JSON types without a new DTO layer.
 
-## Návrh řešení
+## Proposed solution
 
-Rozšířit `internal/server` o handler s injektovaným `config.Store` a rozhraními
-pro budoucí akční služby. Router bude zachovávat SPA fallback. Úspěšné
-odpovědi budou používat existující typy `ActionCard`, `Run`, `StatusSnapshot`
-a `StatusChange`.
+Extend `internal/server` with a handler with an injected `config.Store` and
+interfaces for future action services. The router will keep the SPA
+fallback. Successful responses will use the existing types `ActionCard`,
+`Run`, `StatusSnapshot` and `StatusChange`.
 
-Doporučené mapování chyb: malformed/validation `400`, `ErrNotFound` `404`,
-duplicate create `409`, neočekávaná chyba `500`. Chyby akčních enqueue
-endpointů jsou součástí bloku 0011.
-Všechny JSON odpovědi nastaví `Content-Type: application/json`.
+Recommended error mapping: malformed/validation `400`, `ErrNotFound` `404`,
+duplicate create `409`, unexpected error `500`. Errors of the action
+enqueue endpoints are part of block 0011.
+All JSON responses set `Content-Type: application/json`.
 
-## Testovací plán
+## Test plan
 
-- `httptest` pro health a všechny CRUD endpointy;
-- validní i nevalidní JSON, chybějící pole a trailing JSON;
-- `404`, `409` a `500` mapování;
-- čtení primární historie, posledního statusu a transition historie;
-- nepovolené HTTP metody a SPA fallback.
+- `httptest` for health and all CRUD endpoints;
+- valid and invalid JSON, missing fields and trailing JSON;
+- `404`, `409` and `500` mapping;
+- reading the primary history, the latest status and the transition history;
+- disallowed HTTP methods and the SPA fallback.
 
-## Kritérium hotovosti
+## Done criteria
 
-Viz [Definition of Done](../../devops/definition-of-done.md). Specificky:
-CRUD, read-only historie/status a strict JSON kontrakt jsou pokryté `httptest`
-testy a router nepoužívá globální stav.
+See [Definition of Done](../../devops/definition-of-done.md). Specifically:
+CRUD, read-only history/status and the strict JSON contract are covered by
+`httptest` tests and the router does not use global state.
 
-## Uzavření
+## Closure
 
-- **Stav po implementaci**: Hotovo
-- **Ověření**: `go test ./internal/server -count=1`
-- **Dokumentace aktualizována**: ano; akční enqueue zůstává v bloku 0011
+- **Status after implementation**: Done
+- **Verification**: `go test ./internal/server -count=1`
+- **Documentation updated**: yes; action enqueue remains in block 0011

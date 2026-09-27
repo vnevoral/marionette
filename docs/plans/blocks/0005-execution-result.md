@@ -1,46 +1,47 @@
-# Implementační blok: Zachycení výstupu a vyhodnocení výsledku
+# Implementation block: Output capture and result evaluation
 
-- **Fáze**: 3 — Execution engine
-- **Vazba na požadavky**: FR-13, FR-14, FR-17
-- **Vazba na ADR**: ADR-0005
-- **Stav**: Hotovo
+- **Phase**: 3 — Execution engine
+- **Requirements**: FR-13, FR-14, FR-17
+- **ADRs**: ADR-0005
+- **Status**: Done
 
-## Cíl bloku
+## Goal
 
-Po dokončení execution engine vytvoří kompletní `config.Run` z jednoho
-spuštění: zachytí kombinovaný stdout/stderr do 4 KB, označí oříznutí a
-vyhodnotí exit code nebo `OutputRule`.
+When done, the execution engine builds a complete `config.Run` from a
+single execution: it captures combined stdout/stderr up to 4 KB, marks
+truncation and evaluates the exit code or the `OutputRule`.
 
-## Rozsah
+## Scope
 
-- **Uvnitř**:
-  - společný limit stdout+stderr 4096 bajtů;
-  - `Run.Output` a `Run.Truncated`;
-  - `exit_code`, `match` a `not_match` pravidla;
-  - výsledek `ok`, `fail` nebo `timeout`;
-  - zachycení exit code i při neúspěšném procesu;
-  - testovatelná čistá funkce pro vyhodnocení výsledku.
-- **Mimo rozsah**:
-  - spouštění procesu a timeout (0004);
-  - globální souběžnost (0006);
-  - ukládání historie do store, polling a HTTP API.
+- **In scope**:
+  - a shared stdout+stderr limit of 4096 bytes;
+  - `Run.Output` and `Run.Truncated`;
+  - `exit_code`, `match` and `not_match` rules;
+  - the result `ok`, `fail` or `timeout`;
+  - capturing the exit code even for a failed process;
+  - a testable pure function for evaluating the result.
+- **Out of scope**:
+  - process execution and timeout (0004);
+  - global concurrency (0006);
+  - storing history in the store, polling and the HTTP API.
 
-## Návrh řešení
+## Proposed solution
 
-Rozšířit `internal/exec` o limitovaný writer a evaluator výsledku. Evaluator
-nebude znovu kompilovat regex při každém běhu; konfigurace je validována při
-uložení a načtení. Výstup se vyhodnocuje po oříznutí, v souladu s ADR-0004.
+Extend `internal/exec` with a limited writer and a result evaluator. The
+evaluator will not recompile the regex on every run; the configuration is
+validated on save and load. The output is evaluated after truncation, in
+line with ADR-0004.
 
-## Testovací plán
+## Test plan
 
-- exit code 0/ne-nula;
-- validní `match` a `not_match`, včetně prázdného a neodpovídajícího výstupu;
-- přesně 4096 bajtů a výstup nad limit;
-- kombinovaný stdout/stderr s limitem;
-- timeout má vždy `RunOutcomeTimeout`, i kdyby proces vrátil jiný exit code;
-- neplatné pravidlo je odmítnuto před spuštěním.
+- exit code 0/non-zero;
+- valid `match` and `not_match`, including empty and non-matching output;
+- exactly 4096 bytes and output over the limit;
+- combined stdout/stderr with the limit;
+- a timeout always has `RunOutcomeTimeout`, even if the process returned a different exit code;
+- an invalid rule is rejected before execution.
 
-## Kritérium hotovosti
+## Done criteria
 
-Viz Definition of Done. Specificky: jednotkové testy evaluatoru pokrývají
-hlavní i hraniční scénáře a `go test -race ./...` prochází.
+See Definition of Done. Specifically: the evaluator unit tests cover the
+main and edge scenarios and `go test -race ./...` passes.

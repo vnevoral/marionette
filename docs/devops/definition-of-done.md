@@ -1,29 +1,32 @@
-# Definition of Done (implementační blok)
+# Definition of Done (implementation block)
 
-Tento seznam je výstupní brána společného workflow popsaného v
-[development-workflow.md](development-workflow.md). Blok může být označen jako
-`Hotovo` až po splnění všech bodů.
+This list is the exit gate of the shared workflow described in
+[development-workflow.md](development-workflow.md). A block can be marked
+as `Done` only after all items are met.
 
-Blok je hotový, když jsou splněny všechny následující body:
+A block is done when all of the following items are met:
 
-- [ ] Blok byl před implementací ve stavu `Schváleno` a během práce je ve
-      stavu `Probíhá`.
-- [ ] Kód odpovídá schválenému návrhu v bloku (`docs/plans/blocks/...`); pokud
-      se návrh za implementace změnil, blok je aktualizován.
-- [ ] `make verify` prochází bez chyb (build UI, `golangci-lint`, `eslint`
-      s `--max-warnings 0`, `vue-tsc`, `prettier --check`, `go test -race`,
-      `go build`, `go vet`). Je to jediná definice validační sady; dílčí
-      příkazy (`make test`, `make lint`) slouží jen pro rychlou iteraci.
-      Blok, který mění UI tok nebo HTTP kontrakt, navíc spustí `make e2e`.
-- [ ] Nová/změněná doménová logika má jednotkové testy pokrývající hlavní i
-      chybové scénáře (viz [testing-strategy.md](testing-strategy.md)).
-- [ ] Veřejné API/chování je zdokumentováno (komentář na exportovaném
-      symbolu, případně aktualizace `docs/architecture/overview.md`).
-- [ ] Požadavky (`requirements.md`) a ADR, na které se blok odkazuje, souhlasí
-      se skutečnou implementací; případné rozpory jsou vyřešeny (aktualizace
-      dokumentu, ne tiché odchýlení).
-- [ ] `docs/plans/roadmap.md` má u příslušné fáze/bloku aktualizovaný stav.
-- [ ] Blok je po ověření označen jako `Hotovo` a jsou zaznamenané provedené
-      validační příkazy nebo důvod výjimky.
-- [ ] Žádná nová funkčnost navíc mimo schválený rozsah bloku (out of scope
-      položky se řeší jako nový blok, ne „mimochodem“).
+- [ ] Before implementation the block was in the `Approved` status, and
+      during the work it is in the `In progress` status.
+- [ ] The code matches the approved proposal in the block
+      (`docs/plans/blocks/...`); if the proposal changed during
+      implementation, the block is updated.
+- [ ] `make verify` passes without errors (UI build, `golangci-lint`, `eslint`
+      with `--max-warnings 0`, `vue-tsc`, `prettier --check`, `go test -race`,
+      `go build`, `go vet`). It is the single definition of the validation
+      suite; partial commands (`make test`, `make lint`) are only for fast
+      iteration. A block that changes a UI flow or the HTTP contract also
+      runs `make e2e`.
+- [ ] New/changed domain logic has unit tests covering both the main and
+      the error scenarios (see [testing-strategy.md](testing-strategy.md)).
+- [ ] The public API/behavior is documented (a comment on the exported
+      symbol, or an update of `docs/architecture/overview.md`).
+- [ ] The requirements (`requirements.md`) and ADRs the block refers to
+      agree with the actual implementation; any discrepancies are resolved
+      (by updating the document, not by silently deviating).
+- [ ] `docs/plans/roadmap.md` has an updated status for the relevant
+      phase/block.
+- [ ] After verification the block is marked as `Done` and the validation
+      commands run, or the reason for an exception, are recorded.
+- [ ] No extra functionality beyond the approved scope of the block (out of
+      scope items are handled as a new block, not "in passing").

@@ -1,79 +1,86 @@
-# Vývojový workflow
+# Development workflow
 
-Tento dokument je jediný normativní popis procesu plánování a implementace v
-projektu Marionette. `AGENTS.md`, roadmapa, implementační šablony, DevOps
-kontroly a prompty v `.github/prompts/` tento proces používají a nesmí zavádět
-paralelní metodiku.
+This document is the single normative description of the planning and
+implementation process in the Marionette project. `AGENTS.md`, the roadmap,
+the implementation templates, the DevOps checks and the prompts in
+`.github/prompts/` use this process and must not introduce a parallel
+methodology.
 
-## Životní cyklus
+## Lifecycle
 
-Každá nová funkce nebo změna prochází těmito kroky:
+Every new feature or change goes through these steps:
 
-1. **Požadavek** — popiš problém, uživatelský dopad a hranice změny.
-2. **Requirement** — zapiš nebo uprav testovatelný FR/NFR v
+1. **Request** — describe the problem, the user impact and the boundaries of
+   the change.
+2. **Requirement** — write or update a testable FR/NFR in
    `docs/requirements/requirements.md`.
-3. **ADR** — pokud změna ovlivňuje architekturu, perzistenci, veřejný protokol,
-   bezpečnost nebo technologii, připrav ADR. Implementace na něm může stavět až
-   po stavu `Přijato`.
-4. **Roadmapa** — zařaď práci do fáze a urč pořadí závislostí.
-5. **Implementační blok** — rozlož práci na malý, samostatně ověřitelný blok
-   podle `docs/plans/template-implementation-block.md`.
-6. **Schválení** — blok musí být ve stavu `Schváleno`; samotný stav `Návrh`
-   neopravňuje k implementaci.
-7. **Implementace** — změň pouze schválený rozsah, přidej testy a proveď
-   ověření podle bloku a Definition of Done.
-8. **Uzavření** — aktualizuj stav bloku a roadmapy, dokumentaci, ADR/requirements
-   při odchylce a uveď provedené kontroly.
+3. **ADR** — if the change affects architecture, persistence, a public
+   protocol, security or technology, prepare an ADR. Implementation can build
+   on it only once it is `Accepted`.
+4. **Roadmap** — place the work into a phase and determine the dependency
+   order.
+5. **Implementation block** — break the work down into a small,
+   independently verifiable block per
+   `docs/plans/template-implementation-block.md`.
+6. **Approval** — the block must be in the `Approved` status; the `Proposed`
+   status alone does not authorize implementation.
+7. **Implementation** — change only the approved scope, add tests and perform
+   the verification per the block and the Definition of Done.
+8. **Closure** — update the status of the block and the roadmap, the
+   documentation, the ADR/requirements in case of a deviation, and list the
+   checks performed.
 
-Plánovací kroky (`/new-requirement`, `/new-adr`, `/plan-block`) nemění zdrojový
-kód ani nespouštějí implementaci. Implementační krok (`/implement-block`) nesmí
-začít bez schváleného bloku.
+The planning steps (`/new-requirement`, `/new-adr`, `/plan-block`) do not
+change source code or start implementation. The implementation step
+(`/implement-block`) must not start without an approved block.
 
-## Stavy a přechody
+## Statuses and transitions
 
-- `Návrh` — artefakt je připraven k připomínkám, není implementovatelný.
-- `Schváleno` — rozsah, vazby a testovací plán byly potvrzeny.
-- `Probíhá` — implementace schváleného bloku začala.
-- `Hotovo` — Definition of Done je splněna a ověření je zaznamenané.
-- `Zablokováno` — práce nemůže pokračovat kvůli konkrétní překážce.
-- `Zamítnuto` — návrh se nebude realizovat; důvod zůstává v dokumentaci.
+- `Proposed` — the artifact is ready for comments, it is not implementable.
+- `Approved` — the scope, links and test plan have been confirmed.
+- `In progress` — implementation of the approved block has started.
+- `Done` — the Definition of Done is met and the verification is recorded.
+- `Blocked` — work cannot continue because of a specific obstacle.
+- `Rejected` — the proposal will not be implemented; the reason stays in the
+  documentation.
 
-Povolený běžný přechod je `Návrh` → `Schváleno` → `Probíhá` → `Hotovo`.
-Přechod do `Zablokováno` nebo `Zamítnuto` musí uvést důvod. Změna
-schváleného rozsahu se nejdříve promítne do requirementu, ADR nebo nového
-implementačního bloku; nepřidává se neohlášeně během implementace.
+The allowed regular transition is `Proposed` → `Approved` → `In progress` →
+`Done`. A transition to `Blocked` or `Rejected` must state the reason. A
+change of the approved scope is first reflected in a requirement, ADR or a
+new implementation block; it is not added unannounced during implementation.
 
-## Brány kvality
+## Quality gates
 
-Před implementací ověř:
+Before implementation, verify:
 
-- requirement pokrývá požadované chování;
-- související ADR je `Přijato`, pokud je potřeba;
-- blok má jasný cíl, rozsah včetně out-of-scope, návrh řešení, testovací plán,
-  závislosti a kritérium hotovosti;
-- blok je uvedený v roadmapě a má stav `Schváleno`.
+- the requirement covers the requested behavior;
+- the related ADR is `Accepted`, if needed;
+- the block has a clear goal, a scope including out-of-scope, a proposed
+  solution, a test plan, dependencies and done criteria;
+- the block is listed in the roadmap and has the `Approved` status.
 
-Před uzavřením ověř:
+Before closure, verify:
 
-- implementace odpovídá schválenému rozsahu;
-- testy pokrývají hlavní i chybové scénáře;
-- `make verify` prošel (jediná definice validační sady pro Go i web, viz
-  `Makefile`);
-- veřejné chování a dokumentace odpovídají skutečnosti;
-- roadmapa a stav bloku jsou aktualizované.
+- the implementation matches the approved scope;
+- tests cover both the main and the error scenarios;
+- `make verify` passed (the single definition of the validation suite for
+  both Go and web, see `Makefile`);
+- the public behavior and the documentation match reality;
+- the roadmap and the block status are updated.
 
-Podrobný uzavírací seznam je v
-[Definition of Done](definition-of-done.md). Pokud kontrola selže, blok není
-`Hotovo`.
+The detailed closure checklist is in the
+[Definition of Done](definition-of-done.md). If a check fails, the block is
+not `Done`.
 
-## Odchylky a urgentní opravy
+## Deviations and urgent fixes
 
-Když implementace odhalí neřešitelný rozpor nebo potřebu mimo rozsah, zastav
-změnu, popiš dopad a založ nový requirement, ADR nebo blok. U urgentní opravy
-je dovoleno provést minimální zásah před úplným plánováním pouze kvůli obnově
-funkčnosti nebo bezpečnosti; bezprostředně poté se doplní chybějící artefakty,
-testy a odkaz na důvod výjimky.
+When implementation reveals an unresolvable conflict or a need outside the
+scope, stop the change, describe the impact and create a new requirement,
+ADR or block. For an urgent fix, a minimal intervention before full planning
+is allowed only to restore functionality or security; the missing artifacts,
+tests and a reference to the reason for the exception are added immediately
+afterwards.
 
-Historické ADR, requirements a dokončené bloky se nemění kvůli nové metodice
-bez zachování historie. Opravují se pouze faktické rozpory, odkazy a stavové
-údaje potřebné pro konzistenci.
+Historical ADRs, requirements and completed blocks are not changed because of
+a new methodology without preserving history. Only factual inconsistencies,
+links and status data needed for consistency are corrected.

@@ -1,48 +1,51 @@
-# Implementační blok: Spuštění procesu a vynucený timeout
+# Implementation block: Process launch and enforced timeout
 
-- **Fáze**: 3 — Execution engine
-- **Vazba na požadavky**: FR-11, FR-19, NFR-01, NFR-04
-- **Vazba na ADR**: ADR-0005
-- **Stav**: Hotovo
+- **Phase**: 3 — Execution engine
+- **Requirements**: FR-11, FR-19, NFR-01, NFR-04
+- **ADRs**: ADR-0005
+- **Status**: Done
 
-## Cíl bloku
+## Goal
 
-Po dokončení existuje základ execution engine v `internal/exec`, který spustí
-jednu validní `config.Action` bez shellu, nastaví pracovní adresář a prostředí
-a po timeoutu proces vynuceně ukončí. Blok ještě neřeší globální frontu ani
-polling.
+When done, the foundation of the execution engine exists in
+`internal/exec`; it runs a single valid `config.Action` without a shell,
+sets the working directory and environment, and forcibly terminates the
+process after the timeout. The block does not yet handle the global queue
+or polling.
 
-## Rozsah
+## Scope
 
-- **Uvnitř**:
-  - veřejný executor API pro jedno spuštění akce;
-  - `os/exec.CommandContext` se strukturovanými argumenty;
-  - `Action.Dir` a `Action.Env`;
-  - `context.WithTimeout` podle `Action.TimeoutSec`;
-  - rozlišení dokončení, chyby procesu a timeoutu;
-  - zachování start time a duration v interním výsledku.
-- **Mimo rozsah**:
-  - výstupní limit a regex/exit-code vyhodnocení (0005);
-  - globální semaphore/fronta (0006);
-  - zápis `Run` do config store, HTTP API a polling.
+- **In scope**:
+  - a public executor API for a single action run;
+  - `os/exec.CommandContext` with structured arguments;
+  - `Action.Dir` and `Action.Env`;
+  - `context.WithTimeout` based on `Action.TimeoutSec`;
+  - distinguishing completion, process error and timeout;
+  - keeping the start time and duration in the internal result.
+- **Out of scope**:
+  - output limit and regex/exit-code evaluation (0005);
+  - global semaphore/queue (0006);
+  - writing `Run` to the config store, HTTP API and polling.
 
-## Návrh řešení
+## Proposed solution
 
-Nový balíček `internal/exec` s package name `execengine`. Executor bude mít
-malou testovatelnou abstrakci nad tvorbou procesu. Výsledkem bude struktura,
-kterou další blok převede na `config.Run`; timeout bude jednoznačně označen.
+A new package `internal/exec` with the package name `execengine`. The
+executor will have a small testable abstraction over process creation.
+The result will be a structure that the next block converts to
+`config.Run`; a timeout will be marked unambiguously.
 
-## Testovací plán
+## Test plan
 
-- validní příkaz s argumentem a pracovním adresářem;
-- předání proměnné prostředí;
-- neexistující příkaz skončí jako chyba procesu bez pádu serveru;
-- dlouhý příkaz po timeoutu skončí a nevisí dál;
-- duration a timeout jsou deterministicky rozlišitelné;
-- unit testy používají fake factory, integrační test timeoutu použije malý
-  reálný příkaz.
+- a valid command with an argument and a working directory;
+- passing an environment variable;
+- a nonexistent command ends as a process error without crashing the
+  server;
+- a long command ends after the timeout and does not keep hanging;
+- duration and timeout are deterministically distinguishable;
+- unit tests use a fake factory, the timeout integration test uses a
+  small real command.
 
-## Kritérium hotovosti
+## Done criteria
 
-Viz Definition of Done. Specificky: `go test -race ./...` a ověření, že po
-timeoutu nezůstává spuštěný child process.
+See Definition of Done. Specifically: `go test -race ./...` and
+verification that no child process is left running after the timeout.

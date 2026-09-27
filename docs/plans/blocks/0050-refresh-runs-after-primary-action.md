@@ -1,112 +1,116 @@
-# Implementační blok: Běh primární akce se objeví v detailu bez obnovení stránky
+# Implementation block: A primary action run appears in the detail without a page reload
 
-- **Fáze**: 8 — Zpevnění (dodatek po uzavření fáze)
-- **Vazba na požadavky**: FR-21, FR-17, FR-27
-- **Vazba na ADR**: ADR-0008 (SSE se nemění); nové ADR není potřeba
-- **Stav**: Hotovo
-- **Závislosti**: Bloky 0029, 0039 (průběh akce), 0049 (zpětná vazba
-  v panelu Actions)
+- **Phase**: 8 — Hardening (addendum after the phase was closed)
+- **Requirements**: FR-21, FR-17, FR-27
+- **ADRs**: ADR-0008 (SSE does not change); no new ADR is needed
+- **Status**: Done
+- **Dependencies**: Blocks 0029, 0039 (action progress), 0049 (feedback
+  in the Actions panel)
 
-## Cíl bloku
+## Goal
 
-Po **Run action** v detailu karty se běh v sekci **Recent runs** často
-neobjeví. Detail načte běhy jednou: hned po **Action accepted** (karta bez
-následné kontroly), nebo jakmile je vidět novější status kontrola. Primární
-akce v tu chvíli ale často ještě běží nebo čeká ve frontě, takže seznam
-zůstane beze změny, dokud uživatel stránku neobnoví. Nález pochází
-z nestabilního E2E scénáře (blok 0049, uzavření).
+After **Run action** in the card detail, the run often does not appear in
+the **Recent runs** section. The detail loads runs once: right after
+**Action accepted** (a card without a follow-up check), or as soon as a
+newer status check is visible. At that moment, however, the primary action
+is often still running or waiting in the queue, so the list stays unchanged
+until the user reloads the page. The finding comes from a flaky E2E
+scenario (block 0049, closure).
 
-Po dokončení bloku detail počká na nový běh a zobrazí ho, jakmile ho server
-zapíše.
+When the block is done, the detail waits for the new run and shows it as
+soon as the server records it.
 
-## Rozsah
+## Scope
 
-- **Uvnitř**:
-  - `CardDetailView` / `useCardActivity`: po přijetí primární akce
-    (`202`) se běhy načítají znovu v intervalu **zrychleného pollingu
-    karty** (`fastPollingIntervalSeconds`), a pokud ho karta nemá
-    nastavený, každé **2 s**, dokud se neobjeví běh
-    novější než nejnovější běh známý před kliknutím, nebo dokud nevyprší
-    rozpočet `primary.timeoutSec + 30 s` (rezerva na frontu, stejná jako
-    u ruční kontroly, UX spec §4). Porovnává se `startedAt` nového běhu se
-    `startedAt` dosud nejnovějšího běhu ze serveru, ne s hodinami
-    prohlížeče (odolné vůči posunu času);
-  - platí pro kartu bez následné kontroly i pro kartu, kde kontrola
-    proběhne dřív, než primární akce skončí; status historie se dál načítá
-    podle dnešních pravidel;
-  - čekání na běh neblokuje tlačítka (ta se uvolní podle dnešní logiky
-    stavu požadavku) a skončí při odchodu ze stránky, změně karty nebo
-    novém spuštění akce;
-  - chyba čtení běhů během čekání se zobrazí jako dnes
-    (**Run history is unavailable**) a čekání pokračuje;
-  - UX specifikace §6 (Actions, Recent runs);
-  - testy: Vitest `CardDetailView` (běh přibude až po několika dotazech;
-    rozpočet vyprší; odchod ze stránky čekání ukončí) a E2E scénář
-    `creates, runs, checks and deletes a card` bez nestability.
-- **Mimo rozsah**:
-  - nová SSE událost pro dokončení běhu (změna kontraktu ADR-0008; zvážit
-    až při potřebě živé historie i na dashboardu);
-  - historie běhů na dashboardu (dashboard ji nezobrazuje);
-  - změny backendu nebo API.
+- **In scope**:
+  - `CardDetailView` / `useCardActivity`: after the primary action is
+    accepted (`202`), runs are reloaded at the card's **fast polling
+    interval** (`fastPollingIntervalSeconds`), and if the card does not
+    have it set, every **2 s**, until a run appears that is
+    newer than the newest run known before the click, or until the budget
+    `primary.timeoutSec + 30 s` expires (queue reserve, the same as for a
+    manual check, UX spec §4). The `startedAt` of the new run is compared
+    with the `startedAt` of the newest run so far from the server, not with
+    the browser clock (robust against time drift);
+  - applies to a card without a follow-up check and also to a card where
+    the check completes before the primary action finishes; the status
+    history keeps loading according to the current rules;
+  - waiting for the run does not block the buttons (they are released
+    according to the current request state logic) and ends on leaving the
+    page, changing the card or starting the action again;
+  - an error reading runs during the wait is shown as today
+    (**Run history is unavailable**) and the wait continues;
+  - UX specification §6 (Actions, Recent runs);
+  - tests: Vitest `CardDetailView` (the run appears only after several
+    queries; the budget expires; leaving the page ends the wait) and the
+    E2E scenario `creates, runs, checks and deletes a card` without
+    flakiness.
+- **Out of scope**:
+  - a new SSE event for run completion (an ADR-0008 contract change;
+    consider it only when a live history is needed on the dashboard too);
+  - run history on the dashboard (the dashboard does not display it);
+  - backend or API changes.
 
-## Schválení
+## Approval
 
-- **Schválil**: projektový vlastník
-- **Datum schválení**: 2026-09-27
-- **Poznámky k rozhodnutí**: Vlastník určil, že interval dotazů na běhy
-  není pevných 2 s, ale zrychlený polling interval karty
-  (`fastPollingIntervalSeconds`); 2 s jen jako výchozí hodnota, když
-  karta parametr nemá.
+- **Approved by**: project owner
+- **Approval date**: 2026-09-27
+- **Decision notes**: The owner determined that the interval for querying
+  runs is not a fixed 2 s but the card's fast polling interval
+  (`fastPollingIntervalSeconds`); 2 s only as the default when the card
+  does not have the parameter.
 
-## Návrh řešení
+## Proposed solution
 
-- `useCardActivity` dostane `waitForNewRun({ after, signal, maxWaitMs })`:
-  cyklus `getRuns` s intervalem `intervalMs`, výsledek `found | timeout |
-  aborted`; při `found` nastaví `runs`. `after` je `startedAt` prvního
-  (nejnovějšího) běhu v `runs` před odesláním požadavku (`undefined` =
-  zatím žádný běh).
-- `CardDetailView.runAction` pro `primary` po `202` spustí čekání na běh
-  souběžně s čekáním na status (`requestAction`) a sdílí s ním
-  `AbortController`, aby ho `loadDetail` i `onBeforeUnmount` ukončily.
-- Interval: `card.fastPollingIntervalSeconds * 1000`, jinak výchozí 2 s
-  (`runPollIntervalMs(card)`); rezerva na frontu (30 s) se převezme
-  z `useCardStatus`, aby byla definovaná jednou.
+- `useCardActivity` gets `waitForNewRun({ after, signal, maxWaitMs })`:
+  a `getRuns` loop with interval `intervalMs`, result `found | timeout |
+  aborted`; on `found` it sets `runs`. `after` is the `startedAt` of the
+  first (newest) run in `runs` before the request is sent (`undefined` =
+  no run yet).
+- `CardDetailView.runAction` for `primary`, after `202`, starts waiting for
+  the run concurrently with waiting for the status (`requestAction`) and
+  shares an `AbortController` with it, so that both `loadDetail` and
+  `onBeforeUnmount` end it.
+- Interval: `card.fastPollingIntervalSeconds * 1000`, otherwise the default
+  2 s (`runPollIntervalMs(card)`); the queue reserve (30 s) is taken over
+  from `useCardStatus` so that it is defined once.
 
-## Testovací plán
+## Test plan
 
-- Vitest s falešnými časovači: první dva `getRuns` vrátí starý seznam,
-  třetí nový běh → běh je vidět a dotazy skončí; bez nového běhu dotazy
-  skončí po rozpočtu; odchod ze stránky a nové spuštění akce předchozí
-  čekání zruší; chyba jednoho dotazu ukáže chybu a čekání pokračuje.
-- `make e2e` opakovaně (`--repeat-each 5` pro `card-lifecycle`).
+- Vitest with fake timers: the first two `getRuns` return the old list,
+  the third a new run → the run is visible and the queries stop; without a
+  new run the queries stop after the budget; leaving the page and starting
+  the action again cancel the previous wait; an error in one query shows
+  the error and the wait continues.
+- `make e2e` repeatedly (`--repeat-each 5` for `card-lifecycle`).
 - `make verify`.
 
-## Kritérium hotovosti
+## Done criteria
 
-Viz [Definition of Done](../../devops/definition-of-done.md) +:
+See [Definition of Done](../../devops/definition-of-done.md) plus:
 
-- po **Run action** v detailu se nový běh objeví v **Recent runs** nejvýš
-  jeden interval (zrychlený polling karty, výchozí 2 s) od jeho zápisu na
-  serveru, bez obnovení stránky.
+- after **Run action** in the detail, the new run appears in
+  **Recent runs** at most one interval (the card's fast polling, default
+  2 s) after it is recorded on the server, without a page reload.
 
-## Uzavření
+## Closure
 
-- **Stav po implementaci**: Hotovo (2026-09-27)
-- **Ověření**: `make verify` prošel (174 testů Vitest, `install_test`,
+- **Status after implementation**: Done (2026-09-27)
+- **Verification**: `make verify` passed (174 Vitest tests, `install_test`,
   `release_version_test`, golangci-lint, eslint, vue-tsc, prettier,
-  `go test -race`); `make e2e` prošel (17 scénářů);
-  `npx playwright test e2e/card-lifecycle.e2e.ts --repeat-each 5` prošel
-  (30/30) — nestabilita z bloku 0049 se neopakovala.
-- **Implementace**: `useCardActivity.waitForNewRun(card, previousStartedAt)`
-  (dotazy v intervalu `runPollIntervalMs(card)`, termín
-  `runWaitBudgetMs(card)` jako samostatný časovač, zrušení při novém
-  čekání, `reset()` a odchodu ze stránky), `requestAction` s callbackem
-  `onAccepted`, `CardDetailView` po výsledku akce načítá jen status
-  historii (běhy obstará čekání, takže pomalé starší čtení nepřepíše nový
-  seznam). Nové testy s falešnými časovači v `CardDetailView.spec.ts`
-  (interval 2 s, interval zrychleného pollingu 10 s, rozpočet, chyba
-  čtení, odchod ze stránky).
-- **Odchylky od návrhu**: čekání vlastní `useCardActivity` (ne
-  `CardDetailView`), aby view zůstalo pod 300 řádků; po dokončení status
-  kontroly se znovu načítá jen historie, ne běhy.
-- **Dokumentace aktualizována**: ano — UX specifikace §6, roadmapa.
+  `go test -race`); `make e2e` passed (17 scenarios);
+  `npx playwright test e2e/card-lifecycle.e2e.ts --repeat-each 5` passed
+  (30/30) — the flakiness from block 0049 did not recur.
+- **Implementation**: `useCardActivity.waitForNewRun(card, previousStartedAt)`
+  (queries at interval `runPollIntervalMs(card)`, deadline
+  `runWaitBudgetMs(card)` as a separate timer, cancellation on a new wait,
+  on `reset()` and on leaving the page), `requestAction` with an
+  `onAccepted` callback, `CardDetailView` loads only the status history
+  after the action result (runs are handled by the wait, so a slow older
+  read does not overwrite the new list). New tests with fake timers in
+  `CardDetailView.spec.ts` (2 s interval, 10 s fast polling interval,
+  budget, read error, leaving the page).
+- **Deviations from the plan**: the wait is owned by `useCardActivity`
+  (not `CardDetailView`), so that the view stays under 300 lines; after a
+  status check completes, only the history is reloaded, not the runs.
+- **Documentation updated**: yes — UX specification §6, roadmap.

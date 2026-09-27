@@ -1,43 +1,45 @@
-# Implementační blok: {název}
+# Implementation block: {name}
 
-- **Fáze**: {číslo a název fáze z roadmap.md}
-- **Vazba na požadavky**: {FR-xx, NFR-xx}
-- **Vazba na ADR**: {ADR-xxxx, pokud relevantní}
-- **Stav**: Návrh | Schváleno | Probíhá | Hotovo | Zablokováno | Zamítnuto
-- **Závislosti**: {předchozí bloky, requirements nebo ADR}
+- **Phase**: {phase number and name from roadmap.md}
+- **Requirements**: {FR-xx, NFR-xx}
+- **ADRs**: {ADR-xxxx, if relevant}
+- **Status**: Proposed | Approved | In progress | Done | Blocked | Rejected
+- **Dependencies**: {previous blocks, requirements or ADRs}
 
-## Cíl bloku
+## Goal
 
-Jedna až dvě věty — co po dokončení bloku bude fungovat, co ne.
+One or two sentences — what will work after the block is done, and what
+will not.
 
-## Rozsah
+## Scope
 
-- Co je uvnitř (in scope)
-- Co je záměrně mimo (out of scope) — ať to agent nezkouší dodělávat navíc
+- What is inside (in scope)
+- What is deliberately outside (out of scope) — so the agent does not try
+  to add it on top
 
-## Schválení
+## Approval
 
-- **Schválil**: {uživatel/projektový vlastník}
-- **Datum schválení**: {YYYY-MM-DD, nebo „čeká“}
-- **Poznámky k rozhodnutí**: {volitelné}
+- **Approved by**: {user/project owner}
+- **Approval date**: {YYYY-MM-DD, or "pending"}
+- **Decision notes**: {optional}
 
-## Návrh řešení
+## Proposed solution
 
-Stručně: nové/měněné balíčky, veřejné funkce/typy, datové struktury, API
-kontrakt (pokud relevantní).
+Briefly: new/changed packages, public functions/types, data structures,
+API contract (if relevant).
 
-## Testovací plán
+## Test plan
 
-- Jednotkové testy: co se testuje a jaké edge-case
-- Manuální/integrační ověření (pokud automatizace není možná/účelná)
+- Unit tests: what is tested and which edge cases
+- Manual/integration verification (if automation is not possible/useful)
 
-## Kritérium hotovosti
+## Done criteria
 
-Viz [Definition of Done](../devops/definition-of-done.md) + specifické body
-pro tento blok (pokud nějaké jsou).
+See [Definition of Done](../devops/definition-of-done.md) plus specific
+points for this block (if any).
 
-## Uzavření
+## Closure
 
-- **Stav po implementaci**: {Hotovo | Zablokováno | Zamítnuto}
-- **Ověření**: {příkazy a výsledek}
-- **Dokumentace aktualizována**: {ano/ne, odkazy}
+- **Status after implementation**: {Done | Blocked | Rejected}
+- **Verification**: {commands and result}
+- **Documentation updated**: {yes/no, links}

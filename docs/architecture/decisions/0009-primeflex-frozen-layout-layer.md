@@ -1,59 +1,65 @@
-# ADR-0009: PrimeFlex jako zamrzlá layout vrstva pro MVP
+# ADR-0009: PrimeFlex as a frozen layout layer for the MVP
 
-- **Stav**: Nahrazeno ADR-0010
-- **Datum**: 2026-09-26
+- **Status**: Superseded by ADR-0010
+- **Date**: 2026-09-26
 
-## Kontext
+## Context
 
-Bloky 0019 a 0020 zavedly PrimeFlex 4 jako závaznou utility vrstvu pro
-layout (grid, flex, spacing) vedle PrimeVue komponent a vlastních design
-tokenů. Revize projektu 2026-09-26 upozornila, že upstream PrimeFlex je
-zamrzlý na verzi 4.0.0 (únor 2025), PrimeTek ho dále nerozvíjí a jako
-náhradu doporučuje Tailwind CSS s pluginem `tailwindcss-primeui`. PrimeFlex
-navíc tahá kompletní CSS bez tree-shakingu (~370 kB CSS v bundlu před gzip
-společně s Aura theme). Projekt potřebuje rozhodnout, zda do fáze 8 a dál
-stavět na zamrzlé knihovně, nebo migrovat.
+Blocks 0019 and 0020 introduced PrimeFlex 4 as the mandatory utility layer
+for layout (grid, flex, spacing) alongside PrimeVue components and our own
+design tokens. The 2026-09-26 project review pointed out that upstream
+PrimeFlex is frozen at version 4.0.0 (February 2025), PrimeTek no longer
+develops it and recommends Tailwind CSS with the `tailwindcss-primeui`
+plugin as a replacement. PrimeFlex also pulls in the complete CSS without
+tree-shaking (~370 kB of CSS in the bundle before gzip together with the
+Aura theme). The project needs to decide whether to keep building on a
+frozen library into phase 8 and beyond, or to migrate.
 
-## Rozhodnutí
+## Decision
 
-PrimeFlex 4.0.0 zůstává layout vrstvou Marionette po dobu MVP jako
-**zamrzlá, ale dostačující** závislost. Nezavádí se žádná další utility
-knihovna a nemigruje se na Tailwind. Podmínky:
+PrimeFlex 4.0.0 remains Marionette's layout layer for the duration of the
+MVP as a **frozen but sufficient** dependency. No further utility library
+is introduced and there is no migration to Tailwind. Conditions:
 
-- verze je pevně připnutá (`4.0.0`, bez `^`) a Dependabot ji neaktualizuje;
-- nové obrazovky používají pouze podmnožinu tříd již použitou v projektu
-  (grid, flex, gap, spacing, display, text alignment) — rozsah je
-  zdokumentován v UX specifikaci;
-- veškeré vizuální přizpůsobení PrimeVue komponent jde přes `definePreset`
-  a design tokeny (blok 0033), ne přes `!important` nebo PrimeFlex přepisy;
-- rozhodnutí se znovu otevře, pokud (a) PrimeVue 5 přestane být s PrimeFlex
-  kompatibilní a projekt bude chtít na PrimeVue 5 přejít (viz ADR-0003),
-  nebo (b) velikost CSS bundlu začne měřitelně zpomalovat načtení na
-  Raspberry Pi (NFR-03).
+- the version is pinned exactly (`4.0.0`, without `^`) and Dependabot does
+  not update it;
+- new screens use only the subset of classes already used in the project
+  (grid, flex, gap, spacing, display, text alignment) — the scope is
+  documented in the UX specification;
+- all visual customization of PrimeVue components goes through
+  `definePreset` and design tokens (block 0033), not through `!important`
+  or PrimeFlex overrides;
+- the decision is reopened if (a) PrimeVue 5 stops being compatible with
+  PrimeFlex and the project wants to move to PrimeVue 5 (see ADR-0003),
+  or (b) the CSS bundle size starts measurably slowing down loading on
+  the Raspberry Pi (NFR-03).
 
-## Zvažované alternativy
+## Considered alternatives
 
-- **Migrace na Tailwind CSS + `tailwindcss-primeui`** — aktivně udržované,
-  tree-shaking, oficiální směr PrimeTek. Zamítnuto pro MVP: vyžaduje
-  přepis všech tří view a komponent, zavádí PostCSS build krok a nový
-  slovník tříd bez uživatelského přínosu; hodí se jako samostatná fáze po
-  stabilizaci (fáze 8).
-- **Odstranění utility vrstvy, pouze scoped CSS + tokeny** — nejmenší
-  závislosti, ale opakuje layout kód napříč view a jde proti blokům
-  0019/0020, které duplicitní scoped CSS právě odstraňovaly. Zamítnuto.
-- **Ponechat PrimeFlex bez omezení** — riziko tichého rozšiřování závislosti
-  na zamrzlé knihovně. Zamítnuto ve prospěch podmíněného zmrazení výše.
+- **Migrating to Tailwind CSS + `tailwindcss-primeui`** — actively
+  maintained, tree-shaking, PrimeTek's official direction. Rejected for
+  the MVP: it requires rewriting all three views and components,
+  introduces a PostCSS build step and a new class vocabulary with no user
+  benefit; it fits as a separate phase after stabilization (phase 8).
+- **Removing the utility layer, only scoped CSS + tokens** — fewest
+  dependencies, but repeats layout code across views and goes against
+  blocks 0019/0020, which removed exactly that duplicated scoped CSS.
+  Rejected.
+- **Keep PrimeFlex without restrictions** — risk of silently growing the
+  dependency on a frozen library. Rejected in favor of the conditional
+  freeze above.
 
-## Důsledky
+## Consequences
 
-- Žádná práce navíc ve fázi 8; bloky 0029, 0032 a 0033 staví na stávajícím
-  layoutu.
-- Bundle CSS zůstává větší, než by byl s tree-shakingem; pro LAN nasazení
-  a jednotky karet je to přijatelné (NFR-03 měřeno na referenčním hostu).
-- Upgrade na PrimeVue 5 bude vyžadovat revizi tohoto ADR společně s
+- No extra work in phase 8; blocks 0029, 0032 and 0033 build on the
+  existing layout.
+- The CSS bundle stays larger than it would be with tree-shaking; for a
+  LAN deployment and a handful of cards this is acceptable (NFR-03
+  measured on the reference host).
+- An upgrade to PrimeVue 5 will require revisiting this ADR together with
   ADR-0003.
-- `docs/devops/ci-cd.md` (verzování závislostí) a UX specifikace uvádějí
-  PrimeFlex jako připnutou závislost s omezenou sadou tříd.
+- `docs/devops/ci-cd.md` (dependency versioning) and the UX specification
+  list PrimeFlex as a pinned dependency with a limited set of classes.
 
-> Nahrazeno 2026-09-26: PrimeFlex byl odstraněn a nahrazen vlastní utility
-> vrstvou, viz [ADR-0010](0010-own-layout-utilities-replace-primeflex.md).
+> Superseded 2026-09-26: PrimeFlex was removed and replaced by our own
+> utility layer, see [ADR-0010](0010-own-layout-utilities-replace-primeflex.md).

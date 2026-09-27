@@ -1,59 +1,62 @@
-# Implementační blok: Dashboard karet a ovládání akcí
+# Implementation block: Card dashboard and action controls
 
-- **Fáze**: 6 — Dashboard UI
-- **Vazba na požadavky**: FR-20, FR-21, FR-23, FR-40
-- **Vazba na ADR**: ADR-0003, ADR-0004, ADR-0006
-- **Stav**: Hotovo
-- **Závislosti**: Bloky 0010–0012, REST API v `internal/server`
+- **Phase**: 6 — Dashboard UI
+- **Requirements**: FR-20, FR-21, FR-23, FR-40
+- **ADRs**: ADR-0003, ADR-0004, ADR-0006
+- **Status**: Done
+- **Dependencies**: Blocks 0010–0012, REST API in `internal/server`
 
-## Cíl bloku
+## Goal
 
-Dashboard zobrazí všechny akční karty v přehledné mřížce, načte jejich poslední
-známý status a umožní asynchronně zařadit primární nebo ruční status akci.
-Konfigurace karet, historie a detailní CRUD editor zůstávají v navazujících
-blocích.
+The dashboard shows all action cards in a clear grid, loads their last
+known status and allows asynchronously enqueueing the primary or a manual
+status action. Card configuration, history and the detailed CRUD editor
+remain for follow-up blocks.
 
-## Rozsah
+## Scope
 
-- **Uvnitř**:
-  - typovaný klient pro seznam karet, status a enqueue endpointy;
-  - načtení karet při otevření dashboardu a ruční obnovení;
-  - karta se stavem `unknown`, `ok`, `fail` nebo `running`;
-  - tlačítko primární akce, ruční status akce a deaktivace během požadavku;
-  - chybové a prázdné stavy;
-  - responzivní layout postavený na PrimeVue.
-- **Mimo rozsah**:
-  - create/update/delete formulář karty;
-  - detail běhů a historie status transitions;
-  - autentizace, websockety a server-side job IDs.
+- **In scope**:
+  - a typed client for the card list, status and enqueue endpoints;
+  - loading cards when the dashboard opens, and manual refresh;
+  - a card with the status `unknown`, `ok`, `fail` or `running`;
+  - a primary action button, a manual status action button and disabling
+    them during the request;
+  - error and empty states;
+  - a responsive layout built on PrimeVue.
+- **Out of scope**:
+  - the card create/update/delete form;
+  - run details and status transition history;
+  - authentication, websockets and server-side job IDs.
 
-## Schválení
+## Approval
 
-- **Schválil**: projektový vlastník
-- **Datum schválení**: 2026-09-25
-- **Poznámky k rozhodnutí**: Async endpointy se zobrazí jako přijaté; UI nečeká na dokončení procesu.
+- **Approved by**: project owner
+- **Approval date**: 2026-09-25
+- **Decision notes**: Async endpoints are shown as accepted; the UI does not wait for the process to complete.
 
-## Návrh řešení
+## Proposed solution
 
-Rozšířit `web/src` o malý API modul s typy odpovídajícími existujícím JSON
-typům backendu a dashboardovou view. Stav `running` bude lokální UI projekce
-po dobu enqueue požadavku; po přijetí se karta obnoví z read-only status API.
-PrimeVue Aura zůstává jediným vizuálním základem.
+Extend `web/src` with a small API module with types matching the existing
+backend JSON types, and a dashboard view. The `running` state will be a
+local UI projection for the duration of the enqueue request; after
+acceptance the card is refreshed from the read-only status API. PrimeVue
+Aura remains the only visual foundation.
 
-## Testovací plán
+## Test plan
 
-- TypeScript build ověří typy API dat a Vue šablon.
-- ESLint ověří Vue/TypeScript konvence.
-- Manuálně ověřit prázdný seznam, chybu API, úspěšné načtení a obě enqueue akce.
+- The TypeScript build verifies the types of API data and Vue templates.
+- ESLint verifies Vue/TypeScript conventions.
+- Manually verify an empty list, an API error, successful loading and both
+  enqueue actions.
 
-## Kritérium hotovosti
+## Done criteria
 
-Viz [Definition of Done](../../devops/definition-of-done.md). Specificky:
-dashboard používá skutečné `/api` endpointy, ne health-check mock, a `npm run
-lint` i `npm run build` projdou.
+See [Definition of Done](../../devops/definition-of-done.md). Specifically:
+the dashboard uses real `/api` endpoints, not a health-check mock, and both
+`npm run lint` and `npm run build` pass.
 
-## Uzavření
+## Closure
 
-- **Stav po implementaci**: Hotovo
-- **Ověření**: `npm run format`, `npm run lint`, `npm run build` — úspěšné; lint hlásí 29 neblokujících warningů
-- **Dokumentace aktualizována**: ano; roadmapa odkazuje na tento blok
+- **Status after implementation**: Done
+- **Verification**: `npm run format`, `npm run lint`, `npm run build` — successful; lint reports 29 non-blocking warnings
+- **Documentation updated**: yes; the roadmap links to this block

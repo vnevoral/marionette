@@ -1,62 +1,67 @@
-# Implementační blok: Návod na párování po instalaci
+# Implementation block: Pairing instructions after installation
 
-- **Fáze**: 8 — Zpevnění (dodatek po uzavření fáze)
-- **Vazba na požadavky**: FR-53, FR-01..04
-- **Vazba na ADR**: ADR-0011
-- **Stav**: Hotovo
-- **Závislosti**: Bloky 0023, 0043, 0044
+- **Phase**: 8 — Hardening (addendum after the phase was closed)
+- **Requirements**: FR-53, FR-01..04
+- **ADRs**: ADR-0011
+- **Status**: Done
+- **Dependencies**: Blocks 0023, 0043, 0044
 
-## Cíl bloku
+## Goal
 
-Po instalaci je UI zamčené, dokud operátor nespáruje první zařízení kódem
-z logu služby. `install.sh` o tom dosud mlčel a končil jen hláškou
-„Marionette installed and started“. Po dokončení instalátor na hostu bez
-spárovaných zařízení vypíše adresu UI a příkaz, kterým se první kód najde.
+After installation the UI is locked until the operator pairs the first
+device with a code from the service log. `install.sh` did not mention this
+so far and ended only with the message
+"Marionette installed and started". Once done, on a host without paired
+devices the installer prints the UI address and the command to find the
+first code.
 
-## Rozsah
+## Scope
 
-- **Uvnitř**:
-  - `deploy/install.sh`: `print_pairing_hint` po úspěšné (i staged)
-    instalaci. Návod se vypíše, jen když `MARIONETTE_AUTH` není `off`
-    a soubor zařízení neexistuje. Cesta se odvodí z `MARIONETTE_DEVICES`,
-    jinak z adresáře `MARIONETTE_CONFIG`, port z `MARIONETTE_ADDR`.
-    Hodnoty se z `/etc/default/marionette` čtou `sed`em, soubor se
-    nespouští (`source`);
-  - `deploy/install_test.sh`: návod při první instalaci, port podle
-    `MARIONETTE_ADDR`, žádný návod s existujícím `devices.json` ani
-    s `MARIONETTE_AUTH=off`;
-  - README (sekce instalace).
-- **Mimo rozsah**:
-  - vypsání samotného kódu instalátorem (služba se teprve rozbíhá a kód
-    v logu ještě nemusí být; příkaz z návodu funguje vždy);
-  - zjištění skutečného jména nebo IP hostu (za VPN by bylo často
-    zavádějící, návod proto uvádí `<host>`).
+- **In scope**:
+  - `deploy/install.sh`: `print_pairing_hint` after a successful (including
+    staged) installation. The instructions are printed only when
+    `MARIONETTE_AUTH` is not `off` and the devices file does not exist. The
+    path is derived from `MARIONETTE_DEVICES`, otherwise from the directory
+    of `MARIONETTE_CONFIG`, the port from `MARIONETTE_ADDR`. The values are
+    read from `/etc/default/marionette` with `sed`, the file is not executed
+    (`source`);
+  - `deploy/install_test.sh`: instructions on first installation, port
+    according to `MARIONETTE_ADDR`, no instructions with an existing
+    `devices.json` or with `MARIONETTE_AUTH=off`;
+  - README (installation section).
+- **Out of scope**:
+  - printing the code itself by the installer (the service is only starting
+    up and the code may not be in the log yet; the command from the
+    instructions always works);
+  - detecting the actual name or IP of the host (behind a VPN it would often
+    be misleading, so the instructions show `<host>`).
 
-## Schválení
+## Approval
 
-- **Schválil**: projektový vlastník
-- **Datum schválení**: 2026-09-26
-- **Poznámky k rozhodnutí**: Odpověď „ano“ na návrh č. 1 („Návod na
-  párování po instalaci“) po uzavření bloků 0043–0044.
+- **Approved by**: project owner
+- **Approval date**: 2026-09-26
+- **Decision notes**: The answer "yes" to proposal no. 1 ("Pairing
+  instructions after installation") after blocks 0043–0044 were closed.
 
-## Návrh řešení
+## Proposed solution
 
-Viz rozsah. Návod se vypisuje i ve staged režimu (`DESTDIR`), aby ho
-pokryl automatický test bez root a systemd.
+See the scope. The instructions are printed in staged mode (`DESTDIR`) too,
+so that the automated test covers them without root and systemd.
 
-## Testovací plán
+## Test plan
 
-- `deploy/install_test.sh` (součást `make test` a CI).
+- `deploy/install_test.sh` (part of `make test` and CI).
 - `make verify`.
 
-## Kritérium hotovosti
+## Done criteria
 
-Viz [Definition of Done](../../devops/definition-of-done.md).
+See [Definition of Done](../../devops/definition-of-done.md).
 
-## Uzavření
+## Closure
 
-- **Stav po implementaci**: Hotovo (2026-09-26)
-- **Ověření**: `bash deploy/install_test.sh` prošel, `make verify` prošel.
-  `make e2e` se nespouštěl: blok nemění UI flow ani HTTP kontrakt.
-- **Odchylky od návrhu**: žádné.
-- **Dokumentace aktualizována**: ano — README (instalace), roadmapa.
+- **Status after implementation**: Done (2026-09-26)
+- **Verification**: `bash deploy/install_test.sh` passed, `make verify`
+  passed. `make e2e` was not run: the block changes neither the UI flow nor
+  the HTTP contract.
+- **Deviations from the plan**: none.
+- **Documentation updated**: yes — README (installation), roadmap.

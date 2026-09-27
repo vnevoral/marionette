@@ -1,64 +1,66 @@
-# Implementační blok: UX-05 — Vizuální konzistence, accessibility a responsive audit
+# Implementation block: UX-05 — Visual consistency, accessibility and responsive audit
 
-- **Fáze**: 9 — UX redesign a sdílený design systém
-- **Vazba na požadavky**: FR-24..FR-29, NFR-08..NFR-10
-- **Vazba na ADR**: ADR-0007
-- **Stav**: Hotovo
-- **Závislosti**: Bloky 0015–0020
+- **Phase**: 9 — UX redesign and shared design system
+- **Requirements**: FR-24..FR-29, NFR-08..NFR-10
+- **ADRs**: ADR-0007
+- **Status**: Done
+- **Dependencies**: Blocks 0015–0020
 
-## Cíl bloku
+## Goal
 
-Dokončit fázi UX tak, aby Overview, Manage cards a Card detail používaly jeden
-vizuální a interakční systém. Manage cards nesmí působit jako samostatný tmavý
-nebo technický produkt; všechny obrazovky musí sdílet stejné tokeny, typografii,
-povrchy, spacing, stavové barvy a responsivní chování.
+Finish the UX phase so that Overview, Manage cards and Card detail use one
+visual and interaction system. Manage cards must not feel like a separate
+dark or technical product; all screens must share the same tokens,
+typography, surfaces, spacing, status colors and responsive behavior.
 
-## Rozsah
+## Scope
 
-- sjednotit page header, content width, vertikální rytmus a hlavní akce;
-- sjednotit povrchy panelů/karet, border, radius, shadow a form controls;
-- odstranit lokální barvy, fonty a layout pravidla, která obcházejí tokeny;
-- převést Manage cards na stejný green-first visual language jako Overview;
-- sjednotit semantic status/request feedback a kontrast stavů;
-- doplnit konzistentní keyboard focus, labels, live regions a error feedback;
-- ověřit responsive chování na 320 px, mobilu, tabletu a desktopu;
-- doplnit vizuální smoke/regression kontrolu hlavních workflow;
-- aktualizovat UX specifikaci a roadmapu po uzavření bloku.
+- unify the page header, content width, vertical rhythm and main actions;
+- unify panel/card surfaces, border, radius, shadow and form controls;
+- remove local colors, fonts and layout rules that bypass the tokens;
+- move Manage cards to the same green-first visual language as Overview;
+- unify semantic status/request feedback and status contrast;
+- add consistent keyboard focus, labels, live regions and error feedback;
+- verify responsive behavior at 320 px, mobile, tablet and desktop;
+- add a visual smoke/regression check of the main workflows;
+- update the UX specification and the roadmap after the block is closed.
 
-## Mimo rozsah
+## Out of scope
 
-- nový API kontrakt nebo změna doménového modelu;
-- autentizace a autorizace;
-- změna PrimeVue major verze nebo přidání dalšího UI frameworku;
-- změna produktové palety mimo sjednocení existujících tokenů.
+- a new API contract or a change of the domain model;
+- authentication and authorization;
+- a change of the PrimeVue major version or adding another UI framework;
+- a change of the product palette beyond unifying the existing tokens.
 
-## Schválení
+## Approval
 
-- **Schválil**: projektový vlastník
-- **Datum schválení**: 2026-09-25
-- **Poznámky k rozhodnutí**: Fáze 9 pokračuje sjednocením celé aplikace; nejde pouze o redesign dashboardu.
+- **Approved by**: project owner
+- **Approval date**: 2026-09-25
+- **Decision notes**: Phase 9 continues by unifying the whole application; it is not only a dashboard redesign.
 
-## Testovací plán
+## Test plan
 
 - `npm run format`, `npm run lint -- --quiet`, `npm run build`;
-- browser smoke test Overview, Manage a Detail na 320 px, 390 px, tabletu a desktopu;
-- ověřit žádný horizontální overflow a konzistentní computed font/background/border tokeny;
-- ověřit keyboard tab order, focus visibility a accessible names;
-- ověřit empty, loading, error, save, delete a action feedback states.
+- browser smoke test of Overview, Manage and Detail at 320 px, 390 px, tablet and desktop;
+- verify no horizontal overflow and consistent computed font/background/border tokens;
+- verify keyboard tab order, focus visibility and accessible names;
+- verify empty, loading, error, save, delete and action feedback states.
 
-## Kritérium hotovosti
+## Done criteria
 
-Všechny tři hlavní obrazovky používají stejnou page/header/panel/form language,
-Manage cards vizuálně patří do stejné aplikace jako Overview, žádný běžný stav
-není komunikován pouze barvou a responsive/accessibility smoke testy procházejí.
+All three main screens use the same page/header/panel/form language,
+Manage cards visually belongs to the same application as Overview, no
+regular state is communicated by color alone and the responsive/accessibility
+smoke tests pass.
 
-## Evidence dokončení
+## Completion evidence
 
-- `npm run format`, `npm run lint -- --quiet` a `npm run build` ve `web/`
-  prošly.
-- Browser smoke test formuláře ověřil field-level validation, `aria-invalid`,
-  unsaved-changes confirmation při navigaci a funkční tab order.
-- Responsive kontrola na šířkách 320, 390, 768 a 1440 px neodhalila
-  horizontální overflow ani kolizi obsahu.
-- Ověřeny byly také loading, error, save feedback a běžné empty-state workflow
-  hlavních obrazovek.
+- `npm run format`, `npm run lint -- --quiet` and `npm run build` in `web/`
+  passed.
+- A browser smoke test of the form verified field-level validation,
+  `aria-invalid`, the unsaved-changes confirmation on navigation and a
+  working tab order.
+- A responsive check at widths of 320, 390, 768 and 1440 px revealed no
+  horizontal overflow or content collisions.
+- Loading, error, save feedback and the regular empty-state workflows of the
+  main screens were verified as well.

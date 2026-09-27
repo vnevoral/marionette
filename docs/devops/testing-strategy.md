@@ -1,89 +1,94 @@
-# Testovací strategie
+# Testing strategy
 
 ## Backend (Go)
 
-- Jednotkové testy (`go test -race ./...`, spouští `make test`) pro veškerou doménovou logiku
-  (vyhodnocení akcí, config store, status engine) — bez závislosti na
-  skutečném spouštění procesů nebo souborovém systému, kde to jde (rozhraní +
-  fake implementace).
-- Execution engine se testuje přes abstrakci nad `os/exec` (interface s
-  fake/mock implementací pro testy), reálné spouštění procesů se ověřuje jen
-  v malém počtu integračních testů (např. `echo`, kontrola timeoutu).
-- HTTP handlery (`internal/server`) se testují přes `net/http/httptest`.
-- Cíl pokrytí: doménová logika a handlery ~80 %+; není cílem 100 % pokrytí
-  triviálního kódu (gettery, `main.go`).
+- Unit tests (`go test -race ./...`, run by `make test`) for all domain logic
+  (action evaluation, config store, status engine) — without depending on
+  actually spawning processes or on the file system where possible
+  (interface + fake implementation).
+- The execution engine is tested through an abstraction over `os/exec` (an
+  interface with a fake/mock implementation for tests); real process
+  execution is verified only in a small number of integration tests (e.g.
+  `echo`, timeout check).
+- HTTP handlers (`internal/server`) are tested via `net/http/httptest`.
+- Coverage goal: domain logic and handlers ~80 %+; 100 % coverage of trivial
+  code (getters, `main.go`) is not a goal.
 
-## Nasazení (instalační skript)
+## Deployment (install script)
 
-- `deploy/install_test.sh` (`make deploy-test`, součást `make test` a CI jobu
-  `backend`) nainstaluje balík do dočasného `DESTDIR` bez roota a bez
-  systemd a ověří, že cesty z unity (`ExecStart`, `EnvironmentFile`,
-  `WorkingDirectory` = `ReadWritePaths`, `MARIONETTE_CONFIG`) v instalaci
-  existují, práva odpovídají dokumentaci (binárka 755, data 750,
-  konfigurace 640), opakovaný běh zachová konfiguraci i defaults a soubor,
-  který není ELF, je odmítnut. Chování se skutečným systemd (start, restart,
-  reboot, hardening) se ověřuje ručně na referenčním hostu (blok 0023).
+- `deploy/install_test.sh` (`make deploy-test`, part of `make test` and of
+  the CI job `backend`) installs the package into a temporary `DESTDIR`
+  without root and without systemd and verifies that the paths from the unit
+  (`ExecStart`, `EnvironmentFile`, `WorkingDirectory` = `ReadWritePaths`,
+  `MARIONETTE_CONFIG`) exist in the installation, the permissions match the
+  documentation (binary 755, data 750, configuration 640), a repeated run
+  preserves the configuration and the defaults, and a file that is not ELF
+  is rejected. Behavior with real systemd (start, restart, reboot,
+  hardening) is verified manually on the reference host (block 0023).
 
 ## Frontend (Vue)
 
-- `npm run lint` (`--max-warnings 0`), `vue-tsc` (type-check) a
-  `prettier --check` jsou povinnou součástí CI a `make verify`.
-- Jednotkové a komponentové testy běží ve **Vitest** (`npm test`, součást
-  `make test` a CI jobu `web`) v prostředí `happy-dom`; komponenty se
-  montují přes Vue Test Utils s PrimeVue pluginem. Soubory `src/**/*.spec.ts`
-  leží vedle testovaného kódu, sdílejí Vite konfiguraci (`vitest.config.ts`,
-  alias `@`) a nedostávají se do bundlu. Testuje se čistá logika (API vrstva
-  `api.ts` přes mock `fetch`, model formuláře `cardEditModel.ts`),
-  composables (`useStatusEvents` přes injektovaný konektor,
-  `useCardStatus` s falešnými časovači) a chování view i vlastních komponent
-  (`HomeView`, `CardDetailView`, `CardEditView` s pamětovým routerem —
-  `CardEditView` přes `RouterView`, aby platil `onBeforeRouteLeave`;
-  `ActionEditor` včetně přístupných názvů, `ConnectionStatus`,
-  `StatusBadge`, `ActionCard` pro každý stav, `StatusTimeline` s dobou
-  trvání) a slovník/formátování (`ui/vocabulary`, `ui/format`) — netestuje
-  se vzhled PrimeVue komponent samotných. REST
-  funkce se mockují přes `vi.mock("@/api")` s částečným přepisem, SSE přes
-  sdílený `src/test/fakeEventSource.ts` (`vi.stubGlobal("EventSource", …)`),
-  potvrzovací dialog přes `src/test/fakeConfirm.ts` (provide místo
-  `ConfirmationService`, test volá `accept`/`reject`).
-  Pokrytí: `npm run test:coverage` (v8); cíl pro `api.ts` a čisté moduly
-  ~80 %+, zbylé view se pokrývají v blocích 0032 a 0033.
+- `npm run lint` (`--max-warnings 0`), `vue-tsc` (type-check) and
+  `prettier --check` are a mandatory part of CI and `make verify`.
+- Unit and component tests run in **Vitest** (`npm test`, part of
+  `make test` and of the CI job `web`) in the `happy-dom` environment;
+  components are mounted via Vue Test Utils with the PrimeVue plugin. The
+  `src/**/*.spec.ts` files sit next to the code under test, share the Vite
+  configuration (`vitest.config.ts`, alias `@`) and do not end up in the
+  bundle. Tested are the pure logic (the API layer `api.ts` via a `fetch`
+  mock, the form model `cardEditModel.ts`), composables (`useStatusEvents`
+  via an injected connector, `useCardStatus` with fake timers) and the
+  behavior of views and custom components (`HomeView`, `CardDetailView`,
+  `CardEditView` with a memory router — `CardEditView` via `RouterView` so
+  that `onBeforeRouteLeave` applies; `ActionEditor` including accessible
+  names, `ConnectionStatus`, `StatusBadge`, `ActionCard` for each state,
+  `StatusTimeline` with durations) and the vocabulary/formatting
+  (`ui/vocabulary`, `ui/format`) — the appearance of the PrimeVue components
+  themselves is not tested. REST
+  functions are mocked via `vi.mock("@/api")` with a partial override, SSE
+  via the shared `src/test/fakeEventSource.ts`
+  (`vi.stubGlobal("EventSource", …)`), the confirmation dialog via
+  `src/test/fakeConfirm.ts` (provide instead of `ConfirmationService`, the
+  test calls `accept`/`reject`).
+  Coverage: `npm run test:coverage` (v8); the goal for `api.ts` and pure
+  modules is ~80 %+, the remaining views are covered in blocks 0032 and 0033.
 
 ## End-to-end (Playwright)
 
-- `make e2e` (blok 0041) sestaví binárku s embedded SPA, spustí ji
-  s prázdnou konfigurací v dočasném adresáři na `127.0.0.1:18080`
-  (`web/e2e/start-server.sh`) a projde `web/e2e/*.e2e.ts` v headless
-  Chromiu (`web/playwright.config.ts`, jeden worker — specy sdílí server
-  a každá začíná smazáním všech karet přes API).
-- Pokrývá, co jednotkové testy nevidí: skutečný prohlížeč, embed, SSE
-  (indikátor **Live**, výsledek kontroly), 202 → čekání → výsledek, 422 až
-  k poli formuláře, potvrzovací dialogy, NFR-12 s hlavičkami, které
-  posílá prohlížeč (stránka na jiném originu nespustí akci), a absenci
-  horizontálního scrollu ve 320 px na přehledu, detailu a formulářích
-  (UX spec §9, §10 scénáře 1, 3, 5, 6, 7 a 2 částečně).
-- Server běží se zapnutým ověřováním (blok 0044): projekt `setup`
-  (`e2e/pair.setup.ts`) spáruje prohlížeč kódem z logu serveru
-  (`E2E_SERVER_LOG`) přes obrazovku párování a uloží cookie do
-  `e2e/.auth/device.json`; ostatní specy běží jako spárované zařízení.
-  Nespárované prohlížeče se vytvářejí s prázdným `storageState` —
-  `browser.newContext()` jinak dědí uložený stav projektu.
-- Lokátory hledají prvky podle rolí a přístupných jmen (jako uživatel),
-  CSS třídy jen tam, kde role chybí (badge, `.field-error`).
-- Není součástí `make verify` (vyžaduje prohlížeč, ~15 s); běží jako
-  samostatný CI job `e2e` a spouští se ručně u bloků, které mění UI tok.
-  Prohlížeč se instaluje `npx playwright install --with-deps chromium`
-  (v devcontaineru `post-create.sh`).
+- `make e2e` (block 0041) builds the binary with the embedded SPA, starts it
+  with an empty configuration in a temporary directory on `127.0.0.1:18080`
+  (`web/e2e/start-server.sh`) and runs `web/e2e/*.e2e.ts` in headless
+  Chromium (`web/playwright.config.ts`, one worker — the specs share the
+  server and each starts by deleting all cards via the API).
+- It covers what unit tests cannot see: a real browser, embed, SSE
+  (the **Live** indicator, check result), 202 → waiting → result, 422 all
+  the way to the form field, confirmation dialogs, NFR-12 with the headers
+  the browser sends (a page on a different origin does not run an action),
+  and the absence of horizontal scrolling at 320 px on the overview, detail
+  and forms (UX spec §9, §10 scenarios 1, 3, 5, 6, 7 and 2 partially).
+- The server runs with authentication enabled (block 0044): the `setup`
+  project (`e2e/pair.setup.ts`) pairs the browser using the code from the
+  server log (`E2E_SERVER_LOG`) through the pairing screen and saves the
+  cookie to `e2e/.auth/device.json`; the other specs run as a paired device.
+  Unpaired browsers are created with an empty `storageState` —
+  `browser.newContext()` otherwise inherits the project's saved state.
+- Locators find elements by roles and accessible names (like a user),
+  CSS classes only where a role is missing (badge, `.field-error`).
+- It is not part of `make verify` (requires a browser, ~15 s); it runs as a
+  separate CI job `e2e` and is run manually for blocks that change the UI
+  flow. The browser is installed with
+  `npx playwright install --with-deps chromium` (in the devcontainer by
+  `post-create.sh`).
 
-## Manuální ověření
+## Manual verification
 
-- Před release na ARM host: spustit `make build-arm64`, nasadit na testovací
-  Linux se systemd; referenční ověření provést na Raspberry Pi ARM64 s Ubuntu
-  24.x, včetně `systemd` start/stop/restart a základního scénáře (WOL + ping)
-  end-to-end.
+- Before a release to an ARM host: run `make build-arm64`, deploy to a test
+  Linux with systemd; perform reference verification on a Raspberry Pi ARM64
+  with Ubuntu 24.x, including `systemd` start/stop/restart and the basic
+  scenario (WOL + ping) end-to-end.
 
-## Co se netestuje (vědomě)
+## What is not tested (deliberately)
 
-- Vzhled/vizuální regrese UI (žádný visual regression tool v MVP).
-- Zátěžové testy — mimo očekávaný rozsah použití (jednotky/desítky karet,
-  málo souběžných uživatelů).
+- UI appearance/visual regression (no visual regression tool in the MVP).
+- Load tests — outside the expected scope of use (a handful to dozens of
+  cards, few concurrent users).

@@ -2,96 +2,109 @@
 
 ## CI (GitHub Actions, `.github/workflows/ci.yml`)
 
-Na každý push a pull request:
+On every push and pull request:
 
-1. **backend** — `golangci-lint` (verze připnutá shodně s devcontainerem,
-   konfigurace `.golangci.yml`), `go build ./...`, `go vet ./...`,
-   `go test -race -count=1 ./...` na linux/amd64, `bash -n` a staged test
-   instalačního skriptu (`deploy/install_test.sh`) a test pravidla verze
-   releasu (`deploy/release_version_test.sh`).
+1. **backend** — `golangci-lint` (version pinned identically to the
+   devcontainer, configuration `.golangci.yml`), `go build ./...`,
+   `go vet ./...`, `go test -race -count=1 ./...` on linux/amd64, `bash -n`
+   and a staged test of the install script (`deploy/install_test.sh`) and a
+   test of the release version rule (`deploy/release_version_test.sh`).
 2. **web** — `npm ci`, `npm audit --omit=dev --audit-level=high`,
    `npm run lint` (`--max-warnings 0`), `npm run format:check`,
-   `npm run build` (zahrnuje type-check přes `vue-tsc`) ve `web/`. Verze Node
-   je určena souborem `web/.nvmrc` (shodná s devcontainerem a `engines`).
+   `npm run build` (includes type-check via `vue-tsc`) in `web/`. The Node
+   version is set by the `web/.nvmrc` file (identical to the devcontainer
+   and `engines`).
 3. **e2e** — `npm ci`, `npx playwright install --with-deps chromium`,
-   `make e2e` (build binárky a Playwright testy proti ní, blok 0041); při
-   selhání se nahraje report a trace jako artefakt `playwright-report`.
+   `make e2e` (builds the binary and runs Playwright tests against it,
+   block 0041); on failure the report and trace are uploaded as the
+   `playwright-report` artifact.
 
-Workflow `ci.yml` jde volat i z jiného workflow (`workflow_call`); používá
-ho release workflow níže, aby release prošel stejnými kontrolami.
+The `ci.yml` workflow can also be called from another workflow
+(`workflow_call`); the release workflow below uses it so that a release
+passes the same checks.
 
-Stejnou sadu (kromě jobu `e2e`, lokálně `make e2e`) spouští lokálně
-`make verify`; CI ji pouze zrcadlí. CI běh
-musí projít čistě (lint warningy selhávají build, nepotlačují se) před
-mergem do hlavní větve. Dependabot (`.github/dependabot.yml`) otevírá týdenní
-PR pro Go moduly, npm a GitHub Actions; major verze klíčových UI závislostí
-jsou vyloučené (ADR-0003, ADR-0010).
+The same suite (except the `e2e` job, locally `make e2e`) is run locally by
+`make verify`; CI only mirrors it. The CI run
+must pass cleanly (lint warnings fail the build, they are not suppressed)
+before merging into the main branch. Dependabot (`.github/dependabot.yml`)
+opens weekly PRs for Go modules, npm and GitHub Actions; major versions of
+key UI dependencies are excluded (ADR-0003, ADR-0010).
 
-## Release proces (ověřeno na Raspberry Pi 2026-09-26, fáze 7)
+## Release process (verified on Raspberry Pi 2026-09-26, phase 7)
 
-### Verzování releasů (blok 0051)
+### Release versioning (block 0051)
 
-Každý release má verzi `vMAJOR.MINOR.PATCH` z git tagu (první release je
-`v1.0.0`):
+Every release has a `vMAJOR.MINOR.PATCH` version from a git tag (the first
+release is `v1.0.0`):
 
-- **PATCH** — opravy chyb bez změny chování konfigurace, API a instalace;
-- **MINOR** — nová funkčnost, která je zpětně kompatibilní (včetně nových
-  volitelných položek konfigurace a nových endpointů API);
-- **MAJOR** — nekompatibilní změna konfigurace, API nebo instalačního
-  postupu.
+- **PATCH** — bug fixes without changing the behavior of configuration, API
+  and installation;
+- **MINOR** — new functionality that is backward compatible (including new
+  optional configuration items and new API endpoints);
+- **MAJOR** — an incompatible change to the configuration, API or
+  installation procedure.
 
-Tag vytváří a pushuje vlastník projektu. `make release-arm64` přebírá verzi
-výhradně z tagu tvaru `vMAJOR.MINOR.PATCH` přesně na `HEAD`
-(`deploy/release_version.sh`) a odmítne sestavit release, pokud `HEAD`
-takový tag nemá nebo pracovní strom obsahuje necommitnuté změny (včetně
-nesledovaných souborů). Ruční přepsání `VERSION=… make release-arm64` se
-ignoruje. Vývojové buildy (`make build`, `make build-arm64`) omezení nemají
-a verzi berou z `git describe`.
+The tag is created and pushed by the project owner. `make release-arm64`
+takes the version exclusively from a tag of the form `vMAJOR.MINOR.PATCH`
+exactly on `HEAD` (`deploy/release_version.sh`) and refuses to build a
+release if `HEAD` has no such tag or the working tree contains uncommitted
+changes (including untracked files). A manual override
+`VERSION=… make release-arm64` is ignored. Development builds
+(`make build`, `make build-arm64`) have no such restriction and take the
+version from `git describe`.
 
-### Postup (release z CI, blok 0057)
+### Procedure (release from CI, block 0057)
 
-1. Na čistém stromu vytvořit tag: `git tag -a vX.Y.Z -m "…"`.
-2. `git push origin vX.Y.Z`. Push tagu tvaru `v*.*.*` spustí
+1. On a clean tree, create a tag: `git tag -a vX.Y.Z -m "…"`.
+2. `git push origin vX.Y.Z`. Pushing a tag of the form `v*.*.*` triggers
    `.github/workflows/release.yml`:
-   - job `ci` zavolá celý `ci.yml` (backend, web, e2e); když neprojde,
-     release nevznikne;
-   - job `release` na čistém checkoutu s tagy spustí `make release-arm64`.
-     `deploy/release_version.sh` odmítne tag jiného tvaru (např.
-     `v1.2.3-rc1`, který filtr workflow propustí), takže release nevznikne;
-   - `gh release create` zveřejní GitHub Release pro tag s archivem
-     `marionette-vX.Y.Z-linux-arm64.tar.gz` a jeho `.sha256`. Poznámky
-     se vygenerují z commitů. Právo `contents: write` má jen tento job.
-3. Na cílovém hostu se archiv i `.sha256` stáhnou z GitHub Releases (README,
-   „Installation on Linux with systemd“); referenční ověření probíhá na
-   Raspberry Pi ARM64 s Ubuntu 24.x. V adresáři s oběma soubory se integrita
-   ověří `sha256sum -c marionette-vX.Y.Z-linux-arm64.tar.gz.sha256`.
-4. Po rozbalení se spustí `sudo ./install.sh ./marionette-linux-arm64`.
-   Skript nainstaluje unit, zachová existující konfiguraci a provede
-   `systemctl enable` + start/restart služby.
-5. Nasazená verze se ověří přes `curl -s http://localhost:8080/api/health`
-   (pole `version` musí odpovídat tagu) nebo v patičce UI (FR-41a).
-6. Aktualizace používá stejný skript s novou binárkou; data
-   (`marionette.json`, `devices.json`) i `/etc/default/marionette` zůstávají,
-   přepíše se binárka a unit. Rollback spustí instalátor předchozího
-   releasu (předchozí releasy zůstávají v GitHub Releases). Postup se
-   zálohou, kontrolou a rollbackem přes MAJOR verzi je v README, sekce
-   „Upgrading and rolling back“.
-7. Žádný krok nevyžaduje instalaci Go, Node.js ani jiného runtime na cíli.
+   - the `ci` job calls the whole `ci.yml` (backend, web, e2e); if it does
+     not pass, no release is created;
+   - the `release` job runs `make release-arm64` on a clean checkout with
+     tags. `deploy/release_version.sh` rejects a tag of a different form
+     (e.g. `v1.2.3-rc1`, which the workflow filter lets through), so no
+     release is created;
+   - `gh release create` publishes a GitHub Release for the tag with the
+     archive `marionette-vX.Y.Z-linux-arm64.tar.gz` and its `.sha256`. The
+     notes are generated from the commits. Only this job has the
+     `contents: write` permission.
+3. On the target host, the archive and the `.sha256` are downloaded from
+   GitHub Releases (README, "Installation on Linux with systemd"); the
+   reference verification runs on a Raspberry Pi ARM64 with Ubuntu 24.x. In
+   the directory with both files, integrity is verified with
+   `sha256sum -c marionette-vX.Y.Z-linux-arm64.tar.gz.sha256`.
+4. After unpacking, run `sudo ./install.sh ./marionette-linux-arm64`.
+   The script installs the unit, keeps the existing configuration and
+   performs `systemctl enable` + start/restart of the service.
+5. The deployed version is verified via
+   `curl -s http://localhost:8080/api/health` (the `version` field must
+   match the tag) or in the UI footer (FR-41a).
+6. An upgrade uses the same script with the new binary; the data
+   (`marionette.json`, `devices.json`) and `/etc/default/marionette` are
+   kept, the binary and the unit are overwritten. A rollback runs the
+   installer of the previous release (previous releases stay in GitHub
+   Releases). The procedure with backup, checks and a rollback across a
+   MAJOR version is in the README, section "Upgrading and rolling back".
+7. No step requires installing Go, Node.js or any other runtime on the
+   target.
 
-Záložní ruční postup (bez GitHubu nebo při výpadku CI): po kroku 1 spustit
-lokálně `make release-arm64`. Archiv a `.sha256` vzniknou v `bin/` a na
-host se zkopírují ručně; dál se pokračuje krokem 3.
+Fallback manual procedure (without GitHub or during a CI outage): after
+step 1, run `make release-arm64` locally. The archive and the `.sha256` are
+created in `bin/` and copied to the host manually; then continue with
+step 3.
 
-## Verzování závislostí
+## Dependency versioning
 
-- Go: `go.mod` — udržovat na aktuální stabilní verzi Go (viz README pro
-  minimální verzi); zvyšovat obezřetně a testovat build na arm64.
-- npm (`web/`): držet PrimeVue na stabilní major větvi (`v4-stable` dist-tag),
-  viz [ADR-0003](../architecture/decisions/0003-vue-primevue-frontend.md).
-  Před přijetím nové major verze jakékoli klíčové závislosti (Vite, Vue,
-  PrimeVue, TypeScript) ověřit changelog a napsat/aktualizovat ADR, pokud
-  přináší breaking changes.
-- Layout utility jsou vlastní `web/src/styles/layout.css` (14 tříd, viz
+- Go: `go.mod` — keep on the current stable Go version (see the README for
+  the minimum version); raise it cautiously and test the build on arm64.
+- npm (`web/`): keep PrimeVue on the stable major branch (`v4-stable`
+  dist-tag), see
+  [ADR-0003](../architecture/decisions/0003-vue-primevue-frontend.md).
+  Before accepting a new major version of any key dependency (Vite, Vue,
+  PrimeVue, TypeScript), check the changelog and write/update an ADR if it
+  brings breaking changes.
+- Layout utilities are the project's own `web/src/styles/layout.css`
+  (14 classes, see
   [ADR-0010](../architecture/decisions/0010-own-layout-utilities-replace-primeflex.md));
-  PrimeFlex byl odstraněn v bloku 0035. PrimeVue zůstává na v4 (MIT), verze 5
-  má komerční licenci a vyžaduje nové ADR.
+  PrimeFlex was removed in block 0035. PrimeVue stays on v4 (MIT); version 5
+  has a commercial license and requires a new ADR.

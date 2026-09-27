@@ -1,82 +1,87 @@
-# Implementační blok: Verze aplikace v UI
+# Implementation block: Application version in the UI
 
-- **Fáze**: 8 — Zpevnění (dodatek po uzavření fáze), oblast UI a provozu
-- **Vazba na požadavky**: FR-41a, FR-41, FR-26
-- **Vazba na ADR**: nové ADR není potřeba (čte existující endpoint)
-- **Stav**: Hotovo
-- **Závislosti**: Blok 0051 (verze z git tagu v `/api/health`)
+- **Phase**: 8 — Hardening (addendum after the phase was closed), UI and operations area
+- **Requirements**: FR-41a, FR-41, FR-26
+- **ADRs**: no new ADR is needed (reads an existing endpoint)
+- **Status**: Done
+- **Dependencies**: Block 0051 (version from the git tag in `/api/health`)
 
-## Cíl bloku
+## Goal
 
-Po upgradu (README, „Upgrading and rolling back“) dnes operátor ověřuje
-verzi příkazem `curl … /api/health` na hostu. Po dokončení bloku ji vidí
-přímo v UI na každé obrazovce, i z telefonu.
+After an upgrade (README, "Upgrading and rolling back") the operator
+currently verifies the version with `curl … /api/health` on the host.
+After this block, they see it directly in the UI on every screen, even
+from a phone.
 
-## Rozsah
+## Scope
 
-- **Uvnitř**:
-  - `web/src/api.ts`: `getHealth()` pro `GET /api/health` (typ
-    `{ status, version, uptime… }` podle `healthResponse`);
-  - `AppShell.vue`: nenápadný řádek s verzí v patičce layoutu
-    („Marionette v1.1.0“), tlumenou barvou a malým písmem. Verze se načte
-    jednou po startu SPA. Selhání načtení verzi skryje a nic jiného
-    neovlivní. Vývojový build ukáže `dev`, jak ho vrací server;
-  - verze se znovu načte po znovupřipojení SSE (`Live`), protože to je
-    typicky okamžik po restartu služby při upgradu. Stránka po upgradu tak
-    ukáže novou verzi bez obnovení;
-  - obrazovka párování (bez spárování) verzi nezobrazuje: `/api/health`
-    je sice veřejný, ale obrazovka párování má zůstat minimální;
-  - UX specifikace §2.1 (app shell);
-  - testy: Vitest (`AppShell` zobrazí verzi, při chybě nic, po
-    znovupřipojení načte znovu), E2E (patička ukazuje verzi serveru).
-- **Mimo rozsah**:
-  - upozornění, že je k dispozici novější verze (UI nemá odkud to zjistit
-    a služba nemá přístup ven);
-  - upozornění, že stránka běží se starším buildem UI než server
-    (po upgradu se SPA načítá z nové binárky až po obnovení stránky;
-    řešit, jen pokud to bude v praxi problém).
+- **In scope**:
+  - `web/src/api.ts`: `getHealth()` for `GET /api/health` (type
+    `{ status, version, uptime… }` per `healthResponse`);
+  - `AppShell.vue`: an unobtrusive version line in the layout footer
+    ("Marionette v1.1.0"), in a muted color and small font. The version
+    is loaded once after the SPA starts. A load failure hides the version
+    and affects nothing else. A development build shows `dev`, as
+    returned by the server;
+  - the version is reloaded after SSE reconnects (`Live`), because that
+    is typically the moment after the service restarts during an upgrade.
+    The page thus shows the new version after an upgrade without a
+    reload;
+  - the pairing screen (not paired) does not show the version:
+    `/api/health` is public, but the pairing screen should stay minimal;
+  - UX specification §2.1 (app shell);
+  - tests: Vitest (`AppShell` shows the version, nothing on error,
+    reloads after reconnect), E2E (the footer shows the server version).
+- **Out of scope**:
+  - a notice that a newer version is available (the UI has no way to
+    find out and the service has no outbound access);
+  - a notice that the page runs an older UI build than the server
+    (after an upgrade the SPA is loaded from the new binary only after a
+    page reload; address only if it becomes a problem in practice).
 
-## Schválení
+## Approval
 
-- **Schválil**: projektový vlastník
-- **Datum schválení**: 2026-09-27
-- **Poznámky k rozhodnutí**: Schváleno vlastníkem („souhlas se vším“).
+- **Approved by**: project owner
+- **Approval date**: 2026-09-27
+- **Decision notes**: Approved by the owner ("agree with everything").
 
-## Návrh řešení
+## Proposed solution
 
-Patička místo horní lišty: verze není provozní informace pro běžnou práci
-a na 320 px je v horní liště místo jen na navigaci a stav `Live`. Patička
-je na konci každé obrazovky ve sdíleném `AppShell`, takže stačí jedno
-místo v kódu.
+Footer instead of the top bar: the version is not operational information
+for everyday work, and at 320 px the top bar only has room for navigation
+and the `Live` state. The footer is at the end of every screen in the
+shared `AppShell`, so one place in the code is enough.
 
-## Testovací plán
+## Test plan
 
 - `cd web && npx vitest run`.
 - `make e2e`.
 - `make verify`.
-- Ručně na Pi po upgradu: patička ukáže novou verzi po znovupřipojení.
+- Manually on the Pi after an upgrade: the footer shows the new version
+  after reconnecting.
 
-## Kritérium hotovosti
+## Done criteria
 
-Viz [Definition of Done](../../devops/definition-of-done.md) +:
+See [Definition of Done](../../devops/definition-of-done.md) plus:
 
-- verze v patičce odpovídá `/api/health` a po restartu služby s novou
-  verzí se změní bez obnovení stránky.
+- the version in the footer matches `/api/health` and changes without a
+  page reload after the service restarts with a new version.
 
-## Uzavření
+## Closure
 
-- **Stav po implementaci**: Hotovo (2026-09-27)
-- **Ověření**: `make verify` a `make e2e` (20 scénářů) prošly. Nové testy:
-  Vitest `AppVersion.spec.ts` (zobrazí verzi; při chybě nic; po
-  znovupřipojení streamu načte verzi znovu, po prvním připojení ne),
-  E2E „the footer shows the version the server reports (FR-41a)“
-  (patička = `version` z `/api/health`); stávající test 320 px bez
-  horizontálního scrollu prošel i s patičkou.
-- **Odchylky od návrhu**:
-  - verzi zobrazuje samostatná komponenta `AppVersion.vue` v patičce
-    `AppShell`; layout shellu je sloupcový flex, takže patička je
-    u krátkých stránek dole v okně;
-  - znovunačtení verze sleduje přechod stream odpojen → připojen (ne
-    `onRefresh`, který se volá i při každém pollingu během výpadku).
-- **Dokumentace aktualizována**: UX specifikace §2.1, `docs/devops/ci-cd.md`
-  (ověření verze v UI).
+- **Status after implementation**: Done (2026-09-27)
+- **Verification**: `make verify` and `make e2e` (20 scenarios) passed. New
+  tests: Vitest `AppVersion.spec.ts` (shows the version; nothing on
+  error; reloads the version after the stream reconnects, not after the
+  first connect), E2E "the footer shows the version the server reports
+  (FR-41a)" (footer = `version` from `/api/health`); the existing 320 px
+  no-horizontal-scroll test also passed with the footer.
+- **Deviations from the plan**:
+  - the version is shown by a separate `AppVersion.vue` component in the
+    `AppShell` footer; the shell layout is a column flex, so on short
+    pages the footer sits at the bottom of the window;
+  - the version reload watches the stream disconnected → connected
+    transition (not `onRefresh`, which is also called on every poll
+    during an outage).
+- **Documentation updated**: UX specification §2.1, `docs/devops/ci-cd.md`
+  (verifying the version in the UI).

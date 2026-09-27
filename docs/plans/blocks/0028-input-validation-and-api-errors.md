@@ -1,119 +1,131 @@
-# Implementační blok: Validace vstupů a konzistence chybových odpovědí API
+# Implementation block: Input validation and consistent API error responses
 
-- **Fáze**: 8 — Zpevnění
-- **Vazba na požadavky**: FR-10, FR-11, FR-40, NFR-01, NFR-03, NFR-04
-- **Vazba na ADR**: ADR-0004
-- **Stav**: Hotovo
-- **Závislosti**: Blok 0001 (typy a validace), 0010 (REST API), 0025 (sentinel chyby)
+- **Phase**: 8 — Hardening
+- **Requirements**: FR-10, FR-11, FR-40, NFR-01, NFR-03, NFR-04
+- **ADRs**: ADR-0004
+- **Status**: Done
+- **Dependencies**: Block 0001 (types and validation), 0010 (REST API), 0025 (sentinel errors)
 
-## Cíl bloku
+## Goal
 
-Po dokončení API odmítne kartu, jejíž ID nejde použít v URL, jejíž pole
-překračují rozumné limity nebo jejíž timeout by trvale obsadil slot, a
-všechny chybové odpovědi na `/api/*` mají jednotnou JSON obálku včetně 405,
-413 a 415.
+After completion, the API rejects a card whose ID cannot be used in a URL,
+whose fields exceed reasonable limits or whose timeout would permanently
+occupy a slot, and all error responses on `/api/*` have a uniform JSON
+envelope, including 405, 413 and 415.
 
-## Rozsah
+## Scope
 
-- **Uvnitř**:
-  - ID karty: `^[A-Za-z0-9_-]{1,64}$` (server-generovaná ID vyhovují);
-    ostatní hodnoty se odmítají 422;
-  - limity délek: `Name` ≤ 120, `Description` ≤ 2000, `Command` ≤ 512, každý
-    `Args` prvek ≤ 1024 a max 64 prvků, `Dir` ≤ 1024, `Env` max 64 položek,
-    klíč `^[A-Za-z_][A-Za-z0-9_]*$` ≤ 128, hodnota ≤ 4096;
-  - `TimeoutSec` 1..3600 (horní mez konstanta `MaxTimeoutSec`);
-  - `Icon` omezit na známé hodnoty ze slovníku ikon (viz `CARD_ICON_OPTIONS`
-    ve frontendu) nebo prefix `pi pi-` s délkou ≤ 64;
-  - validační chyby vrací strukturovaně: `{"error": "...", "fields":
-    {"primary.timeoutSec": "must be between 1 and 3600"}}`;
-  - dekodér: `http.MaxBytesError` → 413; chyby JSON dekodéru vrací obecné
-    „invalid JSON body“ + pozice bez interních názvů Go typů;
-  - vlastní 405 handler s JSON obálkou a hlavičkou `Allow`;
-  - `Cache-Control` pro SPA: `index.html` `no-cache`, `assets/*`
-    `public, max-age=31536000, immutable`; adresářové cesty nevrací listing;
-  - `GET /api/health` vrací `{"status":"ok","version":"…","uptimeSec":n}`;
-    verze se vkládá přes `-ldflags -X` v Makefile.
-- **Mimo rozsah**:
-  - whitelisting příkazů (rozhodnutí fáze 1: bez whitelistu);
-  - změna chování fronty (blok 0027);
-  - autentizace.
+- **In scope**:
+  - card ID: `^[A-Za-z0-9_-]{1,64}$` (server-generated IDs comply);
+    other values are rejected with 422;
+  - length limits: `Name` ≤ 120, `Description` ≤ 2000, `Command` ≤ 512,
+    each `Args` element ≤ 1024 and max 64 elements, `Dir` ≤ 1024, `Env`
+    max 64 entries, key `^[A-Za-z_][A-Za-z0-9_]*$` ≤ 128, value ≤ 4096;
+  - `TimeoutSec` 1..3600 (upper bound constant `MaxTimeoutSec`);
+  - restrict `Icon` to known values from the icon vocabulary (see
+    `CARD_ICON_OPTIONS` in the frontend) or the prefix `pi pi-` with length
+    ≤ 64;
+  - validation errors are returned in a structured form: `{"error": "...",
+    "fields": {"primary.timeoutSec": "must be between 1 and 3600"}}`;
+  - decoder: `http.MaxBytesError` → 413; JSON decoder errors return a
+    generic "invalid JSON body" + position without internal Go type names;
+  - a custom 405 handler with the JSON envelope and an `Allow` header;
+  - `Cache-Control` for the SPA: `index.html` `no-cache`, `assets/*`
+    `public, max-age=31536000, immutable`; directory paths do not return a
+    listing;
+  - `GET /api/health` returns `{"status":"ok","version":"…","uptimeSec":n}`;
+    the version is embedded via `-ldflags -X` in the Makefile.
+- **Out of scope**:
+  - command whitelisting (phase 1 decision: no whitelist);
+  - changing queue behavior (block 0027);
+  - authentication.
 
-## Schválení
+## Approval
 
-- **Schválil**: projektový vlastník
-- **Datum schválení**: 2026-09-26
-- **Poznámky k rozhodnutí**: Schváleno včetně navržených limitů. Nález
-  revize 2026-09-26 (M-7, L-7, L-8, L-11 část health).
+- **Approved by**: project owner
+- **Approval date**: 2026-09-26
+- **Decision notes**: Approved including the proposed limits. Finding of
+  the 2026-09-26 review (M-7, L-7, L-8, L-11 health part).
 
-## Návrh řešení
+## Proposed solution
 
-- `internal/config/types.go`: konstanty limitů, `ValidationError` typ s
-  polem `Fields map[string]string`, `Validate()` sbírá všechny chyby místo
-  první; `ErrValidation` sentinel (z 0025).
-- `internal/server/server.go`: `writeValidationError`, `methodNotAllowed`
-  handler zaregistrovaný pro známé cesty s nepodporovanou metodou (Go 1.22
-  mux: registrovat `/api/cards/{id}` bez metody jako fallback), `decodeJSON`
-  s `errors.As(err, &maxBytesErr)`.
-- `internal/server/spa.go` (rozdělení `server.go`): `serveSPA` s
-  `fs.Stat` + `IsDir` kontrolou a cache hlavičkami.
+- `internal/config/types.go`: limit constants, a `ValidationError` type
+  with a `Fields map[string]string` field, `Validate()` collects all
+  errors instead of the first one; `ErrValidation` sentinel (from 0025).
+- `internal/server/server.go`: `writeValidationError`, a
+  `methodNotAllowed` handler registered for known paths with an
+  unsupported method (Go 1.22 mux: register `/api/cards/{id}` without a
+  method as a fallback), `decodeJSON` with `errors.As(err, &maxBytesErr)`.
+- `internal/server/spa.go` (split of `server.go`): `serveSPA` with an
+  `fs.Stat` + `IsDir` check and cache headers.
 - `cmd/marionette/main.go`: `var version = "dev"`; Makefile
   `-ldflags "-X main.version=$(git describe --tags --always)"`.
-- Frontend: zobrazení `fields` u formuláře řeší blok 0032; zde jen kontrakt.
+- Frontend: displaying `fields` in the form is handled by block 0032; here
+  only the contract.
 
-## Testovací plán
+## Test plan
 
-- Tabulkové testy validace: každý limit má případ „na hranici“ a „přes“;
-  ID s `/`, mezerou, diakritikou, prázdné; env klíč s `=`; timeout 0, 3601.
-- Handler testy: 405 s `Allow`, 413 pro tělo > 1 MiB, 415 (po 0026),
-  422 s `fields`, chybová zpráva neobsahuje `Go struct field`.
-- SPA: `/assets` (adresář) → `index.html`, `/assets/<hash>.js` → immutable.
-- Health: JSON obsahuje `version` a `uptimeSec` ≥ 0.
+- Table-driven validation tests: every limit has an "at the boundary" and
+  an "over" case; ID with `/`, a space, diacritics, empty; env key with
+  `=`; timeout 0, 3601.
+- Handler tests: 405 with `Allow`, 413 for a body > 1 MiB, 415 (after
+  0026), 422 with `fields`, the error message does not contain
+  `Go struct field`.
+- SPA: `/assets` (directory) → `index.html`, `/assets/<hash>.js` →
+  immutable.
+- Health: the JSON contains `version` and `uptimeSec` ≥ 0.
 - `go test -race ./...`, `go vet ./...`.
 
-## Kritérium hotovosti
+## Done criteria
 
-Viz [Definition of Done](../../devops/definition-of-done.md) +:
+See [Definition of Done](../../devops/definition-of-done.md) plus:
 
-- žádná odpověď na `/api/*` není `text/plain`;
-- limity jsou vypsané v `docs/architecture/overview.md` (API kontrakt) a
-  ADR-0004 má doplněk „Limity hodnot“;
-- `deploy/marionette.example.json` limity splňuje.
+- no response on `/api/*` is `text/plain`;
+- the limits are listed in `docs/architecture/overview.md` (API contract)
+  and ADR-0004 has a "Value limits" addendum;
+- `deploy/marionette.example.json` satisfies the limits.
 
-## Uzavření
+## Closure
 
-- **Stav po implementaci**: Hotovo (2026-09-26)
-- **Ověření**: `make verify` prošel (golangci-lint, eslint, vue-tsc, prettier,
-  `go test -race -count=1 ./...`, build, vet). Nové testy:
+- **Status after implementation**: Done (2026-09-26)
+- **Verification**: `make verify` passed (golangci-lint, eslint, vue-tsc,
+  prettier, `go test -race -count=1 ./...`, build, vet). New tests:
   `TestValidateCollectsAllFieldsAndMatchesErrValidation`,
-  `TestValidateLimits` (36 případů: každý limit „na hranici“ a „přes“, ID
-  s `/`, mezerou, diakritikou, prázdné, tvar generovaného ID, env klíč
-  s `=` a číslicí na začátku, timeout 0/3600/3601, ikony),
-  `TestRouterAnswersMethodNotAllowedWithAllowAndJSON` (7 cest, `HEAD`
-  na `GET` routě projde), `TestRouterRejectsOversizedBodyWithJSON413`,
-  `TestRouterDecodeErrorsHideGoTypes` (7 tvarů chybného těla, zpráva bez
-  „Go struct“ a názvů balíčků), `TestRouterReturnsValidationFields`,
+  `TestValidateLimits` (36 cases: every limit "at the boundary" and
+  "over", ID with `/`, a space, diacritics, empty, the shape of a
+  generated ID, env key with `=` and a leading digit, timeout
+  0/3600/3601, icons),
+  `TestRouterAnswersMethodNotAllowedWithAllowAndJSON` (7 paths, `HEAD`
+  on a `GET` route passes), `TestRouterRejectsOversizedBodyWithJSON413`,
+  `TestRouterDecodeErrorsHideGoTypes` (7 shapes of invalid body, message
+  without "Go struct" and package names),
+  `TestRouterReturnsValidationFields`,
   `TestHealthReportsVersionAndUptime`, `TestSPACacheHeadersAndDirectories`
-  (`/assets/<hash>` immutable, `/assets` a `/assets/` vrací `index.html`
-  bez listingu). Stávající testy validace (substring) a serveru prošly
-  beze změny. `deploy/marionette.example.json` i `dev-fixture.json` limity
-  splňují (ověřeno skriptem: ID, délky, ikony `pi pi-*`, timeouty 5 s).
-- **Odchylky od návrhu**: (1) ikona se nekontroluje proti slovníku
-  `CARD_ICON_OPTIONS` (duplikace frontendového seznamu v Go), ale jen
-  na tvar `pi pi-<malá písmena, číslice, ->` ≤ 64 — fixture používá
-  `pi pi-exclamation-triangle`, které ve slovníku není; (2) 405 fallback
-  vzniká automaticky z tabulky rout (`routeTable`), ne ručně per cesta,
-  `Allow` u `GET` rout obsahuje i `HEAD`; (3) `ValidationError` má metodu
-  `Is(ErrValidation)`, store proto validační chybu nebalí do
-  `fmt.Errorf("%w: %w")` (zpráva by byla zdvojená); (4) `Settings.Validate`
-  a `OutputRule.Validate` také vrací `ValidationError` kvůli jednotnému
-  slučování polí; (5) `http.FileServer` přesměrovává `/index.html` na `/`
-  (301) — ponecháno, `Cache-Control: no-cache` se nastavuje na `/`;
-  (6) chyba SSE „streaming is not supported“ převedena z `http.Error`
-  (text/plain) na JSON obálku kvůli kritériu „žádná odpověď na `/api/*`
-  není `text/plain`“; (7) `backend-run` i `build*` používají stejné
-  `LDFLAGS`, verze přepsatelná `make build VERSION=…`.
-- **Dokumentace aktualizována**: ano — `docs/architecture/overview.md`
-  (sekce „API kontrakt — chybové odpovědi a limity hodnot“), ADR-0004
-  („Doplnění — Limity hodnot“), README (verze v health), godoc
-  (`ValidationError`, `Validate`, `routeTable`, `decodeJSON`, `spaHandler`),
-  roadmapa. Zobrazení `fields` ve formuláři řeší blok 0032.
+  (`/assets/<hash>` immutable, `/assets` and `/assets/` return
+  `index.html` without a listing). Existing validation (substring) and
+  server tests passed unchanged. `deploy/marionette.example.json` and
+  `dev-fixture.json` satisfy the limits (verified by a script: IDs,
+  lengths, `pi pi-*` icons, 5 s timeouts).
+- **Deviations from the plan**: (1) the icon is not checked against the
+  `CARD_ICON_OPTIONS` vocabulary (that would duplicate the frontend list
+  in Go), only against the shape `pi pi-<lowercase letters, digits, ->`
+  ≤ 64 — the fixture uses `pi pi-exclamation-triangle`, which is not in
+  the vocabulary; (2) the 405 fallback is generated automatically from the
+  route table (`routeTable`), not manually per path; `Allow` on `GET`
+  routes also includes `HEAD`; (3) `ValidationError` has an
+  `Is(ErrValidation)` method, so the store does not wrap the validation
+  error in `fmt.Errorf("%w: %w")` (the message would be duplicated); (4)
+  `Settings.Validate` and `OutputRule.Validate` also return
+  `ValidationError` for uniform field merging; (5) `http.FileServer`
+  redirects `/index.html` to `/` (301) — kept, `Cache-Control: no-cache`
+  is set on `/`; (6) the SSE error "streaming is not supported" was
+  converted from `http.Error` (text/plain) to the JSON envelope because of
+  the criterion "no response on `/api/*` is `text/plain`"; (7)
+  `backend-run` and `build*` use the same `LDFLAGS`, the version can be
+  overridden with `make build VERSION=…`.
+- **Documentation updated**: yes — `docs/architecture/overview.md`
+  (section "API contract — error responses and value limits"), ADR-0004
+  ("Addendum — Value limits"), README (version in health), godoc
+  (`ValidationError`, `Validate`, `routeTable`, `decodeJSON`,
+  `spaHandler`), roadmap. Displaying `fields` in the form is handled by
+  block 0032.

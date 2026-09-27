@@ -1,22 +1,22 @@
-# ADR-XXXX: {Krátký název rozhodnutí}
+# ADR-XXXX: {Short decision title}
 
-- **Stav**: Navrženo | Přijato | Zamítnuto | Nahrazeno ADR-YYYY
-- **Datum**: {YYYY-MM-DD}
+- **Status**: Proposed | Accepted | Rejected | Superseded by ADR-YYYY
+- **Date**: {YYYY-MM-DD}
 
-## Kontext
+## Context
 
-Jaký problém řešíme? Jaká je situace, která vyžaduje rozhodnutí?
+What problem are we solving? What is the situation that requires a decision?
 
-## Rozhodnutí
+## Decision
 
-Co jsme se rozhodli udělat. Formulovat jako jednoznačné tvrzení.
+What we decided to do. Phrase it as an unambiguous statement.
 
-## Zvažované alternativy
+## Considered alternatives
 
-- Alternativa A — proč zamítnuta/přijata
-- Alternativa B — proč zamítnuta/přijata
+- Alternative A — why rejected/accepted
+- Alternative B — why rejected/accepted
 
-## Důsledky
+## Consequences
 
-Co z rozhodnutí plyne — pozitivní i negativní, vč. dopadu na výkon,
-bezpečnost, nasazení, testovatelnost.
+What follows from the decision — positive and negative, including the impact
+on performance, security, deployment, testability.

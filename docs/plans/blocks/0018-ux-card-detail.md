@@ -1,64 +1,65 @@
-# Implementační blok: UX-04 — Detail karty, běhy a status timeline
+# Implementation block: UX-04 — Card detail, runs and status timeline
 
-- **Fáze**: 9 — UX redesign a sdílený design systém
-- **Vazba na požadavky**: FR-17, FR-20, FR-21, FR-24, FR-25, FR-26, FR-27, FR-29, NFR-08..10
-- **Vazba na ADR**: ADR-0003, ADR-0006, ADR-0007
-- **Stav**: Hotovo
-- **Závislosti**: Bloky 0015–0017, read-only API runs/status/history
+- **Phase**: 9 — UX redesign and shared design system
+- **Requirements**: FR-17, FR-20, FR-21, FR-24, FR-25, FR-26, FR-27, FR-29, NFR-08..10
+- **ADRs**: ADR-0003, ADR-0006, ADR-0007
+- **Status**: Done
+- **Dependencies**: Blocks 0015–0017, read-only API runs/status/history
 
-## Cíl bloku
+## Goal
 
-Detail karty poskytne diagnostický pohled na poslední známý status, poslední
-běhy primární akce a historii skutečných status transitions. Uživatel se z
-Overview dostane na detail jedním jasným odkazem.
+The card detail provides a diagnostic view of the last known status, the
+latest runs of the primary action and the history of actual status
+transitions. The user gets from Overview to the detail with one clear link.
 
-## Rozsah
+## Scope
 
-- **Uvnitř**:
-  - route `/cards/:id` a odkaz `View details` z Overview;
-  - header s názvem, ikonou, stavem a poslední kontrolou;
-  - summary aktuálního stavu a délky posledního status intervalu;
-  - actions `Run action` a `Check status`;
-  - recent primary runs s outcome, exit code, časem, délkou a sbalitelným outputem;
-  - status transition timeline s novým stavem, začátkem, koncem a délkou;
-  - loading, empty, not-found a error states;
-  - responsive layout a keyboard-accessible controls.
-- **Mimo rozsah**:
-  - změny backend API nebo job IDs;
-  - editace konfigurace přímo v detailu;
+- **In scope**:
+  - route `/cards/:id` and the `View details` link from Overview;
+  - header with the name, icon, state and last check;
+  - summary of the current state and the duration of the last status interval;
+  - actions `Run action` and `Check status`;
+  - recent primary runs with outcome, exit code, time, duration and collapsible output;
+  - status transition timeline with the new state, start, end and duration;
+  - loading, empty, not-found and error states;
+  - responsive layout and keyboard-accessible controls.
+- **Out of scope**:
+  - changes to the backend API or job IDs;
+  - editing the configuration directly in the detail;
   - live websocket updates;
-  - status run tabulka oddělená od posledního status snapshotu.
+  - a status run table separate from the last status snapshot.
 
-## Schválení
+## Approval
 
-- **Schválil**: projektový vlastník
-- **Datum schválení**: 2026-09-25
-- **Poznámky k rozhodnutí**: Detail používá read-only API a zachovává oddělení provozu a konfigurace.
+- **Approved by**: project owner
+- **Approval date**: 2026-09-25
+- **Decision notes**: The detail uses the read-only API and keeps operations and configuration separate.
 
-## Návrh řešení
+## Proposed solution
 
-Rozšířit `web/src/api.ts` o `getCard`, `getRuns` a `getStatusHistory`. Přidat
-`CardDetailView.vue` s lokálním načtením card/status/runs/history přes
-`Promise.allSettled`, aby selhání jedné read-only sekce neshodilo ostatní.
-Duration hodnoty z Go JSON jsou nanosekundy a UI je převede na čitelnou délku.
-Output bude ve `<details>` prvku, aby dlouhý výstup nerozbil skenování.
+Extend `web/src/api.ts` with `getCard`, `getRuns` and `getStatusHistory`. Add
+`CardDetailView.vue` with local loading of card/status/runs/history via
+`Promise.allSettled`, so that a failure of one read-only section does not
+bring down the others. Duration values from Go JSON are nanoseconds and the
+UI converts them to a readable duration. Output goes in a `<details>`
+element so that long output does not break scanning.
 
-## Testovací plán
+## Test plan
 
 - `npm run format`, `npm run lint`, `npm run build`.
-- Browser smoke test detailu s empty history a s runs/status history.
-- Ověřit `/cards/missing` jako not-found/error state.
-- Ověřit keyboard focus na back, action buttons a output disclosure.
-- Ověřit 320px layout bez horizontálního overflow.
+- Browser smoke test of the detail with empty history and with runs/status history.
+- Verify `/cards/missing` as a not-found/error state.
+- Verify keyboard focus on back, action buttons and the output disclosure.
+- Verify the 320px layout without horizontal overflow.
 
-## Kritérium hotovosti
+## Done criteria
 
-Detail používá skutečné read-only endpointy, zobrazuje transition history jako
-časovou osu, neukazuje technické raw labels jako hlavní text a žádná sekce
-neschová celý detail kvůli izolované chybě.
+The detail uses the real read-only endpoints, shows the transition history as
+a timeline, does not show technical raw labels as the main text, and no
+section hides the whole detail because of an isolated error.
 
-## Uzavření
+## Closure
 
-- **Stav po implementaci**: Hotovo
-- **Ověření**: `npm run format`, `npm run lint -- --quiet`, `npm run build` — úspěšné; browser detail smoke test a 320px responsive test — úspěšné
-- **Dokumentace aktualizována**: ano; roadmapa a UX specifikace
+- **Status after implementation**: Done
+- **Verification**: `npm run format`, `npm run lint -- --quiet`, `npm run build` — successful; browser detail smoke test and 320px responsive test — successful
+- **Documentation updated**: yes; roadmap and UX specification

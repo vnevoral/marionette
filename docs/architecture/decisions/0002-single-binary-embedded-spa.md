@@ -1,39 +1,41 @@
-# ADR-0002: Jeden Go binární soubor s vestavěným SPA
+# ADR-0002: A single Go binary with an embedded SPA
 
-- **Stav**: Přijato
-- **Datum**: 2026-09-25
+- **Status**: Accepted
+- **Date**: 2026-09-25
 
-## Kontext
+## Context
 
-Cílová platforma je Raspberry Pi s Ubuntu (linux/arm64) a obecně
-nízkovýkonné/omezené prostředí, kde nechceme vyžadovat instalaci Node.js,
-webserveru (nginx) ani jiného runtime jen kvůli provozu UI (viz FR-01, FR-02,
-NFR-02).
+The target platform is a Raspberry Pi with Ubuntu (linux/arm64) and, in
+general, a low-power/constrained environment where we do not want to
+require installing Node.js, a web server (nginx) or any other runtime just
+to run the UI (see FR-01, FR-02, NFR-02).
 
-## Rozhodnutí
+## Decision
 
-Backend je napsán v Go a build produkuje jeden statický binární soubor.
-Frontend (Vue 3 SPA) se sestaví přes Vite do `web/dist` a pomocí `go:embed`
-(`internal/webui`) se vloží do binárky. HTTP server (`internal/server`) servíruje
-API i statická aktiva SPA ze stejného procesu a portu, s fallbackem na
-`index.html` pro klientský routing (Vue Router).
+The backend is written in Go and the build produces a single static binary.
+The frontend (Vue 3 SPA) is built with Vite into `web/dist` and embedded
+into the binary using `go:embed` (`internal/webui`). The HTTP server
+(`internal/server`) serves both the API and the SPA's static assets from the
+same process and port, with a fallback to `index.html` for client-side
+routing (Vue Router).
 
-## Zvažované alternativy
+## Considered alternatives
 
-- Samostatný Node.js server pro UI + Go API — zamítnuto, vyžaduje runtime a
-  proces navíc na cíli (NFR-02).
-- Servírování UI přes nginx/Apache vedle Go API — zamítnuto ze stejného
-  důvodu, zbytečná provozní komplexita na Raspberry Pi.
-- SSR/Nuxt — zamítnuto, zbytečná komplexita pro interní dashboard bez
-  požadavku na SEO.
+- A separate Node.js server for the UI + Go API — rejected, requires an
+  extra runtime and process on the target (NFR-02).
+- Serving the UI via nginx/Apache next to the Go API — rejected for the
+  same reason, unnecessary operational complexity on a Raspberry Pi.
+- SSR/Nuxt — rejected, unnecessary complexity for an internal dashboard
+  with no SEO requirement.
 
-## Důsledky
+## Consequences
 
-- Release artefakt je jeden soubor per platforma (`bin/marionette`,
-  `bin/marionette-linux-arm64`), instalace = zkopírovat + spustit (+ systemd
-  unit, viz roadmapa fáze 7).
-- Build pipeline musí vždy nejdřív sestavit UI (`make ui-build`) před
-  `go build`, jinak embed selže nebo obsahuje starý obsah — řešeno pořadím
-  cílů v `Makefile`.
-- Vývojový režim (`ui-dev` + `backend-dev`) běží odděleně přes Vite proxy na
-  `/api`, produkční build je vždy sjednocený do jednoho procesu.
+- The release artifact is one file per platform (`bin/marionette`,
+  `bin/marionette-linux-arm64`), installation = copy + run (+ systemd
+  unit, see roadmap Phase 7).
+- The build pipeline must always build the UI first (`make ui-build`)
+  before `go build`, otherwise the embed fails or contains stale content —
+  handled by the order of targets in the `Makefile`.
+- Development mode (`ui-dev` + `backend-dev`) runs separately via a Vite
+  proxy on `/api`; the production build is always unified into a single
+  process.

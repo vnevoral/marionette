@@ -1,104 +1,115 @@
-# Marionette — instrukce pro AI agenty
+# Marionette — instructions for AI agents
 
-Tento soubor je hlavní vstupní bod pro jakéhokoli AI coding agenta (Copilot,
-Claude Code, Cursor, ...) pracujícího v tomto repozitáři. Čti ho vždy jako
-první před zahájením práce.
+This file is the main entry point for any AI coding agent (Copilot,
+Claude Code, Cursor, ...) working in this repository. Always read it
+first before starting work.
 
-## O projektu
+## About the project
 
-Marionette je samostatně nasaditelná aplikace (jeden binární soubor) běžící
-jako služba na Raspberry Pi (Ubuntu, linux/arm64) nebo obecně na Linuxu, bez
-nutnosti instalovat jakýkoli runtime (Node.js, JVM, ...) na cílovém stroji.
-Aplikace poskytuje webové rozhraní (dashboard) pro definici a ovládání tzv.
-**akčních karet** (action cards) — každá karta spouští na hostu konfigurovaný
-příkaz/akci a umí ověřit výsledný stav pomocí přidružené status/health-check
-akce (např. Wake-on-LAN + ping). Konfigurace karet a akcí se persistuje do
-jednoho konfiguračního souboru (JSON) a za běhu žije v in-memory struktuře.
+Marionette is a self-contained deployable application (a single binary)
+running as a service on a Raspberry Pi (Ubuntu, linux/arm64) or on Linux in
+general, without having to install any runtime (Node.js, JVM, ...) on the
+target machine. The application provides a web interface (dashboard) for
+defining and controlling so-called **action cards** — each card runs a
+configured command/action on the host and can verify the resulting state
+using an associated status/health-check action (e.g. Wake-on-LAN + ping).
+The configuration of cards and actions is persisted to a single
+configuration file (JSON) and lives in an in-memory structure at runtime.
 
-Podrobný a závazný popis požadavků a rozhodnutí najdeš v [docs/](docs/README.md):
+A detailed and binding description of the requirements and decisions is in [docs/](docs/README.md):
 
-- [docs/requirements/requirements.md](docs/requirements/requirements.md) — co se má postavit (SRS)
-- [docs/architecture/overview.md](docs/architecture/overview.md) — jak je to postavené
-- [docs/architecture/decisions/](docs/architecture/decisions) — ADR log (proč)
-- [docs/plans/roadmap.md](docs/plans/roadmap.md) — fáze a implementační bloky
-- [docs/devops/testing-strategy.md](docs/devops/testing-strategy.md) a [docs/devops/ci-cd.md](docs/devops/ci-cd.md)
+- [docs/requirements/requirements.md](docs/requirements/requirements.md) — what is to be built (SRS)
+- [docs/architecture/overview.md](docs/architecture/overview.md) — how it is built
+- [docs/architecture/decisions/](docs/architecture/decisions) — ADR log (why)
+- [docs/plans/roadmap.md](docs/plans/roadmap.md) — phases and implementation blocks
+- [docs/devops/testing-strategy.md](docs/devops/testing-strategy.md) and [docs/devops/ci-cd.md](docs/devops/ci-cd.md)
 
-Pokud cokoliv v kódu nesouhlasí s dokumenty výše, dokumenty jsou zdroj pravdy —
-nejprve navrhni jejich aktualizaci (ADR / requirements), teprve poté měň kód.
+If anything in the code disagrees with the documents above, the documents
+are the source of truth — first propose updating them (ADR / requirements),
+only then change the code.
 
-## Architektura v kostce
+## Architecture at a glance
 
-- `cmd/marionette` — entrypoint: kompozice služeb, `slog`, lifecycle a
+- `cmd/marionette` — entrypoint: service composition, `slog`, lifecycle and
   graceful shutdown
-- `internal/server` — čistě HTTP vrstva: routy, validace požadavků,
-  cross-site ochrana, SSE zápis, SPA fallback (žádné goroutiny mimo handlery)
-- `internal/config` — doménový model karet, in-memory store, JSON persistence
-- `internal/execengine` — bezpečné spouštění akcí (procesní skupina, timeout,
-  minimální prostředí) a limit souběžnosti
-- `internal/status` — vyhodnocení statusu karty a polling scheduler
-- `internal/actions` — fronta akcí na pozadí (bounded, deduplikace, drain)
-- `internal/events` — broker statusových událostí pro SSE
-- `internal/webui` — `go:embed` vestavěného `web/dist` do binárky
-- `web` — Vue 3 + PrimeVue 4 (Aura theme) SPA, buildí se přes Vite do
+- `internal/server` — pure HTTP layer: routes, request validation,
+  cross-site protection, SSE writing, SPA fallback (no goroutines outside
+  handlers)
+- `internal/config` — domain model of cards, in-memory store, JSON persistence
+- `internal/execengine` — safe execution of actions (process group, timeout,
+  minimal environment) and the concurrency limit
+- `internal/status` — card status evaluation and the polling scheduler
+- `internal/actions` — background action queue (bounded, deduplication, drain)
+- `internal/events` — status event broker for SSE
+- `internal/webui` — `go:embed` of the built `web/dist` into the binary
+- `web` — Vue 3 + PrimeVue 4 (Aura theme) SPA, built via Vite into
   `internal/webui/dist`
 
-Výsledkem `make build` je jeden binární soubor bez externích závislostí za
-běhu (žádný Node.js na cíli, žádný samostatný webserver).
+The result of `make build` is a single binary with no external runtime
+dependencies (no Node.js on the target, no separate web server).
 
-## Build & test příkazy
+## Build & test commands
 
 ```bash
-make ui-install     # jednou: npm install pro web/
+make ui-install     # once: npm install for web/
 make ui-dev          # Vite dev server :5173 (proxy /api -> :8080)
-make backend-dev     # Go backend s hot-reload (air) na :8080
-make build           # build UI + embed + Go binárka pro aktuální platformu
-make build-arm64     # cross-compile pro Raspberry Pi (linux/arm64)
+make backend-dev     # Go backend with hot-reload (air) on :8080
+make build           # build UI + embed + Go binary for the current platform
+make build-arm64     # cross-compile for Raspberry Pi (linux/arm64)
 make test            # go test -race ./... + npm test (Vitest)
 make lint            # golangci-lint + eslint + vue-tsc + prettier --check
-make verify          # jediný validační příkaz: build UI + lint + test + go build/vet
+make verify          # the single validation command: build UI + lint + test + go build/vet
 ```
 
-Pro web samostatně (`cd web`): `npm run lint`, `npm run lint:types`,
+For the web alone (`cd web`): `npm run lint`, `npm run lint:types`,
 `npm run format` / `npm run format:check`, `npm run build`
 (`vue-tsc -b && vite build`).
 
-Lokální dev konfigurace `./marionette.json` je ignorovaná gitem a vzniká
-z `deploy/dev-fixture.json` příkazem `make dev-config` (volá se automaticky
-z `make backend-dev` / `backend-run`).
+The local dev configuration `./marionette.json` is ignored by git and is
+created from `deploy/dev-fixture.json` by `make dev-config` (called
+automatically from `make backend-dev` / `backend-run`).
 
-**Před uzavřením jakékoli změny spusť `make verify`** — je to jediné místo,
-kde je definována sada validačních příkazů (CI a Definition of Done na něj
-odkazují). Při rychlé iteraci lze použít dílčí `make test`, `make lint`,
-nebo přímo `go test ./...` a `npm run lint`.
+**Before closing any change, run `make verify`** — it is the only place
+where the set of validation commands is defined (CI and the Definition of
+Done refer to it). During fast iteration you can use the partial
+`make test`, `make lint`, or directly `go test ./...` and `npm run lint`.
 
-## Konvence
+## Conventions
 
-- Go: formát `gofumpt` (přísnější nadmnožina `gofmt`, vynucuje `make lint`),
-  balíčky bez zbytečných abstrakcí, chyby se vracejí,
-  nepoužívá se `panic` mimo `internal/webui` inicializaci vestavěného FS.
-- Vue/TS: `<script setup lang="ts">`, PrimeVue komponenty místo vlastních UI
-  prvků, odsazení tabulátorem (viz `.prettierrc.json`), ESLint flat config.
-- Konfigurace aplikace (akční karty) je jeden JSON soubor — nezaváděj externí
-  databázi bez nové ADR, která to zdůvodní (viz [ADR-0004](docs/architecture/decisions/0004-action-card-domain-model.md)).
-- Akce spouštěné na hostu (shell příkazy) jsou bezpečnostně citlivé — nikdy
-  nepřidávej możnost spouštět libovolný uživatelský vstup bez validace/escapingu;
-  viz bezpečnostní požadavky v [docs/requirements/requirements.md](docs/requirements/requirements.md).
+- Language: everything committed to the repository is in English —
+  requirements, ADRs, roadmap, implementation blocks, UX specification,
+  README, prompts and instructions, code comments and commit messages. The
+  conversation with the project owner may be in another language; artifacts
+  written into the repository are not.
+- Go: `gofumpt` formatting (a stricter superset of `gofmt`, enforced by
+  `make lint`), packages without unnecessary abstractions, errors are
+  returned, `panic` is not used outside the `internal/webui` initialization
+  of the embedded FS.
+- Vue/TS: `<script setup lang="ts">`, PrimeVue components instead of custom
+  UI elements, tab indentation (see `.prettierrc.json`), ESLint flat config.
+- The application configuration (action cards) is a single JSON file — do
+  not introduce an external database without a new ADR that justifies it
+  (see [ADR-0004](docs/architecture/decisions/0004-action-card-domain-model.md)).
+- Actions run on the host (shell commands) are security-sensitive — never
+  add the ability to run arbitrary user input without validation/escaping;
+  see the security requirements in [docs/requirements/requirements.md](docs/requirements/requirements.md).
 
-## Proces vývoje (spec-driven, AI-agent řízený)
+## Development process (spec-driven, AI-agent driven)
 
-Závazný proces je popsán v
+The binding process is described in
 [docs/devops/development-workflow.md](docs/devops/development-workflow.md).
-Postup je: **požadavek → requirement → ADR podle potřeby → roadmapa →
-implementační blok → schválení → implementace + testy → Definition of Done →
-uzavření a aktualizace dokumentace**.
+The flow is: **request → requirement → ADR if needed → roadmap →
+implementation block → approval → implementation + tests → Definition of
+Done → closure and documentation update**.
 
-Pro jednotlivé kroky použij prompty v `.github/prompts/`:
+For the individual steps use the prompts in `.github/prompts/`:
 
-- `/new-requirement` — zápis/úprava požadavku do requirements.md
-- `/new-adr` — návrh nového architektonického rozhodnutí
-- `/plan-block` — rozpracování fáze z roadmapy do konkrétního implementačního bloku
-- `/implement-block` — implementace jednoho schváleného bloku vč. testů
+- `/new-requirement` — write/edit a requirement in requirements.md
+- `/new-adr` — propose a new architectural decision
+- `/plan-block` — elaborate a roadmap phase into a concrete implementation block
+- `/implement-block` — implement one approved block incl. tests
 
-Neimplementuj funkčnost, která není pokrytá requirementem, případným přijatým
-ADR a schváleným implementačním blokem v roadmapě. Detailní pravidla stavů,
-schvalování, odchylek a Definition of Done jsou v uvedeném workflow dokumentu.
+Do not implement functionality that is not covered by a requirement, any
+accepted ADR, and an approved implementation block in the roadmap. The
+detailed rules for statuses, approval, deviations and the Definition of
+Done are in the workflow document mentioned above.

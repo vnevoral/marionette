@@ -1,114 +1,128 @@
-# Implementační blok: Pojmenované verze releasu (git tagy)
+# Implementation block: Named release versions (git tags)
 
-- **Fáze**: 7 — Balíčkování a nasazení (dodatek po uzavření fáze)
-- **Vazba na požadavky**: FR-01, FR-41 (verze v `/api/health`), NFR-02
-- **Vazba na ADR**: ADR-0002; nové ADR není potřeba
-- **Stav**: Hotovo
-- **Závislosti**: Blok 0023 (release archiv, `VERSION` z `git describe`)
+- **Phase**: 7 — Packaging and deployment (addendum after the phase was closed)
+- **Requirements**: FR-01, FR-41 (version in `/api/health`), NFR-02
+- **ADRs**: ADR-0002; no new ADR needed
+- **Status**: Done
+- **Dependencies**: Block 0023 (release archive, `VERSION` from
+  `git describe`)
 
-## Cíl bloku
+## Goal
 
-Dnes je verzí releasu hash commitu (`25a0094`), protože repozitář nemá
-žádný tag; z `/api/health` ani z názvu archivu nejde poznat, o jakou verzi
-jde a jestli je novější. Po dokončení bloku má každý release verzi
-`vMAJOR.MINOR.PATCH` z git tagu, archiv ji nese v názvu a release se
-nedá omylem sestavit z necommitnutých změn.
+Today the release version is the commit hash (`25a0094`), because the
+repository has no tag; neither `/api/health` nor the archive name tells
+which version it is and whether it is newer. After this block every
+release has a `vMAJOR.MINOR.PATCH` version from a git tag, the archive
+carries it in its name, and a release cannot be built from uncommitted
+changes by mistake.
 
-## Rozsah
+## Scope
 
-- **Uvnitř**:
+- **In scope**:
   - `Makefile`:
-    - `release-arm64` odmítne sestavit release, pokud `VERSION` končí na
-      `-dirty` (necommitnuté změny) nebo neodpovídá tagu
-      `vMAJOR.MINOR.PATCH` přesně na `HEAD`; vypíše, jak tag vytvořit.
-      Vývojový build (`make build`, `build-arm64`) zůstává bez omezení;
-    - archiv `bin/marionette-<verze>-linux-arm64.tar.gz` (např.
-      `marionette-v1.0.0-linux-arm64.tar.gz`); obsah archivu a jméno
-      binárky uvnitř se nemění, takže instalační postup zůstává stejný;
-    - vedle archivu soubor `.sha256` pro kontrolu po přenosu;
-  - pravidla verzování v `docs/devops/ci-cd.md` (sekce Release proces):
-    PATCH = opravy, MINOR = nová funkčnost se zpětně kompatibilní
-    konfigurací a API, MAJOR = nekompatibilní změna konfigurace, API nebo
-    instalace; tag vytváří a pushuje vlastník projektu; postup
+    - `release-arm64` refuses to build a release if `VERSION` ends with
+      `-dirty` (uncommitted changes) or does not match a
+      `vMAJOR.MINOR.PATCH` tag exactly on `HEAD`; it prints how to create
+      the tag. The development build (`make build`, `build-arm64`) stays
+      unrestricted;
+    - archive `bin/marionette-<version>-linux-arm64.tar.gz` (e.g.
+      `marionette-v1.0.0-linux-arm64.tar.gz`); the archive content and the
+      binary name inside do not change, so the installation procedure
+      stays the same;
+    - a `.sha256` file next to the archive for checking after transfer;
+  - versioning rules in `docs/devops/ci-cd.md` (Release process section):
+    PATCH = fixes, MINOR = new functionality with backward-compatible
+    configuration and API, MAJOR = incompatible change to the
+    configuration, API or installation; the project owner creates and
+    pushes the tag; procedure
     `git tag -a vX.Y.Z -m "…" && make release-arm64`;
-  - README (instalace): název archivu s verzí, kontrola `sha256sum -c`,
-    ověření verze přes `/api/health`;
-  - automatický test pravidla releasu (skript volaný z `make test`,
-    podobně jako `deploy/install_test.sh`): odmítnutí `-dirty`, odmítnutí
-    verze bez tagu, přijetí `v1.2.3`.
-- **Mimo rozsah**:
-  - automatické publikování do GitHub Releases nebo sestavení releasu v CI;
-  - zobrazení verze v UI (dnes je v `/api/health`);
-  - změna verze v `web/package.json` (balíček je soukromý a verzi
-    aplikace neurčuje);
-  - vytvoření a push prvního tagu — provede vlastník projektu.
+  - README (installation): archive name with the version, `sha256sum -c`
+    check, verifying the version via `/api/health`;
+  - an automated test of the release rule (a script called from
+    `make test`, similar to `deploy/install_test.sh`): rejecting `-dirty`,
+    rejecting a version without a tag, accepting `v1.2.3`.
+- **Out of scope**:
+  - automatic publishing to GitHub Releases or building the release in CI;
+  - showing the version in the UI (today it is in `/api/health`);
+  - changing the version in `web/package.json` (the package is private
+    and does not determine the application version);
+  - creating and pushing the first tag — done by the project owner.
 
-## Schválení
+## Approval
 
-- **Schválil**: projektový vlastník
-- **Datum schválení**: 2026-09-27
-- **Poznámky k rozhodnutí**: Schváleno vlastníkem („souhlas s návrhy“). První verze `v1.0.0` podle návrhu; tag vytvoří a pushne vlastník.
+- **Approved by**: project owner
+- **Approval date**: 2026-09-27
+- **Decision notes**: Approved by the owner ("agree with the proposals"). First version `v1.0.0` as proposed; the owner creates and pushes the tag.
 
-## Návrh řešení
+## Proposed solution
 
-- Kontrola verze v Makefile přes `git describe --tags --exact-match
-  --match 'v[0-9]*.[0-9]*.[0-9]*'` a `git status --porcelain`; logika je
-  v malém shell skriptu `deploy/release_version.sh` (vrací verzi nebo
-  chybu s nápovědou), aby šla otestovat bez Makefile.
-- Bez tagu `release-arm64` skončí chybou; `VERSION=… make release-arm64`
-  (ruční přepsání) se nepodporuje, aby verze vždy odpovídala tagu.
+- Version check in the Makefile via `git describe --tags --exact-match
+  --match 'v[0-9]*.[0-9]*.[0-9]*'` and `git status --porcelain`; the logic
+  lives in a small shell script `deploy/release_version.sh` (returns the
+  version or an error with a hint) so that it can be tested without the
+  Makefile.
+- Without a tag, `release-arm64` ends with an error;
+  `VERSION=… make release-arm64` (manual override) is not supported, so
+  that the version always matches the tag.
 
-## Testovací plán
+## Test plan
 
-- Skriptový test v dočasném git repozitáři: čistý strom s tagem
-  `v1.2.3` → verze `v1.2.3`; necommitnutá změna → chyba; commit za
-  tagem → chyba; tag jiného tvaru (`test`) → chyba.
-- Ruční: `make release-arm64` bez tagu selže s nápovědou; po tagu vytvoří
-  archiv s verzí v názvu a `.sha256`; `/api/health` na Pi vrátí tag.
+- Script test in a temporary git repository: clean tree with tag
+  `v1.2.3` → version `v1.2.3`; uncommitted change → error; commit after
+  the tag → error; a tag of another form (`test`) → error.
+- Manual: `make release-arm64` without a tag fails with a hint; after
+  tagging it creates an archive with the version in its name and a
+  `.sha256`; `/api/health` on the Pi returns the tag.
 - `make verify`.
 
-## Kritérium hotovosti
+## Done criteria
 
-Viz [Definition of Done](../../devops/definition-of-done.md) +:
+See [Definition of Done](../../devops/definition-of-done.md) plus:
 
-- release archiv nese verzi z tagu v názvu i v `/api/health` a nejde
-  sestavit z necommitnutých změn.
+- the release archive carries the tag version in its name and in
+  `/api/health`, and cannot be built from uncommitted changes.
 
-## Uzavření
+## Closure
 
-- **Stav po implementaci**: Hotovo (2026-09-27)
-- **Ověření**:
+- **Status after implementation**: Done (2026-09-27)
+- **Verification**:
   - `bash -n deploy/release_version.sh`, `bash -n deploy/release_version_test.sh` — OK;
   - `bash deploy/release_version_test.sh` — `release_version_test: ok`
-    (dočasný repozitář: commit bez tagu → chyba; čistý strom s anotovaným
-    tagem `v1.2.3` → `v1.2.3`; změněný sledovaný i nový nesledovaný soubor →
-    chyba; commit za tagem → chyba; tagy `test`, `v1.2`, `v1.2.3-rc1` →
-    chyba; lehký tag `v1.3.0` → `v1.3.0`; adresář mimo repozitář → chyba;
-    chybové hlášky obsahují nápovědu `git tag -a vX.Y.Z`);
+    (temporary repository: commit without a tag → error; clean tree with
+    annotated tag `v1.2.3` → `v1.2.3`; modified tracked file and new
+    untracked file → error; commit after the tag → error; tags `test`,
+    `v1.2`, `v1.2.3-rc1` → error; lightweight tag `v1.3.0` → `v1.3.0`;
+    directory outside a repository → error; error messages contain the
+    hint `git tag -a vX.Y.Z`);
   - `bash deploy/install_test.sh` — `install_test: ok`;
-  - `make -n release-arm64` v pracovním stromu s necommitnutými změnami
-    vypíše recept, samotný `make release-arm64` skončí chybou s nápovědou
-    (ověřeno v dočasném klonu); v dočasném klonu s tagem `v1.0.0` vypíše
-    `make -n release-arm64` i s `VERSION=hack` a `RELEASE_VERSION=bad`
-    build s `-X main.version=v1.0.0`, archiv
-    `bin/marionette-v1.0.0-linux-arm64.tar.gz` a `.sha256`;
-  - závěrečné ověření: `make verify` prošel; plný `make release-arm64`
-    v dočasné kopii repozitáře (commit + testovací tag `v1.0.0`, skutečný
-    repozitář beze změny) vytvořil `marionette-v1.0.0-linux-arm64.tar.gz`
-    a `.sha256`, `sha256sum -c` → OK, obsah archivu beze změny, binárka
-    nese `v1.0.0`, strom po buildu zůstal čistý. Ověření `/api/health` na
-    Pi provede vlastník po vytvoření skutečného tagu `v1.0.0`.
-- **Odchylky od návrhu**:
-  - verzi určuje `git tag --points-at HEAD` filtrovaný regulárním výrazem
-    `^v[0-9]+\.[0-9]+\.[0-9]+$` místo `git describe --exact-match --match`
-    (glob by propustil např. `v1.2.3-rc1`); při více tazích na `HEAD` se
-    bere nejvyšší verze;
-  - `release-arm64` už nezávisí na `build-arm64` jako na prerekvizitě:
-    nejdřív ověří verzi a pak volá `$(MAKE) build-arm64 VERSION=<tag>`,
-    aby se kontrola provedla před buildem a verze v binárce odpovídala tagu;
-  - test je zapojen jako nový cíl `make release-test` (součást `make test`)
-    a jako krok jobu `backend` v `.github/workflows/ci.yml`, protože CI
-    `make test` nevolá.
-- **Dokumentace aktualizována**: `docs/devops/ci-cd.md` (CI job backend,
-  pravidla verzování a postup releasu), `README.md` (instalace: archiv
-  s verzí, `sha256sum -c`, ověření verze přes `/api/health`).
+  - `make -n release-arm64` in a working tree with uncommitted changes
+    prints the recipe, `make release-arm64` itself ends with an error with
+    a hint (verified in a temporary clone); in a temporary clone with tag
+    `v1.0.0`, `make -n release-arm64` even with `VERSION=hack` and
+    `RELEASE_VERSION=bad` prints a build with `-X main.version=v1.0.0`,
+    the archive `bin/marionette-v1.0.0-linux-arm64.tar.gz` and `.sha256`;
+  - final verification: `make verify` passed; a full `make release-arm64`
+    in a temporary copy of the repository (commit + test tag `v1.0.0`,
+    the real repository unchanged) created
+    `marionette-v1.0.0-linux-arm64.tar.gz` and `.sha256`,
+    `sha256sum -c` → OK, archive content unchanged, the binary carries
+    `v1.0.0`, the tree stayed clean after the build. Verification of
+    `/api/health` on the Pi will be done by the owner after creating the
+    real `v1.0.0` tag.
+- **Deviations from the plan**:
+  - the version is determined by `git tag --points-at HEAD` filtered by
+    the regular expression `^v[0-9]+\.[0-9]+\.[0-9]+$` instead of
+    `git describe --exact-match --match` (the glob would let through e.g.
+    `v1.2.3-rc1`); with multiple tags on `HEAD` the highest version is
+    taken;
+  - `release-arm64` no longer depends on `build-arm64` as a prerequisite:
+    it first verifies the version and then calls
+    `$(MAKE) build-arm64 VERSION=<tag>`, so that the check runs before the
+    build and the version in the binary matches the tag;
+  - the test is wired in as a new target `make release-test` (part of
+    `make test`) and as a step of the `backend` job in
+    `.github/workflows/ci.yml`, because CI does not call `make test`.
+- **Documentation updated**: `docs/devops/ci-cd.md` (CI backend job,
+  versioning rules and release procedure), `README.md` (installation:
+  archive with the version, `sha256sum -c`, verifying the version via
+  `/api/health`).

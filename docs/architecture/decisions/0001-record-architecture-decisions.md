@@ -1,31 +1,32 @@
-# ADR-0001: Rozhodnutí se zaznamenávají jako ADR v repozitáři
+# ADR-0001: Decisions are recorded as ADRs in the repository
 
-- **Stav**: Přijato
-- **Datum**: 2026-09-25
+- **Status**: Accepted
+- **Date**: 2026-09-25
 
-## Kontext
+## Context
 
-Vývoj řídí primárně AI coding agenti společně s vlastníkem projektu. Aby
-rozhodnutí o architektuře byla dohledatelná, zdůvodněná a nebyla znovu
-otevírána bez kontextu, potřebujeme jednotné místo a formát pro jejich zápis.
+Development is driven primarily by AI coding agents together with the
+project owner. So that architecture decisions are traceable, justified and
+not reopened without context, we need a single place and format for
+recording them.
 
-## Rozhodnutí
+## Decision
 
-Architektonická rozhodnutí se zapisují jako samostatné Markdown soubory ve
-[docs/architecture/decisions/](.) ve formátu `NNNN-kratky-nazev.md` dle
-[šablony](template.md), číslované vzestupně. Nové ADR se navrhují promptem
-`/new-adr` a než jsou označeny jako „Přijato“, implementace na nich stavět
-nesmí.
+Architecture decisions are recorded as separate Markdown files in
+[docs/architecture/decisions/](.) in the format `NNNN-short-name.md` per
+the [template](template.md), numbered in ascending order. New ADRs are
+proposed with the `/new-adr` prompt, and until they are marked as
+"Accepted", implementation must not build on them.
 
-## Zvažované alternativy
+## Considered alternatives
 
-- Rozhodnutí zapisovat jen do README/requirements — zamítnuto, chybí historie
-  a odůvodnění jednotlivých rozhodnutí v čase.
-- Nepoužívat žádný formální proces — zamítnuto, u AI-agentního vývoje hrozí
-  nekonzistentní/protichůdná rozhodnutí mezi jednotlivými seancemi.
+- Recording decisions only in the README/requirements — rejected, it lacks
+  the history and rationale of individual decisions over time.
+- Using no formal process — rejected, AI-agent development risks
+  inconsistent/contradictory decisions between individual sessions.
 
-## Důsledky
+## Consequences
 
-- Každé netriviální architektonické rozhodnutí (volba knihovny, formátu
-  perzistence, komunikačního protokolu apod.) musí mít odpovídající ADR.
-- AGENTS.md odkazuje agenty na ADR log jako zdroj pravdy o „proč“.
+- Every non-trivial architecture decision (choice of library, persistence
+  format, communication protocol, etc.) must have a corresponding ADR.
+- AGENTS.md points agents to the ADR log as the source of truth about "why".

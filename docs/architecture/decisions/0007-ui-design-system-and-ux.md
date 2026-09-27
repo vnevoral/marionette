@@ -1,43 +1,49 @@
-# ADR-0007: Jednotný UI design systém a UX model
+# ADR-0007: Unified UI design system and UX model
 
-- **Stav**: Přijato
-- **Datum**: 2026-09-25
+- **Status**: Accepted
+- **Date**: 2026-09-25
 
-## Kontext
+## Context
 
-První MVP obrazovky používají lokální CSS, odlišné layouty a nekonzistentní
-názvosloví. Dashboard a správa karet proto nepůsobí jako jedna aplikace a
-uživatel obtížně rozlišuje konfiguraci, požadavek na akci a poslední známý
-stav. Požadavky FR-24 až FR-29 a NFR-08 až NFR-10 vyžadují společný základ
-před dalším rozšiřováním UI.
+The first MVP screens use local CSS, different layouts and inconsistent
+naming. The dashboard and card management therefore do not feel like a
+single application, and the user has a hard time distinguishing the
+configuration, the action request and the last known state. Requirements
+FR-24 to FR-29 and NFR-08 to NFR-10 call for a common foundation before the
+UI is extended further.
 
-## Rozhodnutí
+## Decision
 
-Marionette dostane sdílený UI shell a malý projektový design systém nad Vue 3
-a PrimeVue 4. PrimeVue zůstává zdrojem základních komponent; projektová vrstva
-definuje CSS tokeny a vzory pro layout, typografii, semantic status colors,
-akční stavy, formuláře, tabulky/historie, chyby a potvrzení destruktivních akcí.
+Marionette gets a shared UI shell and a small project design system on top of
+Vue 3 and PrimeVue 4. PrimeVue remains the source of the basic components;
+the project layer defines CSS tokens and patterns for layout, typography,
+semantic status colors, action states, forms, tables/histories, errors and
+confirmation of destructive actions.
 
-Každý hlavní tok používá stejný model zpětné vazby: `idle`, `loading`,
-`accepted`, `running`, `success`, `error` a `stale/unknown`, přičemž poslední
-známý status zařízení je vizuálně oddělen od stavu HTTP požadavku. Texty,
-labels a stavové názvy se centralizují v jednom slovníku. Výchozím jazykem UI
-je angličtina (`en-US`); lokalizace do češtiny není součástí této fáze.
+Every main flow uses the same feedback model: `idle`, `loading`,
+`accepted`, `running`, `success`, `error` and `stale/unknown`, where the last
+known device status is visually separated from the state of the HTTP
+request. Texts, labels and state names are centralized in a single
+vocabulary. The default UI language is English (`en-US`); localization into
+Czech is not part of this phase.
 
-## Zvažované alternativy
+## Considered alternatives
 
-- Vlastní sada komponent mimo PrimeVue — zamítnuto; zvyšuje údržbu a obchází
-  přijaté ADR-0003.
-- Pouhé lokální úpravy jednotlivých view — zamítnuto; neřeší konzistenci a
-  vede k dalším odchylkám.
-- Přechod na jinou UI knihovnu nebo Tailwind — odloženo; není potřeba měnit
-  technologickou základnu, dokud PrimeVue 4 pokryje komponentové potřeby.
+- A custom component set outside PrimeVue — rejected; it increases
+  maintenance and bypasses the accepted ADR-0003.
+- Mere local adjustments of individual views — rejected; it does not solve
+  consistency and leads to further deviations.
+- Switching to a different UI library or Tailwind — deferred; there is no
+  need to change the technology base as long as PrimeVue 4 covers the
+  component needs.
 
-## Důsledky
+## Consequences
 
-- Layout, tokeny a stavové vzory budou sdílené mezi dashboardem, správou a
-  budoucím detailem karty.
-- Vizuální změny se budou ověřovat na desktopu i mobilní šířce a přes hlavní
-  workflow, což zvýší čas implementace, ale sníží regresní UX.
-- Nevzniká nová runtime závislost ani změna PrimeVue major verze.
-- Výchozí jazyk UI je angličtina; případná další lokalizace je budoucí rozšíření.
+- Layout, tokens and state patterns will be shared between the dashboard,
+  management and the future card detail.
+- Visual changes will be verified at desktop and mobile width and across the
+  main workflows, which increases implementation time but reduces UX
+  regressions.
+- No new runtime dependency or PrimeVue major version change is introduced.
+- The default UI language is English; any further localization is a future
+  extension.

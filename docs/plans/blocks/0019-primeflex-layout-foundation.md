@@ -1,54 +1,55 @@
-# Implementační blok: PrimeFlex layout foundation
+# Implementation block: PrimeFlex layout foundation
 
-- **Fáze**: 9 — UX redesign a sdílený design systém
-- **Vazba na požadavky**: FR-25, FR-29, NFR-08, NFR-09
-- **Vazba na ADR**: ADR-0003, ADR-0007
-- **Stav**: Hotovo
-- **Závislosti**: Bloky 0015–0018, PrimeVue 4
+- **Phase**: 9 — UX redesign and shared design system
+- **Requirements**: FR-25, FR-29, NFR-08, NFR-09
+- **ADRs**: ADR-0003, ADR-0007
+- **Status**: Done
+- **Dependencies**: Blocks 0015–0018, PrimeVue 4
 
-## Cíl bloku
+## Goal
 
-Projekt používá PrimeFlex jako standardní utility vrstvu pro layout, grid,
-flex, spacing a responsive breakpointy. Vlastní CSS zůstává pouze pro produktové
-kompozice a tokeny, ne pro opakované obecné margin/padding pravidla.
+The project uses PrimeFlex as the standard utility layer for layout, grid,
+flex, spacing and responsive breakpoints. Custom CSS remains only for
+product compositions and tokens, not for repeated general margin/padding
+rules.
 
-## Rozsah
+## Scope
 
-- **Uvnitř**:
-  - instalace `primeflex@4`;
-  - globální načtení `primeflex/primeflex.css`;
-  - dokumentace hranice mezi PrimeFlex layout utilities a vlastními tokeny;
-  - zachování PrimeVue theme a green-first semantic tokenů.
-- **Mimo rozsah**:
-  - kompletní přepis všech existujících view na utility classes;
-  - změna PrimeVue major verze;
-  - změna barevné palety nebo API.
+- **In scope**:
+  - installing `primeflex@4`;
+  - loading `primeflex/primeflex.css` globally;
+  - documenting the boundary between PrimeFlex layout utilities and our own tokens;
+  - keeping the PrimeVue theme and the green-first semantic tokens.
+- **Out of scope**:
+  - a complete rewrite of all existing views to utility classes;
+  - changing the PrimeVue major version;
+  - changing the color palette or the API.
 
-## Schválení
+## Approval
 
-- **Schválil**: projektový vlastník
-- **Datum schválení**: 2026-09-25
-- **Poznámky k rozhodnutí**: PrimeFlex je závazná layout utility vrstva pro další UX bloky.
+- **Approved by**: project owner
+- **Approval date**: 2026-09-25
+- **Decision notes**: PrimeFlex is the mandatory layout utility layer for further UX blocks.
 
-## Návrh řešení
+## Proposed solution
 
-PrimeFlex se načte globálně v `main.ts`. Nové a refaktorované view používají
-utility classes pro grid/flex/spacing/responsive layout. CSS tokeny zůstávají
-pro semantic colors, typography, radius, focus a produktové komponenty.
+PrimeFlex is loaded globally in `main.ts`. New and refactored views use
+utility classes for grid/flex/spacing/responsive layout. CSS tokens remain
+for semantic colors, typography, radius, focus and product components.
 
-## Testovací plán
+## Test plan
 
-- `npm install` dokončí bez dependency konfliktu.
+- `npm install` completes without a dependency conflict.
 - `npm run format`, `npm run lint -- --quiet`, `npm run build`.
-- Browser smoke test ověří, že PrimeFlex CSS je dostupné a aplikace se načte.
+- A browser smoke test verifies that the PrimeFlex CSS is available and the application loads.
 
-## Kritérium hotovosti
+## Done criteria
 
-PrimeFlex je dostupný v bundlu, globálně načtený a dokumentovaný; žádná nová
-layoutová změna nepřidává další utility framework.
+PrimeFlex is available in the bundle, loaded globally and documented; no new
+layout change adds another utility framework.
 
-## Uzavření
+## Closure
 
-- **Stav po implementaci**: Hotovo
-- **Ověření**: `npm install primeflex`, `npm run format`, `npm run lint -- --quiet`, `npm run build` — úspěšné
-- **Dokumentace aktualizována**: ano; roadmapa a ADR-0003
+- **Status after implementation**: Done
+- **Verification**: `npm install primeflex`, `npm run format`, `npm run lint -- --quiet`, `npm run build` — successful
+- **Documentation updated**: yes; roadmap and ADR-0003

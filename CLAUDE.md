@@ -1,1 +1,1 @@
-Instrukce pro AI coding agenty jsou v [AGENTS.md](AGENTS.md) — čti ho jako první.
+Instructions for AI coding agents are in [AGENTS.md](AGENTS.md) — read it first.

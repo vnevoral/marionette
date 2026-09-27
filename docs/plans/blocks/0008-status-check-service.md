@@ -1,46 +1,49 @@
-# Implementační blok: Status check service
+# Implementation block: Status check service
 
-- **Fáze**: 4 — Status/health-check engine
-- **Vazba na požadavky**: FR-12, FR-14, FR-17, FR-19
-- **Vazba na ADR**: ADR-0005, ADR-0006
-- **Stav**: Hotovo
+- **Phase**: 4 — Status/health-check engine
+- **Requirements**: FR-12, FR-14, FR-17, FR-19
+- **ADRs**: ADR-0005, ADR-0006
+- **Status**: Done
 
-## Cíl bloku
+## Goal
 
-Po dokončení lze programově provést jednu status akci karty přes execution
-runner. Výsledek se uloží jako poslední kontrola a do historie se promítne
-jen tehdy, když znamená změnu stavu.
+When done, a single status action of a card can be executed
+programmatically through the execution runner. The result is stored as the
+last check and is reflected in the history only when it means a state
+change.
 
-## Rozsah
+## Scope
 
-- **Uvnitř**:
-  - service přijímající kartu nebo její status akci a card ID;
-  - volání `execengine.Runner`;
-  - mapování výsledku `ok`/`fail`/`timeout` na `StatusState`;
-  - atomické předání výsledku do status projekce/store;
-  - ruční/programové `CheckNow` API bez HTTP vrstvy.
-- **Mimo rozsah**:
-  - scheduler a polling intervaly (0009);
-  - CRUD karet a HTTP endpointy (fáze 5);
-  - uložení každé opakované kontroly do status historie.
+- **In scope**:
+  - a service accepting a card or its status action and the card ID;
+  - calling `execengine.Runner`;
+  - mapping the result `ok`/`fail`/`timeout` to `StatusState`;
+  - atomically handing the result to the status projection/store;
+  - a manual/programmatic `CheckNow` API without the HTTP layer.
+- **Out of scope**:
+  - the scheduler and polling intervals (0009);
+  - card CRUD and HTTP endpoints (phase 5);
+  - storing every repeated check in the status history.
 
-## Návrh řešení
+## Proposed solution
 
-Nový balíček `internal/status` dostane store a `execengine.Runner` přes
-konstruktor. `CheckNow(cardID)` načte kartu, odmítne kartu bez status akce,
-spustí status action a předá `config.Run` jako poslední kontrolu. Store
-rozhodne, zda vznikne `StatusChange`.
+The new package `internal/status` gets the store and `execengine.Runner`
+via the constructor. `CheckNow(cardID)` loads the card, rejects a card
+without a status action, runs the status action and hands over the
+`config.Run` as the last check. The store decides whether a `StatusChange`
+is created.
 
-## Testovací plán
+## Test plan
 
-- status akce s výsledkem `ok`, `fail` a `timeout`;
-- chybějící status akce a neexistující karta;
-- opakované stejné výsledky aktualizují poslední kontrolu, ale ne historii;
-- změna výsledku vytvoří jeden přechod s odpovídajícím časem;
-- execution error neukončí service ani scheduler;
-- fake runner/store a `go test -race`.
+- a status action with the result `ok`, `fail` and `timeout`;
+- a missing status action and a non-existent card;
+- repeated identical results update the last check, but not the history;
+- a change of the result creates one transition with the corresponding time;
+- an execution error does not terminate the service or the scheduler;
+- fake runner/store and `go test -race`.
 
-## Kritérium hotovosti
+## Done criteria
 
-Viz Definition of Done. Specificky: `CheckNow` je testovatelný bez reálné sítě
-nebo procesu a nikdy nezapisuje duplicitní status změnu při stejném výsledku.
+See Definition of Done. Specifically: `CheckNow` is testable without a
+real network or process and never writes a duplicate status change for the
+same result.

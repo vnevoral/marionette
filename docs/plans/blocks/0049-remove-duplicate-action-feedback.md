@@ -1,128 +1,138 @@
-# Implementační blok: Bez duplicitní zpětné vazby akce a skákání karty
+# Implementation block: No duplicate action feedback and no card jumping
 
-- **Fáze**: 8 — Zpevnění (dodatek po uzavření fáze)
-- **Vazba na požadavky**: FR-21, FR-27, FR-29, NFR-08, NFR-09
-- **Vazba na ADR**: ADR-0007 (UX a design systém); nové ADR není potřeba
-- **Stav**: Hotovo
-- **Závislosti**: Bloky 0029, 0037, 0039 (průběh akce a jeho výsledek),
-  0040 (poznámka „Status could not be refreshed“), 0042 (kanály zpětné
-  vazby), 0041 (E2E)
+- **Phase**: 8 — Hardening (addendum after the phase was closed)
+- **Requirements**: FR-21, FR-27, FR-29, NFR-08, NFR-09
+- **ADRs**: ADR-0007 (UX and design system); no new ADR needed
+- **Status**: Done
+- **Dependencies**: Blocks 0029, 0037, 0039 (action progress and its
+  result), 0040 (the "Status could not be refreshed" note), 0042 (feedback
+  channels), 0041 (E2E)
 
-## Cíl bloku
+## Goal
 
-Po spuštění akce karta na dashboardu ukazuje v badge **Queued** /
-**Running** a pod popisem řádek zpětné vazby se stejným textem; po
-dokončení tam asi 4 s visí **Updated**, přestože badge už ukazuje nový
-stav. Řádek vzniká a zaniká, takže karta mění výšku a v mřížce poskakuje
-celá řada. Vlastník projektu (2026-09-26) duplicitu i skákání odmítl.
+After an action is started, the card on the dashboard shows **Queued** /
+**Running** in the badge and, below the description, a feedback line with
+the same text; after completion, **Updated** lingers there for about 4 s
+even though the badge already shows the new status. The line appears and
+disappears, so the card changes height and the whole row in the grid
+jumps. The project owner (2026-09-26) rejected both the duplication and
+the jumping.
 
-Po dokončení bloku karta i detail zobrazují jen zpětnou vazbu, která nese
-informaci navíc proti badge, a to na místě, které nemění výšku karty.
+After this block, both the card and the detail show only feedback that
+carries information beyond the badge, and in a place that does not change
+the card's height.
 
-## Rozsah
+## Scope
 
-- **Uvnitř**:
-  - **Ruší se** (text duplikuje badge): řádek s **Queued** / **Running**
-    během akce a výsledek **Updated** / **Status updated** na dashboardu
-    i v detailu.
-  - **Zůstává** (informace, kterou badge nenese):
-    - **Result not available yet** — kontrola v čekací době nedoběhla,
-      badge ukazuje předchozí stav;
-    - chyba zařazení akce (plná fronta 503, síť, 4xx) — pravidlo §4:
-      chyba nikdy nezmizí beze stopy;
-    - **Accepted** / **Action accepted**, když žádná kontrola
-      nenásleduje (karta bez status akce nebo bez zrychleného pollingu) —
-      jinak by uživatel neměl potvrzení, že se akce spustila.
-  - **Dashboard karta** (`ActionCard.vue`): zbývající zprávy se zobrazí
-    **místo** řádku `Last checked …` / `Not checked yet` na stejné
-    pozici a se stejnou výškou (tón a ikona podle typu, text se ořízne na
-    jeden řádek s plným textem v `title`/tooltipu); po skončení zprávy
-    (asi 4 s, beze změny délky) se vrátí `Last checked …` s novým časem.
-    Karta bez status akce, která dnes řádek `Last checked` nemá, má tento
-    řádek rezervovaný trvale (prázdný, mimo dobu zprávy), aby se její výška
-    neměnila.
-  - **Detail karty** (`CardDetailView.vue`): zbývající zprávy akce se
-    přesunou z řádku nad souhrnem do panelu **Actions** pod tlačítka,
-    do slotu s rezervovanou výškou jednoho řádku. Řádek nad souhrnem
-    zůstává jen pro mazání karty (**Deleting…** a chyba mazání).
-  - **Přístupnost** (NFR-09): změna stavu požadavku se čtečkám dál
-    oznamuje, a to vizuálně skrytou `aria-live="polite"` oblastí (text
-    **Queued**, **Running**, **Updated** …), která nezabírá místo. Badge
-    zůstává nositelem stavu pro vidící uživatele (text + ikona + barva,
-    FR-25).
-  - UX specifikace §4 (feedback rules, feedback channels), §5.2 (anatomie
-    karty) a §6 (detail, Actions) podle tohoto bloku.
-  - Testy komponent a úprava E2E (`card-lifecycle.e2e.ts` dnes čeká na
-    viditelný text **Updated**).
-- **Mimo rozsah**:
-  - změna logiky čekání na kontrolu, časových limitů nebo `useActionRequest`
-    (mění se jen prezentace);
-  - toasty (**Card saved**, **Card deleted**) a zpětná vazba formulářů;
-  - vzhled badge a slovník stavů.
+- **In scope**:
+  - **Removed** (text duplicates the badge): the **Queued** / **Running**
+    line during the action and the **Updated** / **Status updated** result
+    on the dashboard and in the detail.
+  - **Kept** (information the badge does not carry):
+    - **Result not available yet** — the check did not finish within the
+      waiting period, the badge shows the previous status;
+    - an action enqueue error (full queue 503, network, 4xx) — rule §4:
+      an error never disappears without a trace;
+    - **Accepted** / **Action accepted** when no check follows (a card
+      without a status action or without fast polling) — otherwise the
+      user would have no confirmation that the action was started.
+  - **Dashboard card** (`ActionCard.vue`): the remaining messages are shown
+    **instead of** the `Last checked …` / `Not checked yet` line, in the
+    same position and with the same height (tone and icon by type, text
+    truncated to one line with the full text in `title`/tooltip); after the
+    message ends (about 4 s, duration unchanged) `Last checked …` returns
+    with the new time. A card without a status action, which today has no
+    `Last checked` line, has this line reserved permanently (empty outside
+    the message period) so that its height does not change.
+  - **Card detail** (`CardDetailView.vue`): the remaining action messages
+    move from the line above the summary into the **Actions** panel below
+    the buttons, into a slot with a reserved height of one line. The line
+    above the summary remains only for card deletion (**Deleting…** and
+    the deletion error).
+  - **Accessibility** (NFR-09): request state changes are still announced
+    to screen readers, via a visually hidden `aria-live="polite"` region
+    (text **Queued**, **Running**, **Updated** …) that takes up no space.
+    The badge remains the carrier of the status for sighted users (text +
+    icon + color, FR-25).
+  - UX specification §4 (feedback rules, feedback channels), §5.2 (card
+    anatomy) and §6 (detail, Actions) according to this block.
+  - Component tests and E2E adjustment (`card-lifecycle.e2e.ts` currently
+    waits for the visible text **Updated**).
+- **Out of scope**:
+  - changing the logic of waiting for the check, time limits or
+    `useActionRequest` (only the presentation changes);
+  - toasts (**Card saved**, **Card deleted**) and form feedback;
+  - badge appearance and the status vocabulary.
 
-## Schválení
+## Approval
 
-- **Schválil**: projektový vlastník
-- **Datum schválení**: 2026-09-26
-- **Poznámky k rozhodnutí**: Schváleno vlastníkem („vše schvaluji“). Rozdělení zpráv, zobrazení místo `Last checked` a použití i v detailu karty potvrzeno 2026-09-26.
+- **Approved by**: project owner
+- **Approval date**: 2026-09-26
+- **Decision notes**: Approved by the owner ("I approve everything"). The split of messages, display instead of `Last checked`, and use in the card detail as well confirmed 2026-09-26.
 
-## Návrh řešení
+## Proposed solution
 
-- `ActionCard.vue`: `feedback` vrací zprávu jen pro `result`, který není
-  `updated`; `pending` do viditelného textu nevstupuje. Řádek `card-meta`
-  se vykreslí vždy (`Last checked …`, zpráva, nebo prázdný pro kartu bez
-  status akce) s pevnou výškou jednoho řádku.
-- Poznámka **Status could not be refreshed** (blok 0040) zůstává
-  samostatná; pokud by i ona způsobovala skok, řeší se mimo tento blok.
-- Sdílená vizuálně skrytá live oblast: malá komponenta nebo třída
-  `visually-hidden` v globálních stylech (pokud už neexistuje).
-- `RequestState.vue` zůstává pro ostatní použití (editace, zařízení).
+- `ActionCard.vue`: `feedback` returns a message only for a `result` that
+  is not `updated`; `pending` does not enter the visible text. The
+  `card-meta` line is always rendered (`Last checked …`, a message, or
+  empty for a card without a status action) with a fixed height of one
+  line.
+- The **Status could not be refreshed** note (block 0040) remains
+  separate; if it also causes a jump, that is handled outside this block.
+- A shared visually hidden live region: a small component or a
+  `visually-hidden` class in the global styles (if it does not exist yet).
+- `RequestState.vue` remains for other uses (editing, devices).
 
-## Testovací plán
+## Test plan
 
-- Vitest `ActionCard`: během `pending` není viditelný text **Queued** /
-  **Running** mimo badge, ale je v live oblasti; `result.updated` nic
-  viditelného nepřidá; **Result not available yet**, chyba a **Accepted**
-  se zobrazí místo `Last checked` a po vypršení se `Last checked` vrátí;
-  karta bez status akce má řádek vždy.
-- Vitest `CardDetailView`: zprávy akce v panelu Actions, mazání nad
-  souhrnem.
-- `make e2e`: `card-lifecycle` ověří výsledek podle badge místo textu
-  **Updated**; měření, že výška karty během a po akci zůstane stejná
-  (`boundingBox` před / během / po).
+- Vitest `ActionCard`: during `pending` no visible **Queued** /
+  **Running** text outside the badge, but it is in the live region;
+  `result.updated` adds nothing visible; **Result not available yet**, an
+  error and **Accepted** are shown instead of `Last checked` and after
+  expiry `Last checked` returns; a card without a status action always has
+  the line.
+- Vitest `CardDetailView`: action messages in the Actions panel, deletion
+  above the summary.
+- `make e2e`: `card-lifecycle` verifies the result by the badge instead of
+  the **Updated** text; a measurement that the card height stays the same
+  during and after the action (`boundingBox` before / during / after).
 - `make verify`.
 
-## Kritérium hotovosti
+## Done criteria
 
-Viz [Definition of Done](../../devops/definition-of-done.md) +:
+See [Definition of Done](../../devops/definition-of-done.md) plus:
 
-- spuštění akce na dashboardu nezmění výšku žádné karty v mřížce;
-- žádný viditelný text zpětné vazby neopakuje to, co právě ukazuje badge.
+- starting an action on the dashboard does not change the height of any
+  card in the grid;
+- no visible feedback text repeats what the badge is currently showing.
 
-## Uzavření
+## Closure
 
-- **Stav po implementaci**: Hotovo (2026-09-26)
-- **Ověření**: `make verify` prošel (164 testů Vitest, `install_test`,
+- **Status after implementation**: Done (2026-09-26)
+- **Verification**: `make verify` passed (164 Vitest tests, `install_test`,
   golangci-lint, eslint, vue-tsc, prettier, `go test -race`); `make e2e`
-  prošel (16 scénářů), `card-lifecycle` měří výšku karty před akcí, po
-  **Check status** i po **Run action**.
-- **Implementace**: nová komponenta `ActionNote.vue` (klidový řádek, který
-  výsledek akce nahradí na místě, a vizuálně skrytá `aria-live` oblast pro
-  fáze a výsledky); `RequestResult.quiet` pro **Updated** / **Status
-  updated** (`outcomeResult`); `ActionCard` zobrazuje `ActionNote` místo
-  `Last checked` s pevnou výškou jednoho řádku; `CardDetailView` přesunul
-  výsledky akcí do panelu Actions (`useTransientResult`), řádek nad
-  souhrnem zůstal jen pro mazání. Odstraněny nepoužívané texty
-  `FEEDBACK.queued` a `FEEDBACK.actionQueued`.
-- **Odchylky od návrhu**: klidový text panelu Actions („Actions are queued
-  asynchronously…“) se přesunul do slovníku (`FEEDBACK.actionsAsync`),
-  protože ho `ActionNote` zobrazuje jako fallback.
-- **Nález mimo rozsah**: scénář `creates, runs, checks and deletes a card`
-  jednou selhal, protože detail po **Action accepted** načte běhy hned,
-  ještě než primární akce doběhne (sekce Recent runs zůstala prázdná).
-  Opakovaný běh (3×) prošel; chování je původní z bloku 0039 a tento blok
-  ho nemění. Návrh: nový blok, který po přijetí akce bez následné kontroly
-  načte běhy znovu po jejím dokončení (např. po `timeoutSec` nebo přes
-  událost běhu).
-- **Dokumentace aktualizována**: ano — UX specifikace §4, §5.2, §6,
-  roadmapa.
+  passed (16 scenarios), `card-lifecycle` measures the card height before
+  the action, after **Check status** and after **Run action**.
+- **Implementation**: new component `ActionNote.vue` (an idle line that
+  the action result replaces in place, and a visually hidden `aria-live`
+  region for phases and results); `RequestResult.quiet` for **Updated** /
+  **Status updated** (`outcomeResult`); `ActionCard` shows `ActionNote`
+  instead of `Last checked` with a fixed height of one line;
+  `CardDetailView` moved action results into the Actions panel
+  (`useTransientResult`), the line above the summary remained only for
+  deletion. Removed the unused texts `FEEDBACK.queued` and
+  `FEEDBACK.actionQueued`.
+- **Deviations from the plan**: the idle text of the Actions panel
+  ("Actions are queued asynchronously…") moved into the vocabulary
+  (`FEEDBACK.actionsAsync`), because `ActionNote` displays it as a
+  fallback.
+- **Out-of-scope finding**: the scenario `creates, runs, checks and deletes
+  a card` failed once, because after **Action accepted** the detail loads
+  the runs immediately, before the primary action finishes (the Recent
+  runs section stayed empty). A repeated run (3×) passed; the behavior
+  dates from block 0039 and this block does not change it. Proposal: a new
+  block that, after an action is accepted without a subsequent check,
+  reloads the runs after it completes (e.g. after `timeoutSec` or via a run
+  event).
+- **Documentation updated**: yes — UX specification §4, §5.2, §6,
+  roadmap.

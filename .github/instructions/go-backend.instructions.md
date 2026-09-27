@@ -5,20 +5,21 @@ applyTo: "cmd/**/*.go,internal/**/*.go"
 
 # Go backend
 
-- Formát `gofumpt` (`gofumpt -modpath marionette -w`), `go vet` čistota a
-  `golangci-lint` bez nálezů (`.golangci.yml`); exportované symboly mají
-  godoc komentář.
-- Chyby se vracejí (`error`), nepoužívá se `panic` mimo inicializaci
-  vestavěného FS v `internal/webui`.
-- Spouštění externích příkazů (execution engine, fáze 3) vždy přes
-  `exec.CommandContext(ctx, name, args...)` s explicitním seznamem argumentů —
-  nikdy neskládat shell příkaz jako string z uživatelského vstupu.
-- Každé spuštění externího příkazu má timeout (`context.WithTimeout`).
-- Doménová logika (config store, vyhodnocení akcí) je oddělená od HTTP vrstvy
-  (`internal/server`) a testovatelná bez sítě/reálného spouštění procesů.
-- Po každé změně: `go build ./...`, `go vet ./...`, `go test ./...`; před
-  uzavřením `make verify`.
-- Nová funkčnost musí mít odpovídající FR/NFR v
+- `gofumpt` formatting (`gofumpt -modpath marionette -w`), clean `go vet`
+  and `golangci-lint` with no findings (`.golangci.yml`); exported symbols
+  have a godoc comment.
+- Errors are returned (`error`); `panic` is not used except for
+  initializing the embedded FS in `internal/webui`.
+- External commands (execution engine, phase 3) are always run via
+  `exec.CommandContext(ctx, name, args...)` with an explicit argument
+  list — never build a shell command as a string from user input.
+- Every external command run has a timeout (`context.WithTimeout`).
+- Domain logic (config store, action evaluation) is separated from the
+  HTTP layer (`internal/server`) and testable without the network/real
+  process execution.
+- After every change: `go build ./...`, `go vet ./...`, `go test ./...`;
+  before closing, `make verify`.
+- New functionality must have a corresponding FR/NFR in
   [docs/requirements/requirements.md](../../docs/requirements/requirements.md)
-  a případně ADR v
+  and, where applicable, an ADR in
   [docs/architecture/decisions/](../../docs/architecture/decisions).

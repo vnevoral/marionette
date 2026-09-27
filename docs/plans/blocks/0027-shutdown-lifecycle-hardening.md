@@ -1,142 +1,152 @@
-# Implementační blok: Řízené ukončení — pořadí kroků, SSE a fronta akcí
+# Implementation block: Graceful shutdown — step order, SSE and the action queue
 
-- **Fáze**: 8 — Zpevnění
-- **Vazba na požadavky**: FR-35, FR-18, NFR-03, NFR-04, NFR-11
-- **Vazba na ADR**: ADR-0004, ADR-0008
-- **Stav**: Hotovo
-- **Závislosti**: Blok 0024 (kontext skrz Runner), blok 0012 (lifecycle), blok 0022 (SSE)
+- **Phase**: 8 — Hardening
+- **Requirements**: FR-35, FR-18, NFR-03, NFR-04, NFR-11
+- **ADRs**: ADR-0004, ADR-0008
+- **Status**: Done
+- **Dependencies**: Block 0024 (context through the Runner), block 0012 (lifecycle), block 0022 (SSE)
 
-## Cíl bloku
+## Goal
 
-Po dokončení proběhne graceful shutdown deterministicky a rychle: historie
-se uloží dříve, než by systemd mohl proces zabít, SSE klienti se odpojí
-okamžitě a fronta akcí zahodí nespuštěné joby místo čekání na jejich doběh.
+When done, graceful shutdown runs deterministically and quickly: history
+is saved before systemd could kill the process, SSE clients disconnect
+immediately and the action queue drops jobs that have not started instead
+of waiting for them to finish.
 
-## Rozsah
+## Scope
 
-- **Uvnitř**:
-  - `StatusEventBroker.Close()` uzavře všechny odběratele a `events`
-    handler skončí bez čekání na `srv.Close()`;
-  - `http.Server` dostane `IdleTimeout` a `BaseContext` odvozený z
-    aplikačního kontextu;
-  - nové pořadí v `main`: stop příjmu HTTP → uložení config + historie
-    (první průchod) → `BackgroundActions.Close()` (zahodí čekající joby,
-    dokončí běžící s krátkým limitem) → `scheduler.Stop()` → finální
-    uložení historie (druhý průchod, jen pokud se od prvního změnila);
-  - `BackgroundActions.Close()` je idempotentní (`sync.Once`), loguje počet
-    zahozených jobů;
-  - odstranění `requestTracker` nebo zdokumentování důvodu jeho existence
-    (rozhodne implementace podle toho, zda `srv.Shutdown` pokrývá potřebu);
-  - chování fronty podle upřesněného FR-18: plná fronta → 503 s hlavičkou
-    `Retry-After` (hodnota = odhad z délky fronty, min. 1 s); požadavek na
-    kartu + druh akce, které už ve frontě čekají, se nezařazuje znovu a
-    vrací 202 idempotentně (deduplikace jen pro čekající, ne pro běžící);
-  - konfigurovatelný celkový limit shutdownu `MARIONETTE_SHUTDOWN_TIMEOUT`
-    (výchozí 20 s, menší než systemd `TimeoutStopSec` 90 s) — dokumentovat
-    v `deploy/marionette.default`.
-- **Mimo rozsah**:
-  - změna formátu uložené historie;
-  - přerušení již běžícího procesu akce jiným způsobem než zrušením kontextu
-    (řeší 0024);
-  - persistence historie za běhu (ADR-0004 to záměrně nedělá).
+- **In scope**:
+  - `StatusEventBroker.Close()` closes all subscribers and the `events`
+    handler ends without waiting for `srv.Close()`;
+  - `http.Server` gets an `IdleTimeout` and a `BaseContext` derived from
+    the application context;
+  - new order in `main`: stop accepting HTTP → save config + history
+    (first pass) → `BackgroundActions.Close()` (drops waiting jobs,
+    finishes running ones with a short limit) → `scheduler.Stop()` → final
+    history save (second pass, only if it changed since the first);
+  - `BackgroundActions.Close()` is idempotent (`sync.Once`), logs the
+    number of dropped jobs;
+  - remove `requestTracker` or document why it exists (the implementation
+    decides, based on whether `srv.Shutdown` covers the need);
+  - queue behavior per the refined FR-18: full queue → 503 with a
+    `Retry-After` header (value = estimate from the queue length, min. 1 s);
+    a request for a card + action kind that is already waiting in the queue
+    is not enqueued again and returns 202 idempotently (deduplication only
+    for waiting jobs, not running ones);
+  - a configurable overall shutdown limit `MARIONETTE_SHUTDOWN_TIMEOUT`
+    (default 20 s, less than systemd `TimeoutStopSec` 90 s) — document it
+    in `deploy/marionette.default`.
+- **Out of scope**:
+  - changing the format of the saved history;
+  - interrupting an already running action process in any way other than
+    canceling the context (handled by 0024);
+  - persisting history while running (ADR-0004 deliberately does not do
+    that).
 
-## Schválení
+## Approval
 
-- **Schválil**: projektový vlastník
-- **Datum schválení**: 2026-09-26
-- **Poznámky k rozhodnutí**: Schváleno jako oprava a narovnání stavu.
-  Nález revize 2026-09-26 (M-2, M-5, M-8, L-9, L-10); FR-18 upřesněno
-  téhož dne (sekce 13 requirements).
-  Dnes každý shutdown s otevřeným dashboardem trvá plných 5 s a historie se
-  ukládá až po doběhnutí fronty, což při dlouhých akcích porušuje FR-35.
+- **Approved by**: project owner
+- **Approval date**: 2026-09-26
+- **Decision notes**: Approved as a fix and a straightening of the state.
+  Review finding 2026-09-26 (M-2, M-5, M-8, L-9, L-10); FR-18 refined
+  the same day (section 13 of the requirements).
+  Today every shutdown with an open dashboard takes the full 5 s and history
+  is saved only after the queue drains, which violates FR-35 for long
+  actions.
 
-## Návrh řešení
+## Proposed solution
 
-- `internal/server/status_events.go`: `done chan struct{}` v brokeru;
-  `Close()` ho zavře pod zámkem a odpojí subscribery; `events` handler
-  `select` na `r.Context().Done()`, `broker.done`, heartbeat a eventy.
-- `cmd/marionette/main.go`: extrahovat `run(ctx, env, logger) error`;
-  sekvence shutdownu jako samostatná funkce `shutdown(ctx, deps)` s
-  jednotlivými kroky a logem doby trvání každého kroku.
-- `internal/server/actions.go` (nebo nový balíček dle 0034):
-  `Close()` zavře frontu, vyprázdní nezpracované joby, zruší kontext
-  běžících a počká na `WaitGroup` nejvýše `shutdownTimeout`.
-- `config.Store.SaveFileWithHistory` volaná dvakrát je levná (malý JSON),
-  druhé volání jen pokud `store` hlásí změnu od posledního uložení
-  (jednoduchý `dirty` příznak pod `persistMu`).
+- `internal/server/status_events.go`: `done chan struct{}` in the broker;
+  `Close()` closes it under the lock and disconnects subscribers; the
+  `events` handler does a `select` on `r.Context().Done()`, `broker.done`,
+  heartbeat and events.
+- `cmd/marionette/main.go`: extract `run(ctx, env, logger) error`;
+  the shutdown sequence as a separate function `shutdown(ctx, deps)` with
+  individual steps and a log of each step's duration.
+- `internal/server/actions.go` (or a new package per 0034):
+  `Close()` closes the queue, empties unprocessed jobs, cancels the context
+  of running ones and waits on the `WaitGroup` for at most
+  `shutdownTimeout`.
+- `config.Store.SaveFileWithHistory` called twice is cheap (small JSON),
+  the second call only if `store` reports a change since the last save
+  (a simple `dirty` flag under `persistMu`).
 
-## Testovací plán
+## Test plan
 
-- Jednotkové testy:
-  - `TestBrokerCloseEndsEventsHandler`: připojený `httptest` klient na
-    `/api/events`, `Close()` → handler vrátí do 100 ms;
-  - `TestBackgroundActionsCloseDropsQueued`: 10 jobů, 1 worker blokující na
-    ctx, `Close()` → vrátí se do limitu, zahozené joby spočítané;
-  - `TestBackgroundActionsCloseIdempotent`: dvojí `Close()` bez paniky;
-  - `TestEnqueueDeduplicatesWaitingJob`: druhý enqueue stejné karty a druhu
-    vrátí 202 bez nového jobu; po spuštění jobu je nový enqueue opět
-    zařazen;
-  - handler test: plná fronta → 503 a `Retry-After` ≥ 1;
-  - `TestShutdownSavesHistoryBeforeQueueDrain`: fake store zaznamená pořadí
-    volání `SaveFileWithHistory` vs `Close()`.
-- Integrační smoke test `run()`: start, POST akce s dlouhým timeoutem,
-  SIGTERM → proces skončí do 3 s a soubor obsahuje historii.
+- Unit tests:
+  - `TestBrokerCloseEndsEventsHandler`: an `httptest` client connected to
+    `/api/events`, `Close()` → the handler returns within 100 ms;
+  - `TestBackgroundActionsCloseDropsQueued`: 10 jobs, 1 worker blocking on
+    ctx, `Close()` → returns within the limit, dropped jobs counted;
+  - `TestBackgroundActionsCloseIdempotent`: double `Close()` without panic;
+  - `TestEnqueueDeduplicatesWaitingJob`: a second enqueue of the same card
+    and kind returns 202 without a new job; after the job starts, a new
+    enqueue is enqueued again;
+  - handler test: full queue → 503 and `Retry-After` ≥ 1;
+  - `TestShutdownSavesHistoryBeforeQueueDrain`: a fake store records the
+    order of `SaveFileWithHistory` vs `Close()` calls.
+- Integration smoke test of `run()`: start, POST an action with a long
+  timeout, SIGTERM → the process ends within 3 s and the file contains the
+  history.
 - `go test -race ./...`, `go vet ./...`.
-- Manuální ověření na referenčním hostu: `systemctl restart marionette` s
-  otevřeným dashboardem trvá < 3 s; journal ukazuje kroky shutdownu.
+- Manual verification on the reference host: `systemctl restart marionette`
+  with an open dashboard takes < 3 s; the journal shows the shutdown steps.
 
-## Kritérium hotovosti
+## Done criteria
 
-Viz [Definition of Done](../../devops/definition-of-done.md) +:
+See [Definition of Done](../../devops/definition-of-done.md) plus:
 
-- shutdown s připojeným SSE klientem nečeká na 5 s timeout;
-- historie je na disku dříve, než se čeká na frontu a scheduler;
-- `MARIONETTE_SHUTDOWN_TIMEOUT` je zdokumentován v README a FR-34 doplněn o
-  tuto proměnnou.
+- shutdown with a connected SSE client does not wait for the 5 s timeout;
+- history is on disk before waiting for the queue and the scheduler;
+- `MARIONETTE_SHUTDOWN_TIMEOUT` is documented in the README and FR-34 is
+  extended with this variable.
 
-## Uzavření
+## Closure
 
-- **Stav po implementaci**: Hotovo (2026-09-26)
-- **Ověření**: `make verify` prošel (golangci-lint, eslint, vue-tsc, prettier,
-  `go test -race -count=1 ./...`, build, vet). Nové a upravené testy:
-  `TestBrokerCloseEndsEventsHandler` (skutečný HTTP klient, stream skončí
-  do 100 ms), `TestStatusEventsEndpointEndsImmediatelyWhenBrokerClosed`,
-  `TestBackgroundActionsCloseDropsQueued` (4 čekající zahozeny, běžící
-  zrušen po 50 ms grace), `TestBackgroundActionsCloseIdempotent`,
+- **Status after implementation**: Done (2026-09-26)
+- **Verification**: `make verify` passed (golangci-lint, eslint, vue-tsc, prettier,
+  `go test -race -count=1 ./...`, build, vet). New and modified tests:
+  `TestBrokerCloseEndsEventsHandler` (real HTTP client, the stream ends
+  within 100 ms), `TestStatusEventsEndpointEndsImmediatelyWhenBrokerClosed`,
+  `TestBackgroundActionsCloseDropsQueued` (4 waiting dropped, the running
+  one canceled after a 50 ms grace), `TestBackgroundActionsCloseIdempotent`,
   `TestBackgroundActionsCloseLetsRunningJobFinishWithinGrace`,
-  `TestEnqueueDeduplicatesWaitingJob` (stejná karta + druh → `202`, jiný
-  druh se zařadí, po startu jobu se nový požadavek zařadí znovu),
+  `TestEnqueueDeduplicatesWaitingJob` (same card + kind → `202`, a different
+  kind is enqueued, after the job starts a new request is enqueued again),
   `TestEnqueueReportsFullQueueWithRetryAfter`,
   `TestRouterMapsQueueErrorsToAcceptedOrServiceUnavailable` (`202`/`503` +
   `Retry-After`), `TestStoreDirtyTracksChangesSinceHistorySave`,
   `TestLoadEnvironmentDefaultsAndShutdownTimeout`,
-  `TestShutdownSavesHistoryBeforeQueueDrain` (pořadí http → save → actions →
+  `TestShutdownSavesHistoryBeforeQueueDrain` (order http → save → actions →
   scheduler → save), `TestShutdownSkipsSecondSaveWhenCleanAndSaveWhenReadOnly`,
-  `TestGraceDeadlineNeverInThePast` a integrační smoke test
-  `TestRunShutsDownQuicklyWithOpenSSEClientAndSavesHistory` (běžící
-  `sleep 30`, připojený SSE klient, limit 2 s → `run()` skončí do 3 s, stream
-  uzavřen, v souboru je běh s výsledkem `canceled`, procesní skupina
-  neexistuje). Manuální ověření na referenčním hostu (`systemctl restart`
-  s otevřeným dashboardem < 3 s) zbývá provést spolu s blokem 0023.
-- **Odchylky od návrhu**: (1) `requestTracker` odstraněn — `http.Server.Shutdown`
-  sám čeká na doběhnutí aktivních handlerů, tracker byl duplicitní;
-  (2) `BackgroundActions.Close(ctx)` bere kontext místo vnitřního
-  `shutdownTimeout` a vrací počet zahozených jobů; běžící joby dostanou
-  grace (limit minus rezerva 3 s) a teprve pak se zruší, aby krátké akce
-  doběhly a zapsaly se do historie; (3) idempotence Close je řešena
-  příznakem pod zámkem, ne `sync.Once`, kvůli návratové hodnotě;
-  (4) fronta je místo kanálu slice pod zámkem, protože kanál neumožňuje
-  deduplikaci ani zahození čekajících jobů; (5) `Retry-After` se počítá
-  jako `ceil(čekající / workery) × 1 s`, min. 1 s — délky akcí nejsou
-  předem známé; (6) navíc opraven dopad bloku 0025: v režimu jen pro čtení
-  se historie při shutdownu neukládá, aby se nečitelný soubor nepřepsal
-  prázdnou konfigurací (`openStore` vrací příznak `readOnly`);
-  (7) druhý signál během shutdownu ukončí proces okamžitě
-  (`signal.NotifyContext` + obnovení výchozí obsluhy); (8) `http.Server`
-  dostal `IdleTimeout` 60 s a `BaseContext` z aplikačního kontextu.
-- **Dokumentace aktualizována**: ano — `docs/architecture/overview.md`
-  (sekce „Řízené ukončení (shutdown)“), requirements FR-34 a tabulka
-  rozhodnutí (`MARIONETTE_SHUTDOWN_TIMEOUT`), ADR-0008 (doplnění o
-  `Close()`), README (tabulka proměnných, chování shutdownu),
+  `TestGraceDeadlineNeverInThePast` and the integration smoke test
+  `TestRunShutsDownQuicklyWithOpenSSEClientAndSavesHistory` (a running
+  `sleep 30`, a connected SSE client, 2 s limit → `run()` ends within 3 s,
+  the stream is closed, the file contains the run with the result
+  `canceled`, the process group no longer exists). Manual verification on
+  the reference host (`systemctl restart` with an open dashboard < 3 s)
+  remains to be done together with block 0023.
+- **Deviations from the plan**: (1) `requestTracker` removed —
+  `http.Server.Shutdown` itself waits for active handlers to finish, the
+  tracker was redundant; (2) `BackgroundActions.Close(ctx)` takes a
+  context instead of an internal `shutdownTimeout` and returns the number
+  of dropped jobs; running jobs get a grace period (limit minus a 3 s
+  reserve) and only then are canceled, so that short actions finish and
+  get written to history; (3) Close idempotence is implemented with a flag
+  under the lock, not `sync.Once`, because of the return value; (4) the
+  queue is a slice under a lock instead of a channel, because a channel
+  allows neither deduplication nor dropping waiting jobs; (5) `Retry-After`
+  is computed as `ceil(waiting / workers) × 1 s`, min. 1 s — action
+  durations are not known in advance; (6) additionally fixed an impact of
+  block 0025: in read-only mode history is not saved during shutdown, so
+  that an unreadable file is not overwritten with an empty configuration
+  (`openStore` returns a `readOnly` flag); (7) a second signal during
+  shutdown terminates the process immediately (`signal.NotifyContext` +
+  restoring the default handler); (8) `http.Server` got `IdleTimeout` 60 s
+  and `BaseContext` from the application context.
+- **Documentation updated**: yes — `docs/architecture/overview.md`
+  (section "Graceful shutdown"), requirements FR-34 and the
+  decision table (`MARIONETTE_SHUTDOWN_TIMEOUT`), ADR-0008 (addendum on
+  `Close()`), README (variable table, shutdown behavior),
   `deploy/marionette.default`, godoc (`shutdown`, `BackgroundActions.Close`,
-  `StatusEventBroker.Close`, `Store.Dirty`), roadmapa.
+  `StatusEventBroker.Close`, `Store.Dirty`), roadmap.

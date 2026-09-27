@@ -1,74 +1,75 @@
-# Implementační blok: SSE — živé změny statusů
+# Implementation block: SSE — live status changes
 
-- **Fáze**: 10 — Realtime status delivery
-- **Vazba na požadavky**: FR-20, FR-27, FR-40, FR-42, NFR-03, NFR-06, NFR-11
-- **Vazba na ADR**: ADR-0008 (SSE status event stream)
-- **Stav**: Hotovo
-- **Závislosti**: FR-42/NFR-11, existující status projection a scheduler (bloky 0007–0009), REST API (bloky 0010–0012), Dashboard (blok 0013)
+- **Phase**: 10 — Real-time status delivery over SSE
+- **Requirements**: FR-20, FR-27, FR-40, FR-42, NFR-03, NFR-06, NFR-11
+- **ADRs**: ADR-0008 (SSE status event stream)
+- **Status**: Done
+- **Dependencies**: FR-42/NFR-11, the existing status projection and scheduler (blocks 0007–0009), REST API (blocks 0010–0012), Dashboard (block 0013)
 
-## Cíl bloku
+## Goal
 
-Po dokončení backend publikuje změny status projekce přes Server-Sent Events a
-Dashboard je zobrazuje bez čekání na další ruční akci nebo periodický refresh.
-REST zůstává zdrojem počátečního načtení a fallbacku při nedostupném SSE.
+When done, the backend publishes changes of the status projection via
+Server-Sent Events and the Dashboard displays them without waiting for
+another manual action or a periodic refresh. REST remains the source of
+the initial load and the fallback when SSE is unavailable.
 
-## Rozsah
+## Scope
 
-- **Uvnitř**:
-  - SSE endpoint pro klientské odběratele statusových událostí;
-  - event `status.changed` s ID karty a aktuální `StatusSnapshot`;
-  - publikace pouze při skutečné změně statusu, ne při opakované kontrole stejného stavu;
-  - heartbeat, korektní ukončení připojení a omezená správa odběratelů;
-  - reconnect klienta a návrat k REST status API při výpadku streamu;
-  - napojení Dashboardu na `EventSource` a aktualizace příslušné karty;
-  - jednotkové, HTTP/integration a browser smoke testy.
-- **Mimo rozsah**:
-  - WebSocket nebo obousměrná komunikace;
-  - nahrazení interního status scheduleru SSE vrstvou;
-  - doručování historie událostí nebo durable event broker;
-  - autentizace/autorizace připojení;
-  - změna formátu uložené konfigurace nebo status historie.
+- **In scope**:
+  - an SSE endpoint for client subscribers of status events;
+  - a `status.changed` event with the card ID and the current `StatusSnapshot`;
+  - publishing only on an actual status change, not on a repeated check of the same state;
+  - heartbeat, correct connection termination and bounded subscriber management;
+  - client reconnect and falling back to the REST status API when the stream fails;
+  - hooking the Dashboard up to `EventSource` and updating the relevant card;
+  - unit, HTTP/integration and browser smoke tests.
+- **Out of scope**:
+  - WebSocket or bidirectional communication;
+  - replacing the internal status scheduler with the SSE layer;
+  - delivering event history or a durable event broker;
+  - authentication/authorization of connections;
+  - changing the format of the stored configuration or status history.
 
-## Schválení
+## Approval
 
-- **Schválil**: projektový vlastník
-- **Datum schválení**: 2026-09-25
-- **Poznámky k rozhodnutí**: SSE je požadovaný jednosměrný transport server → browser; veřejný kontrakt je definovaný v ADR-0008.
+- **Approved by**: project owner
+- **Approval date**: 2026-09-25
+- **Decision notes**: SSE is the required one-way transport server → browser; the public contract is defined in ADR-0008.
 
-## Návrh řešení
+## Proposed solution
 
-Přidat do serverové vrstvy broadcaster statusových událostí s bezpečným
-přihlášením/odhlášením klientů. Status service po úspěšné aktualizaci projekce
-publikuje pouze přechod stavu; broadcaster zapíše každému odběrateli SSE event
-s `event: status.changed`, `id` a JSON payloadem. Heartbeat bude posílán v
-pravidelném intervalu a pomalý/odpojený klient nesmí blokovat scheduler ani
-ostatní klienty.
+Add a status event broadcaster to the server layer with safe client
+subscribe/unsubscribe. After a successful projection update, the status
+service publishes only a state transition; the broadcaster writes to each
+subscriber an SSE event with `event: status.changed`, `id` and a JSON
+payload. A heartbeat will be sent at a regular interval and a slow or
+disconnected client must not block the scheduler or other clients.
 
-Frontend po načtení Dashboardu otevře `EventSource`, při události aktualizuje
-status konkrétní karty a při `error` použije omezený REST fallback/backoff.
-Stávající periodický polling zůstane jako bezpečnostní fallback, dokud browser
-SSE připojení není potvrzené.
+After the Dashboard loads, the frontend opens an `EventSource`, on an event
+it updates the status of the specific card and on `error` it uses a bounded
+REST fallback/backoff. The existing periodic polling stays as a safety
+fallback until the browser SSE connection is confirmed.
 
-## Testovací plán
+## Test plan
 
-- jednotkový test broadcasteru: publish, subscribe, unsubscribe a odpojení;
-- test, že opakovaný stejný status nevytvoří SSE event;
-- test, že pomalý odběratel neblokuje publikaci ani HTTP API;
-- HTTP test SSE hlaviček, heartbeat a korektního ukončení request contextu;
-- test Dashboardu: event aktualizuje správnou kartu, reconnect a REST fallback;
+- broadcaster unit test: publish, subscribe, unsubscribe and disconnect;
+- test that a repeated identical status does not create an SSE event;
+- test that a slow subscriber does not block publishing or the HTTP API;
+- HTTP test of SSE headers, heartbeat and correct termination of the request context;
+- Dashboard test: an event updates the correct card, reconnect and REST fallback;
 - `go test -race ./...`, `go vet ./...`, `npm run lint`, `npm run build`;
-- manuální browser smoke test změny statusu mezi dvěma otevřenými klienty.
+- manual browser smoke test of a status change between two open clients.
 
-## Kritérium hotovosti
+## Done criteria
 
-SSE připojení je omezené na životnost klientského requestu, neblokuje status
-scheduler ani REST API, změna statusu se v Dashboardu projeví bez ručního
-refresh a při výpadku SSE zůstane dostupný REST fallback. Všechny kontroly
-z Definition of Done projdou.
+The SSE connection is bounded by the lifetime of the client request, it
+does not block the status scheduler or the REST API, a status change shows
+up in the Dashboard without a manual refresh and when SSE fails the REST
+fallback remains available. All checks from the Definition of Done pass.
 
-## Uzavření
+## Closure
 
-- **Stav po implementaci**: Hotovo
-- **Ověření**: `go build ./...`, `go vet ./...`, `go test -race ./...`,
-  `npm run lint -- --quiet`, `npm run build`, `git diff --check` — vše úspěšné.
-- **Dokumentace aktualizována**: ano; ADR-0008, roadmapa, FR-42/NFR-11.
+- **Status after implementation**: Done
+- **Verification**: `go build ./...`, `go vet ./...`, `go test -race ./...`,
+  `npm run lint -- --quiet`, `npm run build`, `git diff --check` — all successful.
+- **Documentation updated**: yes; ADR-0008, roadmap, FR-42/NFR-11.

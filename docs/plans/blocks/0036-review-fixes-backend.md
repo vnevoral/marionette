@@ -1,100 +1,106 @@
-# Implementační blok: Opravy z code review — backend (same-origin za proxy, allowlist, store)
+# Implementation block: Code review fixes — backend (same-origin behind a proxy, allowlist, store)
 
-- **Fáze**: 8 — Zpevnění (dodatek po uzavření fáze)
-- **Vazba na požadavky**: NFR-12, FR-30..33 (perzistence), NFR-05
-- **Vazba na ADR**: —
-- **Stav**: Hotovo
-- **Závislosti**: Bloky 0026, 0028 (persistence), 0034
+- **Phase**: 8 — Hardening (addendum after the phase was closed)
+- **Requirements**: NFR-12, FR-30..33 (persistence), NFR-05
+- **ADRs**: —
+- **Status**: Done
+- **Dependencies**: Blocks 0026, 0028 (persistence), 0034
 
-## Cíl bloku
+## Goal
 
-Po dokončení funguje ochrana NFR-12 i za TLS-terminující reverse proxy a
-allowlist `MARIONETTE_ALLOWED_HOSTS` porovnává hosty stejným pravidlem jako
-`Origin`; config store po neúspěšném zápisu nehlásí falešně `Dirty()`.
+Once done, the NFR-12 protection also works behind a TLS-terminating reverse
+proxy and the `MARIONETTE_ALLOWED_HOSTS` allowlist compares hosts with the
+same rule as `Origin`; the config store does not falsely report `Dirty()`
+after a failed write.
 
-## Rozsah
+## Scope
 
-- **Uvnitř** (nálezy code review 2026-09-26):
-  1. `internal/server/origin.go`: porovnání `Origin` × `Host` nezávisí na
-     TLS stavu spojení — hostname se porovnává case-insensitive a porty se
-     musí shodovat, nebo být oba „výchozí“ (`80`, `443` nebo nezadaný).
-     Explicitní jiný port (`pi.local:8080`) se shodovat musí.
-  2. Allowlist `MARIONETTE_ALLOWED_HOSTS` používá stejnou normalizaci:
-     `pi.local`, `pi.local:80` i `pi.local:443` v seznamu odpovídají `Host`
-     `pi.local`, `pi.local:80` i `pi.local:443`.
-  3. `internal/config/store.go`: rollback po selhání `OnChange`
-     (`CreateCard`, `UpdateCard`, `DeleteCard`) vrací počítadlo `changes`
-     zpět, takže `Dirty()` neohlásí změnu, která se ve skutečnosti nestala.
-  4. `internal/config/types.go`: odstranit wrapper `errorsAs`, volat
-     `errors.As` přímo.
-  5. Dokumentace: `docs/architecture/overview.md` (sekce NFR-12), README
-     (`MARIONETTE_ALLOWED_HOSTS`), NFR-12 v requirements (jedna věta
-     o proxy).
-- **Mimo rozsah**:
-  - důvěra hlavičce `X-Forwarded-Proto` / konfigurace trusted proxy;
-  - autentizace (NFR-01, mimo MVP);
-  - frontendové nálezy (blok 0037).
+- **In scope** (findings of the 2026-09-26 code review):
+  1. `internal/server/origin.go`: the `Origin` × `Host` comparison does not
+     depend on the connection's TLS state — the hostname is compared
+     case-insensitively and the ports must match, or both be "default"
+     (`80`, `443` or not specified). An explicit other port
+     (`pi.local:8080`) must match.
+  2. The `MARIONETTE_ALLOWED_HOSTS` allowlist uses the same normalization:
+     `pi.local`, `pi.local:80` and `pi.local:443` in the list match the
+     `Host` `pi.local`, `pi.local:80` and `pi.local:443`.
+  3. `internal/config/store.go`: the rollback after an `OnChange` failure
+     (`CreateCard`, `UpdateCard`, `DeleteCard`) reverts the `changes`
+     counter, so `Dirty()` does not report a change that did not actually
+     happen.
+  4. `internal/config/types.go`: remove the `errorsAs` wrapper, call
+     `errors.As` directly.
+  5. Documentation: `docs/architecture/overview.md` (NFR-12 section), README
+     (`MARIONETTE_ALLOWED_HOSTS`), NFR-12 in requirements (one sentence
+     about the proxy).
+- **Out of scope**:
+  - trusting the `X-Forwarded-Proto` header / trusted proxy configuration;
+  - authentication (NFR-01, outside the MVP);
+  - frontend findings (block 0037).
 
-## Schválení
+## Approval
 
-- **Schválil**: projektový vlastník
-- **Datum schválení**: 2026-09-26
-- **Poznámky k rozhodnutí**: Schváleno jako oprava stavu („naplanuj a oprav
-  všechny nálezy“) po code review 18 commitů na `main`. Pravidlo
-  „výchozí porty jsou rovnocenné“ je vědomý kompromis: `http://pi.local`
-  a `https://pi.local` jsou obě operátorův host; jiná služba na stejném
-  hostname s vlastním portem zůstává cizím originem.
+- **Approved by**: project owner
+- **Approval date**: 2026-09-26
+- **Decision notes**: Approved as a fix of the state ("plan and fix all the
+  findings") after a code review of 18 commits on `main`. The rule
+  "default ports are equivalent" is a deliberate compromise:
+  `http://pi.local` and `https://pi.local` are both the operator's host;
+  another service on the same hostname with its own port remains a foreign
+  origin.
 
-## Návrh řešení
+## Proposed solution
 
-- `origin.go`: nová funkce `canonicalHost(host string) string` — lowercase,
-  trim, `net.SplitHostPort`; port `80`/`443`/chybějící → jen hostname
-  (IPv6 bez hranatých závorek), jinak `host:port`. `sameOrigin(origin,
-  requestHost)` ztrácí parametr `tls`; allowlist se ukládá i porovnává přes
-  `canonicalHost`. Komentáře `requireSameOrigin`/`sameOrigin` popisují
-  skutečné pravidlo.
-- `store.go`: v každé rollback větvi `store.changes--` místo `++`
-  (paměť po rollbacku odpovídá poslednímu uloženému stavu).
-- `types.go`: `errors.As(err, &validation)` na místě volání.
+- `origin.go`: a new function `canonicalHost(host string) string` —
+  lowercase, trim, `net.SplitHostPort`; port `80`/`443`/missing → hostname
+  only (IPv6 without square brackets), otherwise `host:port`.
+  `sameOrigin(origin, requestHost)` loses the `tls` parameter; the allowlist
+  is stored and compared via `canonicalHost`. The comments of
+  `requireSameOrigin`/`sameOrigin` describe the actual rule.
+- `store.go`: in every rollback branch `store.changes--` instead of `++`
+  (memory after the rollback matches the last saved state).
+- `types.go`: `errors.As(err, &validation)` at the call site.
 
-## Testovací plán
+## Test plan
 
-- `TestSameOriginComparison`: nové řádky — `https://pi.local` × `pi.local`
+- `TestSameOriginComparison`: new rows — `https://pi.local` × `pi.local`
   → true, `http://pi.local` × `pi.local:443` → true, `https://pi.local:8443`
   × `pi.local` → false, `http://pi.local` × `pi.local:8080` → false.
 - `TestAllowedHostsRestrictMutatingRequests`: allowlist `pi.local:80`
-  přijme `Host: pi.local`, allowlist `pi.local` přijme `Host: pi.local:443`,
-  `pi.local:8080` v seznamu nepřijme `Host: pi.local`.
-- `TestStoreRollbackKeepsDirtyHonest`: po selhání `OnChange` je `Dirty()`
-  false, pokud před pokusem bylo false.
+  accepts `Host: pi.local`, allowlist `pi.local` accepts
+  `Host: pi.local:443`, `pi.local:8080` in the list does not accept
+  `Host: pi.local`.
+- `TestStoreRollbackKeepsDirtyHonest`: after an `OnChange` failure `Dirty()`
+  is false if it was false before the attempt.
 - `make verify`.
 
-## Kritérium hotovosti
+## Done criteria
 
-Viz [Definition of Done](../../devops/definition-of-done.md) +:
+See [Definition of Done](../../devops/definition-of-done.md) plus:
 
-- mutující požadavek s `Origin: https://pi.local` a `Host: pi.local` bez
-  TLS je přijat;
-- `docs/architecture/overview.md` už neuvádí odmítnutí za proxy jako známé
-  omezení.
+- a mutating request with `Origin: https://pi.local` and `Host: pi.local`
+  without TLS is accepted;
+- `docs/architecture/overview.md` no longer lists rejection behind a proxy
+  as a known limitation.
 
-## Uzavření
+## Closure
 
-- **Stav po implementaci**: Hotovo (2026-09-26)
-- **Ověření**: `make verify` prošel (lint, `vue-tsc`, Prettier, Vitest,
+- **Status after implementation**: Done (2026-09-26)
+- **Verification**: `make verify` passed (lint, `vue-tsc`, Prettier, Vitest,
   `vite build`, `go test -race`, `go vet`). `TestSameOriginComparison`
-  rozšířen o proxy případy (`https://pi.local` × `pi.local`,
-  `pi.local:80`, `http://pi.local` × `pi.local:443` → shoda;
+  extended with proxy cases (`https://pi.local` × `pi.local`,
+  `pi.local:80`, `http://pi.local` × `pi.local:443` → match;
   `https://pi.local:8443` × `pi.local`, `http://pi.local` × `pi.local:8080`
-  → neshoda), nový `TestCanonicalHost`,
-  `TestAllowedHostsRestrictMutatingRequests` ověřuje `pi.local:80`
-  v seznamu × `Host: pi.local`/`:443` a odmítnutí `pi.local` bez portu,
-  když je v seznamu jen `pi.local:8080`. Nový
-  `TestStoreRollbackKeepsDirtyHonest` (po selhání `OnChange` u create,
-  update i delete je `Dirty()` false).
-- **Odchylky od návrhu**: žádné. `sameOrigin` ztratil parametr `tls`;
-  `request.TLS` se už v middleware nečte.
-- **Dokumentace aktualizována**: ano — `docs/architecture/overview.md`
-  (sekce NFR-12: kanonické porovnání hostů, odstraněno „známé omezení“ za
-  proxy), README (`MARIONETTE_ALLOWED_HOSTS`, odstavec o cross-site
-  ochraně), `docs/requirements/requirements.md` NFR-12, roadmapa.
+  → no match), a new `TestCanonicalHost`,
+  `TestAllowedHostsRestrictMutatingRequests` verifies `pi.local:80`
+  in the list × `Host: pi.local`/`:443` and the rejection of `pi.local`
+  without a port when only `pi.local:8080` is in the list. A new
+  `TestStoreRollbackKeepsDirtyHonest` (after an `OnChange` failure on
+  create, update and delete, `Dirty()` is false).
+- **Deviations from the plan**: none. `sameOrigin` lost the `tls` parameter;
+  `request.TLS` is no longer read in the middleware.
+- **Documentation updated**: yes — `docs/architecture/overview.md`
+  (NFR-12 section: canonical host comparison, removed the "known limitation"
+  behind a proxy), README (`MARIONETTE_ALLOWED_HOSTS`, paragraph about
+  cross-site protection), `docs/requirements/requirements.md` NFR-12,
+  roadmap.

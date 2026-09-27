@@ -1,56 +1,57 @@
-# Implementační blok: PrimeFlex view migration
+# Implementation block: PrimeFlex view migration
 
-- **Fáze**: 9 — UX redesign a sdílený design systém
-- **Vazba na požadavky**: FR-25, FR-29, NFR-08, NFR-09
-- **Vazba na ADR**: ADR-0003, ADR-0007
-- **Stav**: Hotovo
-- **Závislosti**: Blok 0019, UX-02, UX-03, UX-04
+- **Phase**: 9 — UX redesign and shared design system
+- **Requirements**: FR-25, FR-29, NFR-08, NFR-09
+- **ADRs**: ADR-0003, ADR-0007
+- **Status**: Done
+- **Dependencies**: Block 0019, UX-02, UX-03, UX-04
 
-## Cíl bloku
+## Goal
 
-Overview, Manage cards a Card detail používají PrimeFlex pro obecný layout,
-grid, flex, spacing a responsive breakpointy. Vlastní view CSS přestane
-opakovat obecné layout rules.
+Overview, Manage cards and Card detail use PrimeFlex for general layout,
+grid, flex, spacing and responsive breakpoints. The views' own CSS stops
+repeating general layout rules.
 
-## Rozsah
+## Scope
 
-- **Uvnitř**:
-  - page headers, action groups a panel spacing přes PrimeFlex;
-  - Overview card grid přes responsive PrimeFlex columns;
-  - Manage list/editor layout přes responsive columns;
-  - Card detail summary/panels a action groups přes PrimeFlex;
-  - zachování green-first tokenů a vizuálního vzhledu.
-- **Mimo rozsah**:
-  - změna API nebo komponentové hierarchie;
-  - nový layout framework;
-  - odstranění CSS, které řeší skutečně produktový vzhled komponent.
+- **In scope**:
+  - page headers, action groups and panel spacing via PrimeFlex;
+  - the Overview card grid via responsive PrimeFlex columns;
+  - the Manage list/editor layout via responsive columns;
+  - Card detail summary/panels and action groups via PrimeFlex;
+  - keeping the green-first tokens and the visual appearance.
+- **Out of scope**:
+  - changes to the API or the component hierarchy;
+  - a new layout framework;
+  - removing CSS that handles the genuinely product-specific appearance of
+    components.
 
-## Schválení
+## Approval
 
-- **Schválil**: projektový vlastník
-- **Datum schválení**: 2026-09-25
-- **Poznámky k rozhodnutí**: PrimeFlex je standardní layout utility vrstva.
+- **Approved by**: project owner
+- **Approval date**: 2026-09-25
+- **Decision notes**: PrimeFlex is the standard layout utility layer.
 
-## Návrh řešení
+## Proposed solution
 
-Použít `grid`, `col-*`, `flex`, `align-items-*`, `justify-content-*`, `gap-*`,
-`p-*`, `m-*` a responsive varianty. Lokální CSS ponechat pro barvy, border,
-shadow, typography hierarchy, card rows a semantic feedback.
+Use `grid`, `col-*`, `flex`, `align-items-*`, `justify-content-*`, `gap-*`,
+`p-*`, `m-*` and responsive variants. Keep local CSS for colors, border,
+shadow, typography hierarchy, card rows and semantic feedback.
 
-## Testovací plán
+## Test plan
 
 - `npm run format`, `npm run lint -- --quiet`, `npm run build`.
-- Browser smoke test Overview, Manage a Detail na desktopu a 320 px.
-- Ověřit absence horizontálního overflow a zachování keyboard focus.
+- Browser smoke test of Overview, Manage and Detail on desktop and at 320 px.
+- Verify the absence of horizontal overflow and that keyboard focus is kept.
 
-## Kritérium hotovosti
+## Done criteria
 
-Obecné layout CSS pro grid/flex/spacing není duplikované mezi view; responsive
-chování je definované PrimeFlex classes a všechny tři obrazovky vizuálně drží
-stejný shell.
+General layout CSS for grid/flex/spacing is not duplicated between views;
+responsive behavior is defined by PrimeFlex classes and all three screens
+visually keep the same shell.
 
-## Uzavření
+## Closure
 
-- **Stav po implementaci**: Hotovo
-- **Ověření**: `npm run format`, `npm run lint -- --quiet`, `npm run build` — úspěšné; browser smoke test Overview/Manage/Detail desktop + 320px bez overflow
-- **Dokumentace aktualizována**: ano; roadmapa
+- **Status after implementation**: Done
+- **Verification**: `npm run format`, `npm run lint -- --quiet`, `npm run build` — successful; browser smoke test Overview/Manage/Detail desktop + 320px without overflow
+- **Documentation updated**: yes; roadmap

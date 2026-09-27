@@ -1,27 +1,31 @@
 ---
-description: "Rozpracuje fázi z roadmapy do konkrétního implementačního bloku"
-name: "Naplánovat blok"
+description: "Breaks down a roadmap phase into a concrete implementation block"
+name: "Plan a block"
 agent: "agent"
 ---
 
-Rozpracuj zadanou fázi/téma z
-[docs/plans/roadmap.md](../../docs/plans/roadmap.md) do jednoho nebo více
-konkrétních implementačních bloků podle
-[šablony](../../docs/plans/template-implementation-block.md).
+Break down the given phase/topic from
+[docs/plans/roadmap.md](../../docs/plans/roadmap.md) into one or more
+concrete implementation blocks according to the
+[template](../../docs/plans/template-implementation-block.md).
 
-Dodrž [jednotný vývojový workflow](../../docs/devops/development-workflow.md).
-Tento krok je pouze plánovací: nesmí měnit zdrojový kód ani označit blok jako
-`Schváleno` bez výslovného potvrzení vlastníka.
+Follow the [unified development workflow](../../docs/devops/development-workflow.md).
+This step is planning only: it must not change source code or mark a block
+as `Approved` without the owner's explicit confirmation.
 
-Postup:
+Procedure:
 
-1. Ověř, že fáze/téma má jasnou vazbu na FR/NFR a případně na přijaté ADR.
-   Pokud artefakt chybí, zastav plánování a navrhni nejprve jeho doplnění.
-2. Rozděl fázi na bloky dost malé na jednu implementační relaci, s jasným
-   cílem, závislostmi, in/out of scope, návrhem a testovacím plánem.
-3. Ulož každý blok jako `docs/plans/blocks/NNNN-nazev.md` (vzestupné číslo
-   napříč všemi bloky, ne per fázi), se stavem `Návrh` a nevyplněným
-   schválením.
-4. Aktualizuj `docs/plans/roadmap.md` odkazy na nové bloky a jejich stav.
-5. Na konci shrň závislosti, otevřené otázky a přesný krok vyžadující schválení.
-6. Neimplementuj kód a blok neschvaluj v rámci tohoto promptu.
+1. Verify that the phase/topic has a clear link to FR/NFR and, where
+   applicable, to accepted ADRs. If an artifact is missing, stop planning
+   and propose adding it first.
+2. Split the phase into blocks small enough for a single implementation
+   session, with a clear goal, dependencies, in/out of scope, a proposed
+   solution and a test plan.
+3. Save each block as `docs/plans/blocks/NNNN-name.md` (an ascending number
+   across all blocks, not per phase), with status `Proposed` and the
+   approval left blank.
+4. Update `docs/plans/roadmap.md` with links to the new blocks and their
+   status.
+5. At the end, summarize dependencies, open questions and the exact step
+   that requires approval.
+6. Do not implement code and do not approve the block within this prompt.

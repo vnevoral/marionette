@@ -1,99 +1,102 @@
-# Implementační blok: Párování zařízení — UI a E2E
+# Implementation block: Device pairing — UI and E2E
 
-- **Fáze**: 8 — Zpevnění (položka „auth/access control“)
-- **Vazba na požadavky**: FR-50..FR-55, FR-26, NFR-08, NFR-09
-- **Vazba na ADR**: ADR-0011, ADR-0007
-- **Stav**: Hotovo
-- **Závislosti**: Blok 0043
+- **Phase**: 8 — Hardening ("auth/access control" item)
+- **Requirements**: FR-50..FR-55, FR-26, NFR-08, NFR-09
+- **ADRs**: ADR-0011, ADR-0007
+- **Status**: Done
+- **Dependencies**: Block 0043
 
-## Cíl bloku
+## Goal
 
-Po dokončení nespárovaný prohlížeč uvidí obrazovku **Pair this device**,
-zadá kód a název zařízení a dál už se nikdy neověřuje. Spárované zařízení má
-stránku **Devices** se seznamem, odebráním a generováním kódu pro další
-zařízení. E2E sada běží se zapnutým ověřováním.
+When done, an unpaired browser sees the **Pair this device** screen,
+enters the code and a device name, and never authenticates again. A
+paired device has a **Devices** page with a list, removal and generating
+a code for another device. The E2E suite runs with authentication on.
 
-## Rozsah
+## Scope
 
-- **Uvnitř**:
+- **In scope**:
   - `api.ts`: `getSession`, `pairDevice`, `listDevices`, `removeDevice`,
     `createPairingCode`; `ApiError.isUnauthorized`;
-  - router: kontrola session při startu aplikace a přesměrování na
-    `/pair?next=…` po jakékoli `401`; po spárování návrat na `next`;
-  - `PairView` (`/pair`): kód (8 znaků, velká písmena, pomlčka volitelná,
-    předvyplnění z `?code=`), název zařízení (předvyplněný podle prohlížeče
-    a systému), při prvním zařízení nápověda
-    `journalctl -u marionette` s příkazem ke zkopírování, chyby inline;
-  - `DevicesView` (`/devices`): seznam (název, spárováno, naposledy,
-    „This device“), odebrání přes potvrzovací dialog, **Pair a new
-    device** → kód, odpočet platnosti, odkaz ke zkopírování;
-  - `AppShell`: položka navigace **Devices**; na `/pair` shell bez
-    navigace a bez indikátoru Live;
-  - `useStatusEvents`: při `401` z REST fallbacku přestane pollovat;
-  - E2E: `setup` projekt spáruje prohlížeč bootstrap kódem z logu serveru
-    a uloží `storageState`; specy: párování, chybný kód, odebrání zařízení
-    → návrat na párování, druhé zařízení kódem z Devices, API bez tokenu
-    → 401; stávající specy běží spárované;
-  - UX spec (IA §2, nové obrazovky, slovník), testing strategy, README.
-- **Mimo rozsah**: QR kód (nová závislost), přejmenování zařízení,
-  backend (blok 0043).
+  - router: session check at application start and redirect to
+    `/pair?next=…` after any `401`; after pairing, return to `next`;
+  - `PairView` (`/pair`): code (8 characters, uppercase, hyphen optional,
+    prefilled from `?code=`), device name (prefilled based on the browser
+    and system), for the first device a hint
+    `journalctl -u marionette` with a command to copy, inline errors;
+  - `DevicesView` (`/devices`): list (name, paired, last seen,
+    "This device"), removal via a confirmation dialog, **Pair a new
+    device** → code, validity countdown, link to copy;
+  - `AppShell`: **Devices** navigation item; on `/pair` the shell without
+    navigation and without the Live indicator;
+  - `useStatusEvents`: stops polling on `401` from the REST fallback;
+  - E2E: a `setup` project pairs the browser with the bootstrap code from
+    the server log and saves `storageState`; specs: pairing, wrong code,
+    device removal → back to pairing, a second device with a code from
+    Devices, API without a token → 401; existing specs run paired;
+  - UX spec (IA §2, new screens, glossary), testing strategy, README.
+- **Out of scope**: QR code (a new dependency), renaming devices,
+  backend (block 0043).
 
-## Schválení
+## Approval
 
-- **Schválil**: projektový vlastník
-- **Datum schválení**: 2026-09-26
-- **Poznámky k rozhodnutí**: viz blok 0043.
+- **Approved by**: project owner
+- **Approval date**: 2026-09-26
+- **Decision notes**: see block 0043.
 
-## Návrh řešení
+## Proposed solution
 
-- Obrazovky používají stávající komponenty (`PageHeader`, `DetailPanel`,
-  `RequestState`, `ConfirmDialog`, toast přes `useNotify` pro „Device
-  paired“ a „Device removed“ — obojí mění stránku, UX spec §4).
-- Kód se zobrazuje velkým neproporcionálním písmem ve skupinách 4+4
-  (`ABCD-EFGH`), odkaz `/<base>/pair?code=ABCDEFGH`.
+- The screens use existing components (`PageHeader`, `DetailPanel`,
+  `RequestState`, `ConfirmDialog`, toast via `useNotify` for "Device
+  paired" and "Device removed" — both change the page, UX spec §4).
+- The code is shown in a large monospace font in groups of 4+4
+  (`ABCD-EFGH`), link `/<base>/pair?code=ABCDEFGH`.
 
-## Testovací plán
+## Test plan
 
-- Vitest: `PairView` (normalizace kódu, předvyplnění z query, chyby
-  z 400, bootstrap nápověda), `DevicesView` (seznam, odebrání s potvrzením,
-  odebrání vlastního → `/pair`, generování kódu a odpočet), router guard
-  (401 → `/pair?next`), `api.ts` nové funkce.
-- E2E viz rozsah; `make e2e`, `make verify`.
-- Kontrast a 320 px pro obě nové obrazovky (E2E).
+- Vitest: `PairView` (code normalization, prefill from the query, errors
+  from 400, bootstrap hint), `DevicesView` (list, removal with
+  confirmation, removing the own device → `/pair`, code generation and
+  countdown), router guard (401 → `/pair?next`), new `api.ts` functions.
+- E2E see scope; `make e2e`, `make verify`.
+- Contrast and 320 px for both new screens (E2E).
 
-## Kritérium hotovosti
+## Done criteria
 
-Viz [Definition of Done](../../devops/definition-of-done.md).
+See [Definition of Done](../../devops/definition-of-done.md).
 
-## Uzavření
+## Closure
 
-- **Stav po implementaci**: Hotovo (2026-09-26)
-- **Ověření**: `make verify` prošel (Vitest 97 → 119: `api.spec.ts` session
-  paired/unpaired/bootstrap/open, párování, kód, seznam, odebrání, 401
-  handler jen mimo session a párování; `PairView.spec.ts` nápověda s logem
-  jen bez zařízení, formát a předvyplnění kódu, návrh jména, návrat na
-  `next`, žádný návrat mimo aplikaci, jedna zpráva pro chybný kód, chyby
-  jména; `DevicesView.spec.ts` seznam s „This device“ a platností,
-  odebrání jiného zařízení inline, odebrání vlastního → párování + toast,
-  kód s odpočtem a odkazem, detekce nově spárovaného zařízení, nový kód po
-  vypršení, vypnuté ověřování; `deviceName.spec.ts`, `params.spec.ts`).
-  `make e2e` se zapnutým ověřováním: 14 testů (setup spáruje prohlížeč
-  kódem z logu serveru; nespárovaný prohlížeč vidí jen párování a API
-  vrací 401; chybný kód; druhý prohlížeč kódem z Devices, detekce bez
-  reloadu, odebrání a návrat odebraného na párování; párovací odkaz,
-  odebrání vlastního zařízení = odhlášení; 320 px pro Devices, párování
-  a zobrazený kód; všechny dřívější scénáře jako spárované zařízení);
-  3 opakované běhy 14/14.
-- **Odchylky od návrhu**: (1) Oprávnění k `/pair` řeší guard routeru přes
-  `meta.pairing` místo samostatného layoutu; `AppShell` na této routě skryje
-  navigaci i indikátor Live, takže se neotevře SSE stream bez tokenu.
-  (2) Kód se zobrazuje v elementu `<output>` (jednou ho ohlásí čtečka),
-  ne v `<p aria-label>`, který by čtečky ignorovaly. (3) `useStatusEvents`
-  se neměnil: po 401 router odvede na párování, view se odpojí a stream i
-  polling skončí s posledním odběratelem. (4) `tsconfig.node.json` dostal
-  `target` ES2022 a `lib` s DOM, protože nově kontroluje i E2E soubory.
-  (5) Přihlášený prohlížeč na `/pair` (např. otevřený párovací odkaz) je
-  přesměrován na `next` nebo přehled.
-- **Dokumentace aktualizována**: ano — UX spec §2.1, §2.2, nová §7.4,
-  testing strategy (E2E se setup projektem), README (vývoj se zapnutým
-  ověřováním), roadmapa.
+- **Status after implementation**: Done (2026-09-26)
+- **Verification**: `make verify` passed (Vitest 97 → 119: `api.spec.ts`
+  session paired/unpaired/bootstrap/open, pairing, code, list, removal,
+  401 handler only outside session and pairing; `PairView.spec.ts` hint
+  with the log only with no devices, code format and prefill, name
+  suggestion, return to `next`, no return outside the application, one
+  message for a wrong code, name errors; `DevicesView.spec.ts` list with
+  "This device" and validity, inline removal of another device, removing
+  the own device → pairing + toast, code with countdown and link,
+  detection of a newly paired device, a new code after expiry,
+  authentication turned off; `deviceName.spec.ts`, `params.spec.ts`).
+  `make e2e` with authentication on: 14 tests (setup pairs the browser
+  with the code from the server log; an unpaired browser sees only
+  pairing and the API returns 401; wrong code; a second browser with a
+  code from Devices, detection without reload, removal and the removed
+  one back to pairing; pairing link, removing the own device = sign-out;
+  320 px for Devices, pairing and the shown code; all earlier scenarios
+  as a paired device); 3 repeated runs 14/14.
+- **Deviations from the plan**: (1) Access to `/pair` is handled by the
+  router guard via `meta.pairing` instead of a separate layout;
+  `AppShell` on this route hides both the navigation and the Live
+  indicator, so no SSE stream is opened without a token. (2) The code is
+  shown in an `<output>` element (the screen reader announces it once),
+  not in `<p aria-label>`, which screen readers would ignore.
+  (3) `useStatusEvents` did not change: after a 401 the router redirects
+  to pairing, the view unmounts and the stream and polling end with the
+  last subscriber. (4) `tsconfig.node.json` got `target` ES2022 and a
+  `lib` with DOM, because it now also checks the E2E files. (5) A signed-in
+  browser on `/pair` (e.g. an opened pairing link) is redirected to
+  `next` or the overview.
+- **Documentation updated**: yes — UX spec §2.1, §2.2, new §7.4, testing
+  strategy (E2E with a setup project), README (development with
+  authentication on), roadmap.

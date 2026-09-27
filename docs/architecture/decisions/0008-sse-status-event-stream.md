@@ -1,89 +1,101 @@
-# ADR-0008: SSE stream pro živé změny statusů
+# ADR-0008: SSE stream for live status changes
 
-- **Stav**: Přijato
-- **Datum**: 2026-09-25
+- **Status**: Accepted
+- **Date**: 2026-09-25
 
-## Kontext
+## Context
 
-Status scheduler aktualizuje projekci stavu karet na serveru, ale browser se o
-změně dozvídá až při ručním obnovení, navigaci nebo periodickém REST pollingu.
-Marionette potřebuje jednosměrný transport pro okamžité doručení změn statusů
-bez zavádění obousměrného protokolu nebo externího message brokeru.
+The status scheduler updates the projection of card statuses on the server,
+but the browser learns about a change only on a manual refresh, navigation or
+periodic REST polling. Marionette needs a one-way transport for immediate
+delivery of status changes without introducing a bidirectional protocol or
+an external message broker.
 
-Požadavek je veden ve FR-42 a NFR-11. Status projekce již rozlišuje poslední
-kontrolu od skutečného přechodu stavu (ADR-0006), takže opakované kontroly
-stejného stavu nemají vytvářet zbytečné klientské události.
+The requirement is recorded in FR-42 and NFR-11. The status projection
+already distinguishes the last check from an actual status transition
+(ADR-0006), so repeated checks of the same status should not create
+unnecessary client events.
 
-## Rozhodnutí
+## Decision
 
-Marionette použije Server-Sent Events pro živé doručování změn statusů ze
-serveru do připojených browser klientů.
+Marionette will use Server-Sent Events for live delivery of status changes
+from the server to connected browser clients.
 
-- Veřejný endpoint bude poskytovat `text/event-stream` a událost
+- A public endpoint will provide `text/event-stream` and the event
   `status.changed`.
-- Událost ponese `id`, identifikátor karty a JSON `StatusSnapshot`.
-- Událost se publikuje pouze po změně interpretovaného stavu karty; opakovaná
-  kontrola bez změny stavu se publikuje pouze jako interní aktualizace projekce.
-- Server bude posílat heartbeat a při ukončení HTTP request contextu odběratele
-  bezpečně odhlásí bez blokování scheduleru, REST API nebo ostatních klientů.
-- Klient použije nativní `EventSource`, automatický reconnect a REST read-only
-  API jako počáteční načtení i fallback při nedostupném SSE.
-- SSE nenahrazuje interní scheduler, status service ani REST kontrakt a
-  nevyžaduje externí broker.
+- The event will carry an `id`, the card identifier and a JSON
+  `StatusSnapshot`.
+- The event is published only after the card's interpreted status changes; a
+  repeated check without a status change is published only as an internal
+  projection update.
+- The server will send a heartbeat and, when a subscriber's HTTP request
+  context ends, safely unsubscribe it without blocking the scheduler, the
+  REST API or other clients.
+- The client will use the native `EventSource`, automatic reconnect and the
+  REST read-only API both for the initial load and as a fallback when SSE is
+  unavailable.
+- SSE does not replace the internal scheduler, the status service or the
+  REST contract and does not require an external broker.
 
-## Zvažované alternativy
+## Considered alternatives
 
-- **Polling pouze z browseru** — zamítnuto jako hlavní řešení; zvyšuje počet
-  dotazů, přináší zpoždění a klient neví, kdy se změna skutečně stala. Zůstává
-  jako fallback.
-- **WebSocket** — zamítnuto; aplikace potřebuje pouze server → browser tok a
-  nemá požadavek na obousměrnou komunikaci.
-- **Externí message broker** — zamítnuto; odporuje cíli jednoho binárního
-  procesu bez runtime/databázových závislostí.
+- **Polling from the browser only** — rejected as the main solution; it
+  increases the number of requests, adds delay and the client does not know
+  when the change actually happened. It remains as a fallback.
+- **WebSocket** — rejected; the application only needs a server → browser
+  flow and has no requirement for bidirectional communication.
+- **External message broker** — rejected; it contradicts the goal of a single
+  binary process without runtime/database dependencies.
 
-## Důsledky
+## Consequences
 
-- Dashboard může zobrazit změnu statusu prakticky okamžitě bez ručního refresh.
-- Přibude lifecycle a paměťová správa připojených SSE klientů; broadcaster
-  musí mít omezené buffery a nesmí čekat na pomalého odběratele.
-- REST API zůstává nutné pro první načtení, reconnect synchronizaci a fallback.
-- SSE endpoint musí být součástí HTTP testů a browser smoke testu včetně
-  odpojení, reconnectu a paralelních klientů.
-- V MVP se nepersistuje event log a klient nemůže žádat historické události;
-  při reconnectu načte aktuální projekci přes REST.
+- The dashboard can show a status change practically immediately without a
+  manual refresh.
+- Lifecycle and memory management of connected SSE clients is added; the
+  broadcaster must have bounded buffers and must not wait for a slow
+  subscriber.
+- The REST API remains necessary for the first load, reconnect
+  synchronization and fallback.
+- The SSE endpoint must be part of the HTTP tests and the browser smoke test,
+  including disconnects, reconnects and parallel clients.
+- In the MVP no event log is persisted and the client cannot request
+  historical events; on reconnect it loads the current projection via REST.
 
-## Doplnění 2026-09-26 (blok 0034)
+## Addendum 2026-09-26 (block 0034)
 
-Broadcaster žije v samostatném balíčku `internal/events` (`events.Broker`
-s `Publish`, `Subscribe`, `Close`, `Done`); `internal/server` obsahuje jen
-SSE zápis přes rozhraní `EventSource`. Napojení `Store.OnStatusChange →
-Broker.Publish` provádí kompoziční kořen v `cmd/marionette`, ne router.
+The broadcaster lives in a separate package `internal/events`
+(`events.Broker` with `Publish`, `Subscribe`, `Close`, `Done`);
+`internal/server` contains only the SSE writing via the `EventSource`
+interface. The wiring `Store.OnStatusChange → Broker.Publish` is done by the
+composition root in `cmd/marionette`, not by the router.
 
-## Doplnění 2026-09-26 (blok 0027)
+## Addendum 2026-09-26 (block 0027)
 
-Broadcaster (`StatusEventBroker`) má `Close()`, které při řízeném ukončení
-aplikace odpojí všechny odběratele a ukončí každý běžící `/api/events`
-handler okamžitě; volá se z `http.Server.RegisterOnShutdown`, takže
-`Shutdown` na dlouhožijící SSE spojení nečeká. Události publikované po
-`Close()` se zahazují. Klient se po restartu služby připojí znovu díky
-nativnímu reconnectu `EventSource`.
+The broadcaster (`StatusEventBroker`) has `Close()`, which on a graceful
+application shutdown disconnects all subscribers and ends every running
+`/api/events` handler immediately; it is called from
+`http.Server.RegisterOnShutdown`, so `Shutdown` does not wait for long-lived
+SSE connections. Events published after `Close()` are discarded. The client
+reconnects after a service restart thanks to the native `EventSource`
+reconnect.
 
-## Doplnění 2026-09-27: událost `run.recorded` (blok 0058)
+## Addendum 2026-09-27: `run.recorded` event (block 0058)
 
-> Stav doplňku: **Přijato** (2026-09-27, schválením bloku 0058).
+> Addendum status: **Accepted** (2026-09-27, by approval of block 0058).
 
-Stream `/api/events` nese kromě `status.changed` i událost `run.recorded`
-(FR-42a). Posílá se po zapsání dokončeného běhu **primární akce** do
-historie (`Store.AppendRun`), s `cardId` a během ve stejném tvaru jako
-položka `GET /api/cards/{id}/runs`. Spuštění akce zůstává asynchronní
-(`202`); událost jen oznamuje, že běh doběhl a je zapsaný.
+Besides `status.changed`, the `/api/events` stream also carries the event
+`run.recorded` (FR-42a). It is sent after a finished run of the **primary
+action** is written to the history (`Store.AppendRun`), with `cardId` and
+the run in the same shape as an item of `GET /api/cards/{id}/runs`. Running
+an action stays asynchronous (`202`); the event only announces that the run
+has finished and is recorded.
 
-Platí stejná pravidla jako pro `status.changed`: broker neblokuje
-producenta, pomalý odběratel ztrácí nejstarší události, event log ani
-replay nejsou. Klient proto událost bere jako zrychlení, ne jako jediný
-zdroj. Po znovupřipojení načte běhy přes REST a při čekání na běh má
-záložní dotazy a časový rozpočet (blok 0050). Běh, který se nezapíše
-(akce zrušená při vypnutí služby dřív, než dostala místo ke spuštění, nebo
-karta smazaná během běhu), událost nevytvoří; běh přerušený za chodu se
-zapíše jako `canceled`.
-Události pro zařazení a start akce se nezavádějí.
+The same rules as for `status.changed` apply: the broker does not block the
+producer, a slow subscriber loses the oldest events, there is no event log
+or replay. The client therefore treats the event as a speed-up, not as the
+only source. After reconnecting it loads the runs via REST and while waiting
+for a run it has fallback requests and a time budget (block 0050). A run
+that is not written (an action canceled on service shutdown before it got a
+slot to run, or a card deleted during the run) does not create an event; a
+run interrupted while running is recorded as `canceled`.
+Events for enqueueing and starting an action are not introduced.

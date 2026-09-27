@@ -440,5 +440,5 @@ Before closing a UX block, verify:
 - **UX-04**: card detail, runs, and status timeline;
 - **UX-05**: accessibility, responsive audit, and visual regression checks.
 
-Each UX block requires its own scope, test plan, and `Schváleno` state before
+Each UX block requires its own scope, test plan, and `Approved` state before
 implementation.

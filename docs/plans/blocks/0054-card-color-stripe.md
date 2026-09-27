@@ -1,91 +1,96 @@
-# Implementační blok: Barevný proužek karty
+# Implementation block: Card color stripe
 
-- **Fáze**: 8 — Zpevnění (dodatek po uzavření fáze), oblast UI
-- **Vazba na požadavky**: FR-10a, FR-10, FR-20, FR-25, FR-28, FR-29
-- **Vazba na ADR**: ADR-0004 (doménový model karty se rozšíří o volitelné
-  pole, ukládání se nemění). Nové ADR není potřeba: nemění se architektura,
-  jen nové nepovinné pole karty
-- **Stav**: Hotovo
-- **Závislosti**: Bloky 0019/0020 a 0033 (design tokeny, karta na
-  dashboardu), 0049 (stabilní výška karty)
+- **Phase**: 8 — Hardening (addendum after the phase was closed), UI area
+- **Requirements**: FR-10a, FR-10, FR-20, FR-25, FR-28, FR-29
+- **ADRs**: ADR-0004 (the card domain model gains an optional field;
+  persistence does not change). No new ADR is needed: the architecture
+  does not change, only a new optional card field is added
+- **Status**: Done
+- **Dependencies**: Blocks 0019/0020 and 0033 (design tokens, card on the
+  dashboard), 0049 (stable card height)
 
-## Cíl bloku
+## Goal
 
-Na dashboardu s více kartami se karty rozlišují jen ikonou a názvem. Po
-dokončení bloku jde každé kartě v editaci přiřadit barvu z pevné palety
-a karta na dashboardu ji ukáže jako tlustou barevnou horní hranu.
-Karty tak jde seskupit podle smyslu (např. PC, síť, servery) a
-najít je očima rychleji.
+On a dashboard with many cards, cards are told apart only by icon and
+name. After this block, each card can be assigned a color from a fixed
+palette in the editor, and the card on the dashboard shows it as a thick
+colored top edge. Cards can then be grouped by meaning (e.g. PC, network,
+servers) and found by eye faster.
 
-## Rozsah
+## Scope
 
-- **Uvnitř**:
-  - `internal/config`: pole `ActionCard.Color string` (`json:"color,omitempty"`)
-    s názvem barvy z palety (ne hex hodnotou), aby šlo odstín upravit
-    v UI bez migrace konfigurace. Validace v `Validate`: prázdné nebo
-    jeden z názvů v `CardColors` → jinak chyba pole `color` (API `422`).
-    Prázdná hodnota znamená bez barvy. Chybějící pole ve starší konfiguraci
-    znamená také bez barvy;
-  - API karet (`GET`/`POST`/`PUT`) pole přenáší beze změny kontraktu
-    ostatních polí; tabulka polí karty v `docs/architecture/overview.md`;
-  - paleta: 8 možností, viz návrh řešení. Hex hodnoty jako tokeny
-    `--card-color-<name>` v `web/src/styles/tokens.css`. Seznam názvů je
-    v UI (`web/src/ui/cardColors.ts`) i v Go a test hlídá, že se shodují;
-  - `ActionCard.vue` (dashboard): karta s barvou má horní hranu 6 px
-    v dané barvě, bez barvy vypadá jako dnes. Proužek je dekorativní
-    a nemění výšku karty ani rozložení mřížky (FR-29, blok 0049): kreslí se
-    jako `box-shadow: inset` a barva horního okraje, které žádné místo
-    v layoutu neberou;
-  - `CardIdentityFields.vue`: pole **Color** (`Select` se vzorkem barvy
-    a textovým názvem, stejný vzor jako výběr ikony, FR-28), výchozí
-    **None**. `cardEditModel` přenese barvu do formuláře a zpět,
-    chyba serveru `color` se zobrazí u pole;
-  - UX specifikace §5.2 (anatomie karty), §7.2 (Card identity) a §8.2
-    (tokeny palety a pravidlo, že barva karty nenese stav);
-  - `deploy/dev-fixture.json`: jedna karta s barvou;
-  - testy: Go (`Validate` přijme prázdnou hodnotu a všechny názvy
-    z palety, odmítne neznámou hodnotu a hex; JSON bez pole se načte;
-    `omitempty` při uložení), Vitest (`ActionCard` s barvou a bez ní,
-    `cardEditModel` round-trip barvy, `CardEditView` uloží vybranou barvu
-    a zobrazí chybu `color`, shoda palety UI s Go přes sdílený seznam
-    v testu), E2E (`card-lifecycle`: nastavení barvy v editoru, proužek
-    je na dashboardu vidět i po obnovení stránky; karta s barvou má stejnou
-    výšku jako stejná karta bez barvy).
-- **Mimo rozsah**:
-  - libovolná barva (color picker, hex vstup);
-  - barva v detailu karty a v dalších obrazovkách (lze doplnit později);
-  - filtrování nebo řazení dashboardu podle barvy;
-  - volba umístění proužku per karta (umístění je jednotné pro všechny
-    karty, aby mřížka působila konzistentně).
+- **In scope**:
+  - `internal/config`: field `ActionCard.Color string` (`json:"color,omitempty"`)
+    holding the name of a palette color (not a hex value), so the shade can
+    be adjusted in the UI without a configuration migration. Validation in
+    `Validate`: empty or one of the names in `CardColors` → otherwise an
+    error on field `color` (API `422`). An empty value means no color. A
+    missing field in an older configuration also means no color;
+  - the card API (`GET`/`POST`/`PUT`) carries the field without changing
+    the contract of the other fields; card field table in
+    `docs/architecture/overview.md`;
+  - palette: 8 options, see the proposed solution. Hex values as tokens
+    `--card-color-<name>` in `web/src/styles/tokens.css`. The list of names
+    lives in the UI (`web/src/ui/cardColors.ts`) and in Go, and a test
+    checks that they match;
+  - `ActionCard.vue` (dashboard): a card with a color has a 6 px top edge
+    in that color; without a color it looks as it does today. The stripe
+    is decorative and does not change the card height or the grid layout
+    (FR-29, block 0049): it is drawn as `box-shadow: inset` and a top
+    border color, which take no space in the layout;
+  - `CardIdentityFields.vue`: field **Color** (`Select` with a color swatch
+    and a text name, same pattern as the icon picker, FR-28), default
+    **None**. `cardEditModel` carries the color into the form and back;
+    a server `color` error is shown at the field;
+  - UX specification §5.2 (card anatomy), §7.2 (Card identity) and §8.2
+    (palette tokens and the rule that the card color carries no status);
+  - `deploy/dev-fixture.json`: one card with a color;
+  - tests: Go (`Validate` accepts an empty value and all palette names,
+    rejects an unknown value and hex; JSON without the field loads;
+    `omitempty` on save), Vitest (`ActionCard` with and without a color,
+    `cardEditModel` color round-trip, `CardEditView` saves the selected
+    color and shows a `color` error, UI palette matches Go via a shared
+    list in the test), E2E (`card-lifecycle`: setting a color in the
+    editor, the stripe is visible on the dashboard also after a page
+    reload; a card with a color has the same height as the same card
+    without one).
+- **Out of scope**:
+  - arbitrary color (color picker, hex input);
+  - color in the card detail and other screens (can be added later);
+  - filtering or sorting the dashboard by color;
+  - choosing the stripe position per card (the position is the same for
+    all cards so the grid looks consistent).
 
-## Schválení
+## Approval
 
-- **Schválil**: projektový vlastník
-- **Datum schválení**: 2026-09-27
-- **Poznámky k rozhodnutí**: Schváleno vlastníkem („souhlas“): horní hrana,
-  paleta podle návrhu (bez červené a zelené). Vlastník požaduje jednotnou
-  výšku karet s proužkem i bez něj, doplněno do návrhu a kritéria hotovosti.
+- **Approved by**: project owner
+- **Approval date**: 2026-09-27
+- **Decision notes**: Approved by the owner ("agree"): top edge, palette
+  as proposed (no red and green). The owner requires the same card height
+  with and without the stripe; added to the proposal and done criteria.
 
-## Návrh řešení
+## Proposed solution
 
-**Umístění**: tlustá horní hrana (6 px) napříč celou šířkou karty, se
-zaoblením podle rohů karty. Proč ne bok: horní hrana navazuje na horní
-pruh karty (ikona + status badge), na 320 px nebere šířku obsahu a
-v mřížce o více sloupcích je barva vidět i při rychlém pohledu přes řádek.
+**Position**: a thick top edge (6 px) across the full card width, rounded
+to match the card corners. Why not the side: the top edge follows the
+card's top bar (icon + status badge), takes no content width at 320 px,
+and in a multi-column grid the color is visible even at a quick glance
+across a row.
 
-**Jednotná výška**: karta má dnes horní okraj 1 px. U karty s barvou se
-obarví a doplní vnitřním stínem `inset 0 5px 0` ve stejné barvě, dohromady
-6 px. Okraj ani stín nemění rozměry boxu, takže karta s barvou i bez ní má
-stejnou výšku i odsazení obsahu.
-Boční proužek je technicky stejně jednoduchý. Pokud ho vlastník preferuje,
-změní se jen CSS.
+**Uniform height**: the card today has a 1 px top border. For a card with
+a color it is colored and complemented by an inner shadow `inset 0 5px 0`
+in the same color, 6 px in total. Neither the border nor the shadow
+changes the box dimensions, so a card with or without a color has the
+same height and content padding.
+A side stripe is technically just as simple. If the owner prefers it,
+only the CSS changes.
 
-**Paleta (návrh)**:
+**Palette (proposal)**:
 
-| Název (UI) | Hodnota v JSON | Odstín |
+| Name (UI) | Value in JSON | Shade |
 |---|---|---|
-| None | *(prázdné)* | bez proužku (bílá/průhledná) |
-| Black | `black` | `#26332f` (barva textu) |
+| None | *(empty)* | no stripe (white/transparent) |
+| Black | `black` | `#26332f` (text color) |
 | Blue | `blue` | `#3b6fb6` |
 | Teal | `teal` | `#2a9d8f` |
 | Purple | `purple` | `#7b5ea7` |
@@ -93,67 +98,71 @@ změní se jen CSS.
 | Orange | `orange` | `#e07b39` |
 | Yellow | `yellow` | `#e0b53a` |
 
-Červená a zelená v paletě záměrně nejsou. Na dashboardu už znamenají stav
-**Problem** a **Healthy** (FR-25), takže červený proužek na zdravé kartě
-by mátl. Oranžová a žlutá jsou sytější a teplejší než stavová `warning`
-(`#ad7e3f`) a proužek je na jiném místě než badge s textem. Přesné odstíny
-se doladí při implementaci podle kontrastu vůči `--color-canvas` a povrchu
-karty.
+Red and green are intentionally not in the palette. On the dashboard they
+already mean the **Problem** and **Healthy** statuses (FR-25), so a red
+stripe on a healthy card would be confusing. Orange and yellow are more
+saturated and warmer than the status `warning` (`#ad7e3f`), and the
+stripe is in a different place than the text badge. The exact shades
+will be tuned during implementation for contrast against `--color-canvas`
+and the card surface.
 
-**Kompatibilita a verze**: pole je nepovinné, takže konfigurace
-z v1.0.0 se načte beze změny. Starší verze neznámé pole při načtení
-ignoruje, ale při nejbližším uložení konfigurace ho zahodí. Po rollbacku
-na v1.0.0 se tak barvy karet ztratí, karty samotné zůstanou. Jde
-o zpětně kompatibilní novou funkčnost, tedy verzi MINOR (`v1.1.0`).
+**Compatibility and version**: the field is optional, so a configuration
+from v1.0.0 loads unchanged. An older version ignores the unknown field
+on load but drops it on the next configuration save. After a rollback to
+v1.0.0 the card colors are therefore lost; the cards themselves remain.
+This is backward-compatible new functionality, hence a MINOR version
+(`v1.1.0`).
 
-## Testovací plán
+## Test plan
 
 - `go test -race ./internal/config ./internal/server`.
 - `cd web && npx vitest run`.
-- `make e2e` (rozšíření `card-lifecycle.e2e.ts`).
-- Ruční kontrola dashboardu na 320 px, tabletu a desktopu s kartami
-  s barvou i bez ní (stejná výška karet, žádný posun layoutu).
+- `make e2e` (extending `card-lifecycle.e2e.ts`).
+- Manual check of the dashboard at 320 px, tablet and desktop with cards
+  with and without a color (same card height, no layout shift).
 - `make verify`.
 
-## Kritérium hotovosti
+## Done criteria
 
-Viz [Definition of Done](../../devops/definition-of-done.md) +:
+See [Definition of Done](../../devops/definition-of-done.md) plus:
 
-- barva vybraná v editoru se uloží do konfigurace, přežije restart služby
-  a na dashboardu je vidět jako proužek; karta bez barvy vypadá jako
-  před blokem;
-- karty s barvou a bez ní mají stejnou výšku (ověřeno E2E porovnáním
-  výšky dvou karet se stejným obsahem).
+- a color selected in the editor is saved to the configuration, survives
+  a service restart and is visible on the dashboard as a stripe; a card
+  without a color looks as it did before the block;
+- cards with and without a color have the same height (verified by E2E
+  comparing the height of two cards with the same content).
 
-## Uzavření
+## Closure
 
-- **Stav po implementaci**: Hotovo (2026-09-27)
-- **Ověření**: `make verify` prošel (183 testů Vitest, `go test -race`,
+- **Status after implementation**: Done (2026-09-27)
+- **Verification**: `make verify` passed (183 Vitest tests, `go test -race`,
   golangci-lint, eslint, vue-tsc, prettier, `install_test`,
-  `release_version_test`); `make e2e` prošel (18 scénářů včetně nového
-  „colours a card with a stripe that keeps the card height“: barva
-  vybraná v editoru, proužek po obnovení dashboardu, stejná výška karty
-  s barvou a bez ní i stejné odsazení nadpisu). Vizuální kontrola
-  dashboardu se všemi 8 možnostmi a rozbaleného výběru v editoru
-  (snímky z Playwright, 1280 px).
-  Nové testy: Go `TestActionCardValidateLimits` (prázdná, známá,
-  neznámá, hex a velká písmena), `TestSaveFileRoundTripKeepsCardColor`
-  (barva přežije uložení a načtení, karta bez barvy se zapíše bez klíče),
-  `TestCardColorsMatchTheUIPalette` (seznam v Go = seznam v UI),
-  `TestValidateEssentialIgnoresLimits` (neznámá barva ze souboru se
-  načte), `TestRouterReturnsValidationFields` (`422` s `fields.color`);
-  Vitest `ActionCard` (proužek jen pro barvu z palety),
-  `cardEditModel` (fingerprint, mapování chyby `color`),
-  `CardEditView` (uložená barva se zobrazí, nová se uloží, chyba `422`
-  u pole).
-- **Odchylky od návrhu**:
-  - karta nese atribut `data-color` kvůli testům a ladění stylu;
-  - neznámá barva načtená ze souboru (ručně upravená konfigurace) se
-    na dashboardu nezobrazí a editor ji při načtení karty převede na
-    **None** (`knownCardColor`), takže karta jde uložit a neznámá hodnota
-    se tím odstraní (nález z code review po implementaci: původně editor
-    ukázal prázdné pole a uložení skončilo chybou `422`);
-  - formulář drží „bez barvy“ jako prázdný řetězec, aby načtení jiné
-    karty nepřevzalo barvu předchozí.
-- **Dokumentace aktualizována**: UX specifikace §5.2, §7.2, §8.2; tabulka
-  limitů polí v `docs/architecture/overview.md`; `deploy/dev-fixture.json`.
+  `release_version_test`); `make e2e` passed (18 scenarios including the
+  new "colours a card with a stripe that keeps the card height": color
+  selected in the editor, stripe after a dashboard reload, same height of
+  a card with and without a color and the same heading padding). Visual
+  check of the dashboard with all 8 options and the expanded picker in
+  the editor (Playwright screenshots, 1280 px).
+  New tests: Go `TestActionCardValidateLimits` (empty, known, unknown,
+  hex and uppercase), `TestSaveFileRoundTripKeepsCardColor` (the color
+  survives save and load; a card without a color is written without the
+  key), `TestCardColorsMatchTheUIPalette` (Go list = UI list),
+  `TestValidateEssentialIgnoresLimits` (an unknown color from the file
+  loads), `TestRouterReturnsValidationFields` (`422` with `fields.color`);
+  Vitest `ActionCard` (stripe only for a palette color),
+  `cardEditModel` (fingerprint, mapping of the `color` error),
+  `CardEditView` (a saved color is shown, a new one is saved, a `422`
+  error at the field).
+- **Deviations from the plan**:
+  - the card carries a `data-color` attribute for tests and style
+    debugging;
+  - an unknown color loaded from the file (hand-edited configuration) is
+    not shown on the dashboard, and the editor converts it to **None**
+    when loading the card (`knownCardColor`), so the card can be saved
+    and the unknown value is thereby removed (finding from the
+    post-implementation code review: originally the editor showed an
+    empty field and saving failed with `422`);
+  - the form keeps "no color" as an empty string so that loading another
+    card does not inherit the previous card's color.
+- **Documentation updated**: UX specification §5.2, §7.2, §8.2; field
+  limits table in `docs/architecture/overview.md`; `deploy/dev-fixture.json`.

@@ -1,92 +1,101 @@
-# Implementační blok: Release z CI po pushnutí tagu
+# Implementation block: Release from CI after pushing a tag
 
-- **Fáze**: 7 — Balíčkování a nasazení (dodatek po uzavření fáze)
-- **Vazba na požadavky**: FR-06, FR-01, FR-04, NFR-02
-- **Vazba na ADR**: ADR-0002; nové ADR není potřeba
-- **Stav**: Hotovo
-- **Závislosti**: Blok 0051 (`deploy/release_version.sh`,
+- **Phase**: 7 — Packaging and deployment (addendum after the phase was closed)
+- **Requirements**: FR-06, FR-01, FR-04, NFR-02
+- **ADRs**: ADR-0002; no new ADR needed
+- **Status**: Done
+- **Dependencies**: Block 0051 (`deploy/release_version.sh`,
   `make release-arm64`)
 
-## Cíl bloku
+## Goal
 
-Release dnes sestavuje vlastník ručně (`make release-arm64`) a archiv
-přenáší na Pi ze svého počítače. Výsledek tak závisí na lokálním prostředí
-a nikde není zveřejněný. Po dokončení bloku stačí pushnout tag `vX.Y.Z`:
-CI spustí testy, sestaví archiv stejným příkazem a zveřejní ho jako GitHub
-Release. Na Pi jde archiv stáhnout přímo odkazem.
+Today the owner builds a release manually (`make release-arm64`) and
+transfers the archive to the Pi from their own computer. The result thus
+depends on the local environment and is not published anywhere. After this
+block, pushing a `vX.Y.Z` tag is enough: CI runs the tests, builds the
+archive with the same command and publishes it as a GitHub Release. The
+archive can be downloaded on the Pi directly via a link.
 
-## Rozsah
+## Scope
 
-- **Uvnitř**:
-  - nový workflow `.github/workflows/release.yml`, spouštěný při push tagu
-    `v*.*.*`:
-    - checkout s tagy (`fetch-depth: 0`), Go a Node podle `go.mod`
-      a `web/.nvmrc`;
-    - `make verify` a `make e2e`; při selhání se release nezveřejní;
-    - `make release-arm64`; `release_version.sh` sám odmítne tag jiného
-      tvaru nebo nečistý strom, takže pravidla zůstávají na jednom místě;
-    - GitHub Release pro tag s archivem a `.sha256` (`gh release create`
-      s `GITHUB_TOKEN`, oprávnění `contents: write` jen pro tento
-      workflow). Poznámky k releasu se vygenerují z commitů
-      (`--generate-notes`);
-  - `docs/devops/ci-cd.md` (Release proces): tag → push → workflow; ruční
-    `make release-arm64` zůstává jako záložní postup;
-  - README (instalace a upgrade): stažení archivu z GitHub Releases
-    (`curl -LO …/releases/download/vX.Y.Z/…`) včetně `.sha256`.
-- **Mimo rozsah**:
-  - release pro linux/amd64 (cíl je Pi; přidat, až bude potřeba);
-  - podepisování archivů (cosign, GPG);
-  - automatické vytváření tagů nebo verzí z commitů;
-  - předběžné verze (`-rc`), které `release_version.sh` záměrně odmítá.
+- **In scope**:
+  - a new workflow `.github/workflows/release.yml`, triggered on push of a
+    `v*.*.*` tag:
+    - checkout with tags (`fetch-depth: 0`), Go and Node according to
+      `go.mod` and `web/.nvmrc`;
+    - `make verify` and `make e2e`; on failure the release is not
+      published;
+    - `make release-arm64`; `release_version.sh` itself rejects a tag of
+      any other shape or a dirty tree, so the rules stay in one place;
+    - a GitHub Release for the tag with the archive and `.sha256`
+      (`gh release create` with `GITHUB_TOKEN`, `contents: write`
+      permission only for this workflow). Release notes are generated
+      from commits (`--generate-notes`);
+  - `docs/devops/ci-cd.md` (Release process): tag → push → workflow; the
+    manual `make release-arm64` remains as a fallback procedure;
+  - README (installation and upgrade): downloading the archive from GitHub
+    Releases (`curl -LO …/releases/download/vX.Y.Z/…`) including
+    `.sha256`.
+- **Out of scope**:
+  - a release for linux/amd64 (the target is the Pi; add when needed);
+  - signing archives (cosign, GPG);
+  - automatic creation of tags or versions from commits;
+  - pre-release versions (`-rc`), which `release_version.sh` deliberately
+    rejects.
 
-## Schválení
+## Approval
 
-- **Schválil**: projektový vlastník
-- **Datum schválení**: 2026-09-27
-- **Poznámky k rozhodnutí**: Schváleno vlastníkem („souhlas se vším“). Tag a jeho push dál provádí vlastník.
+- **Approved by**: project owner
+- **Approval date**: 2026-09-27
+- **Decision notes**: Approved by the owner ("agree with everything"). The tag and its push are still done by the owner.
 
-## Návrh řešení
+## Proposed solution
 
-Samostatný workflow místo úpravy `ci.yml`: release má jiný spouštěč,
-potřebuje právo zápisu a nemá běžet u pull requestů. Používá se `gh` CLI,
-který je na runnerech GitHubu předinstalovaný, místo akce třetí strany.
-Tak nepřibyde další závislost s přístupem k tokenu.
+A separate workflow instead of modifying `ci.yml`: the release has a
+different trigger, needs write permission and must not run on pull
+requests. It uses the `gh` CLI, which is preinstalled on GitHub runners,
+instead of a third-party action. This way no additional dependency with
+access to the token is added.
 
-## Testovací plán
+## Test plan
 
-- `actionlint`, pokud je k dispozici, jinak kontrola syntaxe YAML.
-- Ověření na skutečném repozitáři: vlastník pushne tag (např. `v1.1.0`),
-  workflow projde a Release obsahuje archiv a `.sha256`;
-  `sha256sum -c` po stažení na Pi → OK; `/api/health` vrátí tag.
-- Negativní případy v forku nebo testovacím repozitáři: tag
-  `v1.2.3-rc1` workflow spustí (filtr `v*.*.*` je glob), ale
-  `release_version.sh` ho odmítne a Release nevznikne; tag na commitu
-  s padajícím testem Release také nevytvoří.
+- `actionlint`, if available, otherwise a YAML syntax check.
+- Verification on the real repository: the owner pushes a tag (e.g.
+  `v1.1.0`), the workflow passes and the Release contains the archive and
+  `.sha256`; `sha256sum -c` after download on the Pi → OK; `/api/health`
+  returns the tag.
+- Negative cases in a fork or a test repository: the tag `v1.2.3-rc1`
+  triggers the workflow (the `v*.*.*` filter is a glob), but
+  `release_version.sh` rejects it and no Release is created; a tag on a
+  commit with a failing test does not create a Release either.
 - `make verify`.
 
-## Kritérium hotovosti
+## Done criteria
 
-Viz [Definition of Done](../../devops/definition-of-done.md) +:
+See [Definition of Done](../../devops/definition-of-done.md) plus:
 
-- po pushnutí tagu `vX.Y.Z` vznikne bez ručního kroku GitHub Release
-  s archivem a `.sha256` a archiv jde podle README nainstalovat na Pi.
+- after pushing a `vX.Y.Z` tag, a GitHub Release with the archive and
+  `.sha256` is created without any manual step, and the archive can be
+  installed on the Pi according to the README.
 
-## Uzavření
+## Closure
 
-- **Stav po implementaci**: Hotovo v repozitáři (2026-09-27); ověření na
-  skutečném tagu provede vlastník (první tag po tomto bloku, např.
-  `v1.1.0`).
-- **Ověření**: `actionlint` v1.7.7 (`go run`) bez nálezů pro `ci.yml`
-  i `release.yml`; `make verify` prošel. Build release archivu ověřil už
-  blok 0051 (`make release-arm64` v dočasném klonu s tagem); release job
-  spouští stejný cíl na čistém checkoutu, kde `npm ci` strom nezmění
-  (`node_modules` je ignorovaný). Negativní scénáře (tag `v1.2.3-rc1`,
-  padající test) nejdou ověřit bez pushnutí tagu. Ověří se, až je vlastník
-  bude potřebovat, v forku.
-- **Odchylky od návrhu**: místo samostatných kroků `make verify` a
-  `make e2e` volá release workflow celý `ci.yml` (nový spouštěč
-  `workflow_call`), takže release prochází přesně stejnými joby jako
-  push do `main` (backend, web, e2e) a pravidla CI jsou na jednom místě.
-- **Dokumentace aktualizována**: `docs/devops/ci-cd.md` (CI, postup
-  releasu z CI a záložní ruční postup), README (stažení z GitHub Releases,
-  upgrade).
+- **Status after implementation**: Done in the repository (2026-09-27);
+  verification on a real tag will be done by the owner (the first tag
+  after this block, e.g. `v1.1.0`).
+- **Verification**: `actionlint` v1.7.7 (`go run`) with no findings for
+  `ci.yml` and `release.yml`; `make verify` passed. Building the release
+  archive was already verified by block 0051 (`make release-arm64` in a
+  temporary clone with a tag); the release job runs the same target on a
+  clean checkout, where `npm ci` does not change the tree (`node_modules`
+  is ignored). The negative scenarios (tag `v1.2.3-rc1`, failing test)
+  cannot be verified without pushing a tag. They will be verified in a
+  fork when the owner needs them.
+- **Deviations from the plan**: instead of separate `make verify` and
+  `make e2e` steps, the release workflow calls the whole `ci.yml` (new
+  trigger `workflow_call`), so the release goes through exactly the same
+  jobs as a push to `main` (backend, web, e2e) and the CI rules are in one
+  place.
+- **Documentation updated**: `docs/devops/ci-cd.md` (CI, the release
+  procedure from CI and the fallback manual procedure), README (download
+  from GitHub Releases, upgrade).

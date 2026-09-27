@@ -1,51 +1,55 @@
-# Implementační blok: Standardní a zrychlený polling scheduler
+# Implementation block: Standard and fast polling scheduler
 
-- **Fáze**: 4 — Status/health-check engine
-- **Vazba na požadavky**: FR-15, FR-15a, FR-17, FR-18
-- **Vazba na ADR**: ADR-0006
-- **Stav**: Hotovo
+- **Phase**: 4 — Status/health-check engine
+- **Requirements**: FR-15, FR-15a, FR-17, FR-18
+- **ADRs**: ADR-0006
+- **Status**: Done
 
-## Cíl bloku
+## Goal
 
-Po dokončení scheduler pravidelně spouští status kontroly karet se zapnutým
-standardním pollingem a po primární akci dočasně používá fast interval. Po
-uplynutí fast window se vrátí ke standardnímu intervalu.
+After this block, the scheduler regularly runs status checks for cards
+with standard polling enabled and temporarily uses the fast interval after
+a primary action. Once the fast window has elapsed, it returns to the
+standard interval.
 
-## Rozsah
+## Scope
 
-- **Uvnitř**:
-  - start/stop lifecycle scheduleru přes `context.Context`;
-  - per-card standardní interval (`PollingIntervalSeconds`);
-  - aktivace fast window po programovém `NotifyPrimaryAction(cardID)`;
-  - fast interval a návrat po `FastPollingWindowSeconds`;
-  - ignorování fast nastavení, pokud je standardní polling vypnutý;
-  - napojení na `StatusCheckService` a sdílený execution runner;
-  - bezpečné přidání/odebrání karet při restartu scheduleru.
-- **Mimo rozsah**:
-  - samotné vyhodnocení status výsledku (0008);
-  - API endpointy a UI;
-  - perzistentní fronta polling úloh nebo prioritizace;
-  - ukládání historie každého ticku.
+- **In scope**:
+  - start/stop lifecycle of the scheduler via `context.Context`;
+  - per-card standard interval (`PollingIntervalSeconds`);
+  - activating the fast window after a programmatic `NotifyPrimaryAction(cardID)`;
+  - fast interval and return after `FastPollingWindowSeconds`;
+  - ignoring the fast settings when standard polling is disabled;
+  - wiring to `StatusCheckService` and the shared execution runner;
+  - safely adding/removing cards when the scheduler restarts.
+- **Out of scope**:
+  - the evaluation of the status result itself (0008);
+  - API endpoints and UI;
+  - a persistent queue of polling jobs or prioritization;
+  - storing history for every tick.
 
-## Návrh řešení
+## Proposed solution
 
-Nový scheduler v `internal/status` bude mít jeden lifecycle context a timer
-pro každou aktivní kartu. `NotifyPrimaryAction` nastaví konec fast window pro
-konkrétní kartu; při dalším plánování se použije fast interval. Po skončení
-okna se timer vrátí na standardní interval. Kontroly půjdou přes stejný
-runner jako ruční spuštění, takže platí globální limit souběžnosti.
+A new scheduler in `internal/status` will have one lifecycle context and a
+timer for each active card. `NotifyPrimaryAction` sets the end of the fast
+window for the given card; the next scheduling uses the fast interval.
+After the window ends, the timer returns to the standard interval. Checks
+go through the same runner as manual runs, so the global concurrency
+limit applies.
 
-## Testovací plán
+## Test plan
 
-- karta s pollingem spouští kontroly v nastaveném standardním intervalu;
-- karta s pollingem 0 nespouští žádné kontroly;
-- fast window po primární akci používá fast interval a po vypršení standardní;
-- fast konfigurace bez standardního pollingu nemá efekt;
-- stop ukončí timery a nevytvoří další kontroly;
-- více karet má nezávislé intervaly a sdílí runner limit;
-- fake clock/check service, bez čekání na reálné desítky sekund.
+- a card with polling runs checks at the configured standard interval;
+- a card with polling 0 runs no checks;
+- the fast window after a primary action uses the fast interval, and the
+  standard one after it expires;
+- a fast configuration without standard polling has no effect;
+- stop ends the timers and creates no further checks;
+- multiple cards have independent intervals and share the runner limit;
+- fake clock/check service, without waiting for real tens of seconds.
 
-## Kritérium hotovosti
+## Done criteria
 
-Viz Definition of Done. Specificky: `go test -race ./...` prochází a testy
-ověří standardní interval, fast window i návrat na standardní polling.
+See Definition of Done. Specifically: `go test -race ./...` passes and the
+tests verify the standard interval, the fast window and the return to
+standard polling.

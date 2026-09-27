@@ -1,49 +1,52 @@
-# Implementační blok: In-memory config store (CRUD karet + historie primárních běhů)
+# Implementation block: In-memory config store (card CRUD + primary run history)
 
-- **Fáze**: 2 — Doménový model + config store (in-memory + JSON perzistence)
-- **Vazba na požadavky**: FR-10, FR-17, FR-18, FR-31, FR-32, NFR-05, NFR-07
-- **Vazba na ADR**: ADR-0004
-- **Stav**: Hotovo
+- **Phase**: 2 — Domain model + config store (in-memory + JSON persistence)
+- **Requirements**: FR-10, FR-17, FR-18, FR-31, FR-32, NFR-05, NFR-07
+- **ADRs**: ADR-0004
+- **Status**: Done
 
-## Cíl bloku
+## Goal
 
-Po dokončení existuje thread-safe in-memory `Store` v `internal/config`
-poskytující CRUD nad `ActionCard` a `Settings` a ukládající historii běhů
-primární akce (`Run`) jako ring buffer omezený `Settings.HistorySize`. Vše
-čistě v paměti — bez čtení/zápisu na disk (to řeší blok 0003). Poslední
-status kontrola a historie přechodů statusu jsou samostatný kontrakt ADR-0006,
-který se dopracuje ve fázi 4.
+When done, there is a thread-safe in-memory `Store` in `internal/config`
+providing CRUD over `ActionCard` and `Settings` and storing the run
+history of the primary action (`Run`) as a ring buffer limited by
+`Settings.HistorySize`. Everything purely in memory — no reading/writing to
+disk (that is handled by block 0003). The last status check and the
+history of status transitions are a separate ADR-0006 contract, which will
+be completed in phase 4.
 
-## Rozsah
+## Scope
 
-- **Uvnitř**:
-  - `Store` struct s `sync.RWMutex`, drží `Settings` a mapu
-    `map[string]ActionCard` (klíč = `ActionCard.ID`).
-  - `NewStore(settings Settings) *Store` — vytvoří prázdný store (bez karet).
+- **In scope**:
+  - `Store` struct with `sync.RWMutex`, holds `Settings` and the map
+    `map[string]ActionCard` (key = `ActionCard.ID`).
+  - `NewStore(settings Settings) *Store` — creates an empty store (no cards).
   - `ListCards() []ActionCard`, `GetCard(id string) (ActionCard, bool)`.
-  - `CreateCard(card ActionCard) (ActionCard, error)` — vygeneruje `ID`
-    (pokud prázdné), zvaliduje (`card.Validate()` z bloku 0001), odmítne
-    duplicitní ID.
+  - `CreateCard(card ActionCard) (ActionCard, error)` — generates the `ID`
+    (if empty), validates (`card.Validate()` from block 0001), rejects a
+    duplicate ID.
   - `UpdateCard(id string, card ActionCard) (ActionCard, error)`,
-    `DeleteCard(id string) error` — chyba `ErrNotFound`, pokud karta
-    neexistuje.
-  - `GetSettings() Settings`, `UpdateSettings(s Settings) error` — validuje;
-    pokud se `HistorySize` zmenší, existující historie se ořízne na nový
-    limit (zahodí nejstarší záznamy).
-  - `AppendRun(cardID string, run Run) error` — přidá běh primární akce do
-    ring bufferu a udrží max `Settings.HistorySize` posledních záznamů.
-  - `GetRuns(cardID string, actionKind string) ([]Run, error)` — vrátí kopii
-    historie primárních běhů; status přechody se řeší samostatnou logikou
-    fáze 4 podle ADR-0006.
-  - Veškeré návratové hodnoty jsou kopie (žádné sdílené mutable struktury
-    mezi voláními), aby volající nemohl obejít mutex.
-- **Mimo rozsah**: JSON perzistence a atomický zápis (blok 0003), spouštění
-  příkazů/vyhodnocení `OutputRule` (fáze 3 — tento blok jen ukládá hotové
-  `Run` záznamy, nevytváří je), HTTP API (fáze 5).
+    `DeleteCard(id string) error` — error `ErrNotFound` if the card does
+    not exist.
+  - `GetSettings() Settings`, `UpdateSettings(s Settings) error` —
+    validates; if `HistorySize` decreases, the existing history is trimmed
+    to the new limit (drops the oldest records).
+  - `AppendRun(cardID string, run Run) error` — adds a primary action run
+    to the ring buffer and keeps at most `Settings.HistorySize` latest
+    records.
+  - `GetRuns(cardID string, actionKind string) ([]Run, error)` — returns a
+    copy of the primary run history; status transitions are handled by
+    separate phase 4 logic per ADR-0006.
+  - All return values are copies (no shared mutable structures between
+    calls), so that the caller cannot bypass the mutex.
+- **Out of scope**: JSON persistence and atomic write (block 0003),
+  executing commands/evaluating `OutputRule` (phase 3 — this block only
+  stores finished `Run` records, it does not create them), HTTP API
+  (phase 5).
 
-## Návrh řešení
+## Proposed solution
 
-Nový soubor `internal/config/store.go`. Interní stav:
+New file `internal/config/store.go`. Internal state:
 
 ```go
 type Store struct {
@@ -54,24 +57,25 @@ type Store struct {
 }
 ```
 
-Ring buffer lze implementovat jednoduše jako slice s ořezáváním na
-`Settings.HistorySize` při každém `AppendRun` (na desítky karet a nízké N
-není potřeba kruhový index).
+The ring buffer can be implemented simply as a slice trimmed to
+`Settings.HistorySize` on every `AppendRun` (for dozens of cards and a low
+N a circular index is not needed).
 
-## Testovací plán
+## Test plan
 
-- CRUD: create/get/update/delete happy path + `ErrNotFound` na
-  update/delete neexistující karty, duplicitní ID na create.
-- `AppendRun`/`GetRuns`: naplnění přes limit `HistorySize` ořízne nejstarší
-  primární běhy.
-- `UpdateSettings` se zmenšujícím `HistorySize` ořízne existující historie
-  všech karet.
-- Souběžný přístup: test s `go test -race` spouštějící CRUD a `AppendRun`
-  ze více goroutin současně bez race podmínek.
-- Vrácené slice/struct z `ListCards`/`GetRuns` nejsou ovlivněny pozdější
-  mutací store (kopie, ne reference na interní stav).
+- CRUD: create/get/update/delete happy path + `ErrNotFound` on
+  update/delete of a non-existent card, duplicate ID on create.
+- `AppendRun`/`GetRuns`: filling beyond the `HistorySize` limit trims the
+  oldest primary runs.
+- `UpdateSettings` with a decreasing `HistorySize` trims the existing
+  history of all cards.
+- Concurrent access: a test with `go test -race` running CRUD and
+  `AppendRun` from multiple goroutines simultaneously without race
+  conditions.
+- Slices/structs returned from `ListCards`/`GetRuns` are not affected by a
+  later mutation of the store (copies, not references to internal state).
 
-## Kritérium hotovosti
+## Done criteria
 
-Viz [Definition of Done](../../devops/definition-of-done.md). Specificky:
-`go test -race ./...` čistě prochází pro `internal/config`.
+See [Definition of Done](../../devops/definition-of-done.md). Specifically:
+`go test -race ./...` passes cleanly for `internal/config`.

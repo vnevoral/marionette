@@ -5,16 +5,18 @@ applyTo: "web/src/**"
 
 # Vue + PrimeVue frontend
 
-- `<script setup lang="ts">` s Composition API; žádné Options API komponenty.
-- UI prvky přednostně z PrimeVue (`Card`, `Button`, `Tag`, `DataTable`,
-  `Dialog`, formulářové vstupy) místo vlastního HTML/CSS od nuly — viz
+- `<script setup lang="ts">` with the Composition API; no Options API
+  components.
+- Prefer UI elements from PrimeVue (`Card`, `Button`, `Tag`, `DataTable`,
+  `Dialog`, form inputs) over custom HTML/CSS from scratch — see
   [ADR-0003](../../docs/architecture/decisions/0003-vue-primevue-frontend.md).
-- Odsazení tabulátorem, dvojité uvozovky (viz `.prettierrc.json`); po úpravě
-  spustit `npm run format` a `npm run lint` z `web/`.
-- Nepřidávat novou major verzi PrimeVue/Vue/Vite bez nového ADR, který
-  zhodnotí breaking changes.
-- API volání směřují na `/api/...` (v dev proxováno Vite na backend `:8080`,
-  v produkci stejný proces/port).
-- Po každé změně: `npm run lint` a `npm run build` ve `web/` (lint běží s
-  `--max-warnings 0`, formátování hlídá Prettier přes `eslint-config-prettier`);
-  před uzavřením `make verify` z kořene repozitáře.
+- Tab indentation, double quotes (see `.prettierrc.json`); after a change
+  run `npm run format` and `npm run lint` from `web/`.
+- Do not add a new major version of PrimeVue/Vue/Vite without a new ADR
+  that evaluates the breaking changes.
+- API calls go to `/api/...` (in dev proxied by Vite to the backend
+  `:8080`, in production the same process/port).
+- After every change: `npm run lint` and `npm run build` in `web/` (lint
+  runs with `--max-warnings 0`, formatting is enforced by Prettier via
+  `eslint-config-prettier`); before closing, `make verify` from the
+  repository root.

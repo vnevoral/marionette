@@ -1,76 +1,87 @@
-# Implementační blok: Orchestrace primární a status akce
+# Implementation block: Orchestration of the primary and status action
 
-- **Fáze**: 5 — REST API
-- **Vazba na požadavky**: FR-11, FR-12, FR-13, FR-14, FR-15a, FR-17, FR-18, FR-40
-- **Vazba na ADR**: ADR-0004, ADR-0005, ADR-0006
-- **Stav**: Hotovo
-- **Závislosti**: Blok 0010; `config.Store`, `execengine.Runner`, `StatusCheckService`, `Scheduler`
+- **Phase**: 5 — REST API
+- **Requirements**: FR-11, FR-12, FR-13, FR-14, FR-15a, FR-17, FR-18, FR-40
+- **ADRs**: ADR-0004, ADR-0005, ADR-0006
+- **Status**: Done
+- **Dependencies**: Block 0010; `config.Store`, `execengine.Runner`, `StatusCheckService`, `Scheduler`
 
-## Cíl bloku
+## Goal
 
-REST API přijme požadavek na primární nebo ruční status akci a vrátí klientovi
-odpověď bez čekání na dokončení procesu. Samotný běh pokračuje na background
-workeru; primární výsledek se uloží do historie, status výsledek aktualizuje
-projekci. Čtení statusu zůstává oddělenou read-only operací.
+The REST API accepts a request for the primary or a manual status action and
+returns a response to the client without waiting for the process to finish.
+The run itself continues on a background worker; the primary result is
+stored in the history, the status result updates the projection. Reading
+the status stays a separate read-only operation.
 
-## Rozsah
+## Scope
 
-- **Uvnitř**:
+- **In scope**:
   - `POST /api/cards/{id}/actions/primary`;
   - `POST /api/cards/{id}/actions/status/check`;
-  - primární endpoint vrací `202 Accepted` po přijetí validního požadavku;
-  - background orchestrace `Runner.Run` → `Result.ToRun("primary")` → `AppendRun`;
-  - volání `Scheduler.NotifyPrimaryAction` ihned po přijetí primární akce;
-  - status endpoint ověří status akci a zařadí `StatusCheckService.CheckNow` na
-    background worker;
-  - oba enqueue endpointy vracejí pouze potvrzení zařazení.
-- **Mimo rozsah**:
-  - nové process execution pravidlo;
-  - změna status transition modelu;
-  - veřejný async job resource, polling jobu, cancellation a prioritizace;
-  - scheduler reconcile a lifecycle (0012).
+  - the primary endpoint returns `202 Accepted` after accepting a valid
+    request;
+  - background orchestration `Runner.Run` → `Result.ToRun("primary")` → `AppendRun`;
+  - calling `Scheduler.NotifyPrimaryAction` right after the primary action is
+    accepted;
+  - the status endpoint validates the status action and enqueues
+    `StatusCheckService.CheckNow` on the background worker;
+  - both enqueue endpoints return only an enqueue confirmation.
+- **Out of scope**:
+  - a new process execution rule;
+  - changes to the status transition model;
+  - a public async job resource, job polling, cancellation and
+    prioritization;
+  - scheduler reconcile and lifecycle (0012).
 
-## Schválení
+## Approval
 
-- **Schválil**: čeká
-- **Datum schválení**: čeká
-- **Poznámky k rozhodnutí**: Primární request vrací přijetí, ne výsledek procesu.
-  Selhání se po dokončení zaznamená do `Run` jako `fail` nebo `timeout`; status
-  karty je autoritativní cesta pro zjištění výsledného stavu.
+- **Approved by**: pending
+- **Approval date**: pending
+- **Decision notes**: The primary request returns acceptance, not the process
+  result. A failure is recorded after completion in the `Run` as `fail` or
+  `timeout`; the card status is the authoritative way to find out the
+  resulting state.
 
-## Návrh řešení
+## Proposed solution
 
-Handler obdrží rozhraní pro background execution manager, status checker a
-scheduler notifier. Primární endpoint ověří kartu a požadavek, předá
-`card.Primary` background workeru a zavolá `NotifyPrimaryAction`. Worker
-následně zavolá `Runner.Run`, převede výsledek přes `Result.ToRun("primary")` a
-uloží jej přes `AppendRun`. Background manager nabízí `Wait`/`Close`; jeho
-zapojení do lifecycle aplikace dokončí blok 0012.
+The handler receives interfaces for the background execution manager, the
+status checker and the scheduler notifier. The primary endpoint validates the
+card and the request, hands `card.Primary` to the background worker and
+calls `NotifyPrimaryAction`. The worker then calls `Runner.Run`, converts
+the result via `Result.ToRun("primary")` and stores it via `AppendRun`. The
+background manager offers `Wait`/`Close`; wiring it into the application
+lifecycle will be completed by block 0012.
 
-Status se v tomto handleru nespouští; read-only status handler pouze vrací
-poslední uloženou projekci. Doporučené tělo odpovědi primárního endpointu je
-jen potvrzení přijetí s `cardId` a
-`actionKind: "primary"`; výsledek se čte z historie/status endpointu.
+The status is not run in this handler; the read-only status handler only
+returns the last stored projection. The recommended response body of the
+primary endpoint is only an acceptance confirmation with `cardId` and
+`actionKind: "primary"`; the result is read from the history/status endpoint.
 
-## Testovací plán
+## Test plan
 
-- primární endpoint vrátí `202` bez čekání na dokončení procesu;
-- background worker zpracuje outcome `ok`, `fail` a `timeout`;
-- uložení primárního běhu v newest-first historii;
-- notifikace scheduleru před dokončením primární akce;
-  - status enqueue s `ok`/`fail`, chybějící status akcí a neexistující kartou;
-  - runner/setup chyba a persistence chyba;
-  - ověření, že background spuštění neobchází scheduler ani sdílený runner;
-  - ověření, že `GET /status` pouze čte poslední snapshot a nic nespouští.
+- the primary endpoint returns `202` without waiting for the process to
+  finish;
+- the background worker handles the outcomes `ok`, `fail` and `timeout`;
+- storing the primary run in the newest-first history;
+- notifying the scheduler before the primary action finishes;
+  - status enqueue with `ok`/`fail`, a missing status action and a
+    non-existent card;
+  - a runner/setup error and a persistence error;
+  - verifying that background runs do not bypass the scheduler or the shared
+    runner;
+  - verifying that `GET /status` only reads the last snapshot and runs
+    nothing.
 
-## Kritérium hotovosti
+## Done criteria
 
-Viz [Definition of Done](../../devops/definition-of-done.md). Specificky:
-primární endpoint nečeká na proces, každý přijatý běh je před shutdownem
-drainovatelný a žádné spouštění neobchází sdílený concurrency-limited runner.
+See [Definition of Done](../../devops/definition-of-done.md). Specifically:
+the primary endpoint does not wait for the process, every accepted run can
+be drained before shutdown and no execution bypasses the shared
+concurrency-limited runner.
 
-## Uzavření
+## Closure
 
-- **Stav po implementaci**: Hotovo
-- **Ověření**: `go test ./internal/server -count=1`, `go test -race ./...`
-- **Dokumentace aktualizována**: ano; lifecycle zapojení zůstává v bloku 0012
+- **Status after implementation**: Done
+- **Verification**: `go test ./internal/server -count=1`, `go test -race ./...`
+- **Documentation updated**: yes; the lifecycle wiring stays in block 0012

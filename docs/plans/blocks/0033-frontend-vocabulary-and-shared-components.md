@@ -1,125 +1,129 @@
-# Implementační blok: Sdílený slovník stavů, komponenty a theme preset
+# Implementation block: Shared status vocabulary, components and theme preset
 
-- **Fáze**: 8 — Zpevnění
-- **Vazba na požadavky**: FR-25, FR-26, NFR-06, NFR-08
-- **Vazba na ADR**: ADR-0003, ADR-0007, ADR-0009
-- **Stav**: Hotovo
-- **Závislosti**: Bloky 0029, 0032 (aby refaktor nekolidoval s opravami), 0030 (testy)
+- **Phase**: 8 — Hardening
+- **Requirements**: FR-25, FR-26, NFR-06, NFR-08
+- **ADRs**: ADR-0003, ADR-0007, ADR-0009
+- **Status**: Done
+- **Dependencies**: Blocks 0029, 0032 (so the refactor does not collide with the fixes), 0030 (tests)
 
-## Cíl bloku
+## Goal
 
-Po dokončení existuje jeden modul se slovníkem stavů a textů, sdílené typy
-a komponenty ze spec §8.4, a PrimeVue theme je přizpůsobené přes
-`definePreset` místo `!important` přepisů.
+When done, there is a single module with the vocabulary of states and
+texts, shared types and components from spec §8.4, and the PrimeVue theme
+is customized via `definePreset` instead of `!important` overrides.
 
-## Rozsah
+## Scope
 
-- **Uvnitř**:
-  - `src/ui/vocabulary.ts`: labely, `statusPresentation(state)` →
-    `{label, icon, tone}`, texty prázdných/chybových stavů; `StatusTone`
-    definován jednou v `src/types.ts` spolu s `EnvironmentRow` a dalšími
-    sdílenými typy;
-  - komponenty `PageHeader`, `EmptyState`, `RequestState`, `ActionCard`,
-    `RunTable`, `StatusTimeline` (spec §8.4); view se zmenší pod ~250 řádků;
-  - globální třídy `.eyebrow`, `.page`, `.page-lede`, `.loading-state` v
-    `tokens.css`, odstranění duplicit ze scoped CSS;
-  - `definePreset(Aura, …)` v `main.ts` pro primary/formField/surface
-    tokeny, odstranění všech `!important` v `tokens.css` a `:deep` přepisů
-    v `CardEditView.vue`; tokeny srovnat se spec §8.2 (nebo spec upravit
-    podle skutečnosti, rozhodne vlastník);
-  - odlišit tón `Queued` (amber) a `Running` (blue) dle spec §4; doplnit
-    „Last checked …/Not checked yet“ a „state duration“ (FR-17) tam, kde
-    chybí; line-clamp popisu na kartě;
-  - `env.d.ts` shim odstranit, pokud `vue-tsc` funguje bez něj.
-- **Mimo rozsah**:
-  - migrace PrimeFlex → Tailwind (zamítnuto pro MVP, viz ADR-0009);
-  - Pinia nebo jiný store (velikost aplikace to nevyžaduje);
-  - nové funkce.
+- **In scope**:
+  - `src/ui/vocabulary.ts`: labels, `statusPresentation(state)` →
+    `{label, icon, tone}`, texts for empty/error states; `StatusTone`
+    defined once in `src/types.ts` together with `EnvironmentRow` and other
+    shared types;
+  - components `PageHeader`, `EmptyState`, `RequestState`, `ActionCard`,
+    `RunTable`, `StatusTimeline` (spec §8.4); views shrink below ~250 lines;
+  - global classes `.eyebrow`, `.page`, `.page-lede`, `.loading-state` in
+    `tokens.css`, removing duplicates from scoped CSS;
+  - `definePreset(Aura, …)` in `main.ts` for primary/formField/surface
+    tokens, removing all `!important` in `tokens.css` and `:deep` overrides
+    in `CardEditView.vue`; align tokens with spec §8.2 (or adjust the spec
+    to reality, the owner decides);
+  - distinguish the `Queued` (amber) and `Running` (blue) tones per spec §4;
+    add "Last checked …/Not checked yet" and "state duration" (FR-17) where
+    missing; line-clamp the description on the card;
+  - remove the `env.d.ts` shim if `vue-tsc` works without it.
+- **Out of scope**:
+  - migration PrimeFlex → Tailwind (rejected for the MVP, see ADR-0009);
+  - Pinia or another store (the size of the app does not require it);
+  - new features.
 
-## Schválení
+## Approval
 
-- **Schválil**: projektový vlastník
-- **Datum schválení**: 2026-09-26
-- **Poznámky k rozhodnutí**: Schváleno; PrimeFlex zůstává dle ADR-0009 a
-  jeho verze se v tomto bloku připne na `4.0.0`. Nález revize 2026-09-26
+- **Approved by**: project owner
+- **Approval date**: 2026-09-26
+- **Decision notes**: Approved; PrimeFlex stays per ADR-0009 and its
+  version is pinned to `4.0.0` in this block. Review finding 2026-09-26
   (M4, M6, L4, L6).
-  ADR-0007 slovník explicitně vyžaduje; dnes je `StatusTone` definován 3×.
+  ADR-0007 explicitly requires a vocabulary; today `StatusTone` is defined
+  3×.
 
-## Návrh řešení
+## Proposed solution
 
-- `src/ui/vocabulary.ts` exportuje `const STATUS = { ok: {label:"Healthy",
+- `src/ui/vocabulary.ts` exports `const STATUS = { ok: {label:"Healthy",
   icon:"pi pi-check-circle", tone:"success"}, … } satisfies Record<StatusState,
-  Presentation>`; `StatusBadge` i `ActionCard` z něj čtou.
+  Presentation>`; both `StatusBadge` and `ActionCard` read from it.
 - `src/theme/preset.ts`: `definePreset(Aura, { semantic: { primary: {…},
   colorScheme: { light: { surface: {…}, formField: {…} } } } })`.
-- Refaktor po jedné view: `HomeView` → `ActionCard` + `EmptyState`;
+- Refactor one view at a time: `HomeView` → `ActionCard` + `EmptyState`;
   `CardDetailView` → `RunTable` + `StatusTimeline`; `CardEditView` →
   `PageHeader` + `RequestState`.
 
-## Testovací plán
+## Test plan
 
-- Vitest: `statusPresentation` pokrývá všechny `StatusState` (typový test
-  `satisfies`); `ActionCard` render pro každý stav; `StatusTimeline`
-  výpočet doby trvání.
-- `grep -r "!important" web/src` vrací 0 řádků; `grep -rn "type StatusTone"`
-  vrací 1 řádek.
-- Manuální screenshot smoke test všech tří obrazovek v 320 px a desktop
-  (NFR-10), kontrola kontrastu tokenů (axe).
+- Vitest: `statusPresentation` covers all `StatusState` values (type test
+  `satisfies`); `ActionCard` render for each state; `StatusTimeline`
+  duration calculation.
+- `grep -r "!important" web/src` returns 0 lines; `grep -rn "type StatusTone"`
+  returns 1 line.
+- Manual screenshot smoke test of all three screens at 320 px and desktop
+  (NFR-10), token contrast check (axe).
 - `npm run lint`, `npm run build`, `npm test`.
 
-## Kritérium hotovosti
+## Done criteria
 
-Viz [Definition of Done](../../devops/definition-of-done.md) +:
+See [Definition of Done](../../devops/definition-of-done.md) plus:
 
-- žádný `!important` v `web/src`;
-- každá view < 300 řádků;
-- UX spec §8.2/§8.4 odpovídá implementaci.
+- no `!important` in `web/src`;
+- every view < 300 lines;
+- UX spec §8.2/§8.4 matches the implementation.
 
-## Uzavření
+## Closure
 
-- **Stav po implementaci**: Hotovo (2026-09-26)
-- **Ověření**: `make verify` prošel (lint, `vue-tsc`, Prettier, Vitest 77
-  testů ve 14 souborech, `vite build`, `go test -race`, `go vet`). Nové testy:
-  `ui/vocabulary.spec.ts` (každý `StatusState` a `Run.outcome` má label,
-  ikonu i tón; raw hodnoty `ok/fail/accepted/running/timeout` se nikdy
-  nezobrazí; Queued = amber, Running = blue), `ui/format.spec.ts`
-  (nanosekundy, hrubé rozpětí, „Last checked/Not checked yet“,
-  `transitionDuration` pro ukončený i aktuální přechod), `components/ActionCard.spec.ts`
-  (render pro ok/fail/unknown, bez status akce, queued/running s blokovanými
-  tlačítky, výsledek, emity), `components/StatusTimeline.spec.ts`
-  (doba trvání aktuálního přechodu z `now`, uložená doba u ukončených,
-  loading/empty/error). Kritéria: `grep -rn "!important" web/src` = 0,
-  `grep -rn "type StatusTone" web/src` = 1, view: `HomeView` 243,
-  `CardEditView` 293, `CardDetailView` 294 řádků. `env.d.ts` odstraněn —
-  `vue-tsc -b` i `vite build` fungují bez shim. PrimeFlex připnut na
-  `4.0.0` v `package.json` i lockfile. Manuální screenshot smoke test
-  (320 px / desktop) a kontrola kontrastu axe zůstávají na referenční host.
-- **Odchylky od návrhu**: (1) Tóny `StatusTone` zůstávají
-  `healthy|problem|unknown|info|warning` (spec §4 „Queued amber / Running
-  blue“ mapováno na `warning`/`info`), ne `success` jako v návrhu — názvy
-  odpovídají existujícím CSS třídám `status-*` a testům z 0030. (2) Kromě
-  komponent ze spec §8.4 (`PageHeader`, `EmptyState`, `RequestState`,
-  `InlineError`, `ActionCard`, `ActionControls`, `RunTable`,
-  `StatusTimeline`, `FormSection`, `ConnectionStatus` z 0032) přibyly
-  `DetailPanel`, `DetailErrorState`, `StatusSummary`, `CardIdentityFields`,
-  `PollingFields` a `SaveBar`, aby se všechny view vešly pod 300 řádků;
-  `UnsavedChangesDialog` je realizován jako composable
-  `useUnsavedChangesGuard` nad sdíleným `ConfirmDialog` (žádná druhá
-  dialogová komponenta). Logika detailu je v composables
-  `useCardActivity` (runs + history s generací) a `useTransientMessage`.
-  (3) Slovník je rozdělen na `src/ui/vocabulary.ts` (labely, prezentace,
-  texty) a `src/ui/format.ts` (formátování času a dob trvání); sdílené typy
-  v `src/types.ts`, `cardEditModel.ts` je re-exportuje. (4) Tokeny v UX
-  spec §8.2 byly upraveny podle skutečnosti (paleta doladěná v blocích
-  0019/0020 zůstává), spec nově uvádí, že PrimeVue barvy jdou
-  z `src/theme/preset.ts` přes `definePreset(Aura, …)`; `darkModeSelector`
-  je vypnutý, aplikace má jedno světlé schéma. (5) FR-17 „state duration“:
-  detail ukazuje „In this state for …“ z aktuálního přechodu historie,
-  `StatusTimeline` značí aktuální přechod „(current)“ a obnovuje uplynulý čas
-  každou minutu. (6) `.primary-action-button` a `.primary-action-link`
-  zůstávají globální třídy (bez `!important`); měkký zelený „primary“ styl
-  není v Aura tokenech vyjádřitelný bez varianty tlačítka.
-- **Dokumentace aktualizována**: ano — UX spec §8.2 (tokeny podle
-  skutečnosti, preset) a §8.4 (stav komponent), `docs/architecture/overview.md`
-  (řádek SPA), `docs/devops/testing-strategy.md` (nové testy), roadmapa
-  (fáze 8 hotová).
+- **Status after implementation**: Done (2026-09-26)
+- **Verification**: `make verify` passed (lint, `vue-tsc`, Prettier, Vitest 77
+  tests in 14 files, `vite build`, `go test -race`, `go vet`). New tests:
+  `ui/vocabulary.spec.ts` (every `StatusState` and `Run.outcome` has a
+  label, icon and tone; the raw values `ok/fail/accepted/running/timeout`
+  are never displayed; Queued = amber, Running = blue), `ui/format.spec.ts`
+  (nanoseconds, rough span, "Last checked/Not checked yet",
+  `transitionDuration` for both a finished and the current transition), `components/ActionCard.spec.ts`
+  (render for ok/fail/unknown, without a status action, queued/running with
+  blocked buttons, result, emits), `components/StatusTimeline.spec.ts`
+  (duration of the current transition from `now`, stored duration for
+  finished ones, loading/empty/error). Criteria: `grep -rn "!important"
+  web/src` = 0, `grep -rn "type StatusTone" web/src` = 1, views: `HomeView`
+  243, `CardEditView` 293, `CardDetailView` 294 lines. `env.d.ts` removed —
+  both `vue-tsc -b` and `vite build` work without the shim. PrimeFlex pinned
+  to `4.0.0` in both `package.json` and the lockfile. The manual screenshot
+  smoke test (320 px / desktop) and the axe contrast check remain for the
+  reference host.
+- **Deviations from the plan**: (1) The `StatusTone` tones stay
+  `healthy|problem|unknown|info|warning` (spec §4 "Queued amber / Running
+  blue" mapped to `warning`/`info`), not `success` as in the plan — the
+  names match the existing `status-*` CSS classes and the tests from 0030.
+  (2) Besides the components from spec §8.4 (`PageHeader`, `EmptyState`,
+  `RequestState`, `InlineError`, `ActionCard`, `ActionControls`,
+  `RunTable`, `StatusTimeline`, `FormSection`, `ConnectionStatus` from
+  0032), `DetailPanel`, `DetailErrorState`, `StatusSummary`,
+  `CardIdentityFields`, `PollingFields` and `SaveBar` were added, so that
+  all views fit under 300 lines; `UnsavedChangesDialog` is implemented as
+  the composable `useUnsavedChangesGuard` on top of the shared
+  `ConfirmDialog` (no second dialog component). The detail logic is in the
+  composables `useCardActivity` (runs + history with generation) and
+  `useTransientMessage`. (3) The vocabulary is split into
+  `src/ui/vocabulary.ts` (labels, presentation, texts) and
+  `src/ui/format.ts` (formatting of times and durations); shared types are
+  in `src/types.ts`, `cardEditModel.ts` re-exports them. (4) The tokens in
+  UX spec §8.2 were adjusted to reality (the palette fine-tuned in blocks
+  0019/0020 stays), the spec now states that PrimeVue colors come
+  from `src/theme/preset.ts` via `definePreset(Aura, …)`; `darkModeSelector`
+  is disabled, the app has a single light scheme. (5) FR-17 "state
+  duration": the detail shows "In this state for …" from the current
+  history transition, `StatusTimeline` marks the current transition
+  "(current)" and refreshes the elapsed time every minute.
+  (6) `.primary-action-button` and `.primary-action-link` remain global
+  classes (without `!important`); the soft green "primary" style cannot be
+  expressed in Aura tokens without a button variant.
+- **Documentation updated**: yes — UX spec §8.2 (tokens per reality,
+  preset) and §8.4 (component status), `docs/architecture/overview.md`
+  (SPA row), `docs/devops/testing-strategy.md` (new tests), roadmap
+  (phase 8 done).

@@ -1,112 +1,116 @@
-# Implementační blok: Přejmenování spárovaného zařízení
+# Implementation block: Renaming a paired device
 
-- **Fáze**: 8 — Zpevnění (dodatek po uzavření fáze), oblast přístupu
-- **Vazba na požadavky**: FR-57, FR-52, FR-55, NFR-12, NFR-13
-- **Vazba na ADR**: ADR-0011. Nové ADR není potřeba: nový endpoint
-  rozšiřuje správu zařízení ve stejném bezpečnostním modelu (stejná
-  oprávnění jako odebrání, token ani platnost se nemění)
-- **Stav**: Hotovo
-- **Závislosti**: Bloky 0043, 0044 (registr zařízení, stránka Devices)
+- **Phase**: 8 — Hardening (addendum after the phase was closed), access
+  area
+- **Requirements**: FR-57, FR-52, FR-55, NFR-12, NFR-13
+- **ADRs**: ADR-0011. No new ADR is needed: the new endpoint extends
+  device management within the same security model (the same permissions
+  as removal; neither the token nor the expiry changes)
+- **Status**: Done
+- **Dependencies**: Blocks 0043, 0044 (device registry, Devices page)
 
-## Cíl bloku
+## Goal
 
-Název zařízení se dnes zadá jen při párování (obrazovka párování nabídne
-název odvozený z prohlížeče) a později nejde změnit; kdo přijal výchozí
-návrh, má v seznamu třeba dvě „Chrome on Linux“. Po dokončení bloku jde
-na stránce **Devices** přejmenovat kterékoli spárované zařízení.
+Today a device name is entered only during pairing (the pairing screen
+offers a name derived from the browser) and cannot be changed later; anyone
+who accepted the default suggestion may have, say, two "Chrome on Linux"
+entries in the list. After this block, any paired device can be renamed on
+the **Devices** page.
 
-## Rozsah
+## Scope
 
-- **Uvnitř**:
+- **In scope**:
   - `internal/access`: `Registry.Rename(id, name string) (Device, error)`
-    — stejná validace jako `Pair` (`strings.TrimSpace`, neprázdné, nejvýš
-    `MaxDeviceNameLength` znaků → `ErrInvalidName`), neznámé nebo
-    vypršelé zařízení → `ErrDeviceNotFound`, okamžité uložení souboru
-    zařízení (`saveLocked`) s návratem původního názvu při chybě zápisu,
-    stejně jako `Remove`; token, `PairedAt` ani `LastSeenAt` se nemění;
-  - `internal/server`: `PATCH /api/devices/{id}` s tělem `{"name": "…"}`
-    → `200 {device}` (tvar jako v `GET /api/devices`, včetně
-    `current`); neplatný název `422` s `fields.name`; neznámé zařízení
-    `404`; chráněno párováním (FR-50) a cross-site ochranou
-    (`requireSameOrigin`, NFR-12) jako ostatní mutující routy;
+    — the same validation as `Pair` (`strings.TrimSpace`, non-empty, at
+    most `MaxDeviceNameLength` characters → `ErrInvalidName`), unknown or
+    expired device → `ErrDeviceNotFound`, immediate save of the device
+    file (`saveLocked`) with the original name restored on a write error,
+    just like `Remove`; the token, `PairedAt` and `LastSeenAt` do not
+    change;
+  - `internal/server`: `PATCH /api/devices/{id}` with body `{"name": "…"}`
+    → `200 {device}` (same shape as in `GET /api/devices`, including
+    `current`); invalid name `422` with `fields.name`; unknown device
+    `404`; protected by pairing (FR-50) and cross-site protection
+    (`requireSameOrigin`, NFR-12) like the other mutating routes;
   - `web/src/api.ts`: `renameDevice(id, name)`;
-  - `DevicesView`: u každého zařízení tlačítko **Rename** (ikona tužky
-    s přístupným názvem „Rename <název>“), které nahradí název polem
-    s tlačítky **Save** / **Cancel**; Enter uloží, Escape zruší; chyba
-    `422` se zobrazí u pole; po uložení inline potvrzení
-    „"<nový název>" saved“ (UX spec §4: inline, ne toast);
-  - slovník (`ACCESS.rename`, …), UX specifikace §7.4, tabulka endpointů
-    v `docs/architecture/overview.md`, README (sekce o zařízeních);
-  - testy: Go (`Registry.Rename` — oříznutí, prázdný a příliš dlouhý
-    název, neznámé zařízení, perzistence po znovunačtení, nezměněný
-    token a časy; handler — 200, 422, 404, 401 bez tokenu, 403 z cizího
-    originu), Vitest `DevicesView` (přejmenování, zrušení, chyba 422,
-    klávesnice), E2E (přejmenování vlastního zařízení a jeho zobrazení
-    po obnovení stránky).
-- **Mimo rozsah**:
-  - unikátnost názvů (FR-57: nemusí být unikátní);
-  - omezení přejmenování jen na vlastní zařízení (FR-57: stejná
-    oprávnění jako odebrání);
-  - historie nebo audit změn názvu (změna se zapíše do logu služby na
-    úrovni info, stejně jako párování a odebrání).
+  - `DevicesView`: a **Rename** button for each device (pencil icon with
+    the accessible name "Rename <name>") that replaces the name with a
+    field with **Save** / **Cancel** buttons; Enter saves, Escape cancels;
+    a `422` error is shown at the field; after saving, an inline
+    confirmation "\"<new name>\" saved" (UX spec §4: inline, not a toast);
+  - vocabulary (`ACCESS.rename`, …), UX specification §7.4, the endpoint
+    table in `docs/architecture/overview.md`, README (section on devices);
+  - tests: Go (`Registry.Rename` — trimming, empty and too long name,
+    unknown device, persistence after reload, unchanged token and times;
+    handler — 200, 422, 404, 401 without a token, 403 from a foreign
+    origin), Vitest `DevicesView` (rename, cancel, 422 error, keyboard),
+    E2E (renaming one's own device and its display after a page reload).
+- **Out of scope**:
+  - uniqueness of names (FR-57: they need not be unique);
+  - restricting renaming to one's own device only (FR-57: the same
+    permissions as removal);
+  - history or audit of name changes (the change is written to the service
+    log at info level, just like pairing and removal).
 
-## Schválení
+## Approval
 
-- **Schválil**: projektový vlastník
-- **Datum schválení**: 2026-09-27
-- **Poznámky k rozhodnutí**: Schváleno vlastníkem („souhlas s návrhy“).
+- **Approved by**: project owner
+- **Approval date**: 2026-09-27
+- **Decision notes**: Approved by the owner ("agree with the proposals").
 
-## Návrh řešení
+## Proposed solution
 
-Viz rozsah. `PATCH` místo `PUT`, protože se mění jen jedno pole zdroje.
-Zápis do logu: `renamed paired device` s `device` (id) a novým `name`;
-starý název se do logu nezapisuje zbytečně dvakrát. Rozhraní na stránce
-Devices používá PrimeVue `InputText` a `Button` (konvence projektu);
-pole má popisek „Device name“ a stejný limit délky jako obrazovka
-párování.
+See scope. `PATCH` instead of `PUT`, because only one field of the resource
+changes. Log entry: `renamed paired device` with `device` (id) and the new
+`name`; the old name is not needlessly written to the log twice. The UI on
+the Devices page uses PrimeVue `InputText` and `Button` (project
+convention); the field has the label "Device name" and the same length
+limit as the pairing screen.
 
-## Testovací plán
+## Test plan
 
 - `go test -race ./internal/access ./internal/server`.
 - Vitest `DevicesView.spec.ts`.
-- `make e2e` (rozšíření `pairing.e2e.ts`).
+- `make e2e` (extension of `pairing.e2e.ts`).
 - `make verify`.
 
-## Kritérium hotovosti
+## Done criteria
 
-Viz [Definition of Done](../../devops/definition-of-done.md) +:
+See [Definition of Done](../../devops/definition-of-done.md) plus:
 
-- nový název je vidět na všech spárovaných zařízeních po obnovení seznamu
-  a přežije restart služby.
+- the new name is visible on all paired devices after the list is
+  refreshed and survives a service restart.
 
-## Uzavření
+## Closure
 
-- **Stav po implementaci**: Hotovo (2026-09-27). `make verify` a
-  `make e2e` (17 scénářů včetně nového přejmenování) prošly v závěrečném
-  ověření spolu s bloky 0050 a 0051.
-- **Ověření**: `go test -race ./internal/...`, `go vet ./...`,
-  `gofumpt -l`, `golangci-lint run ./...` — bez chyb; ve `web/`
-  `npx vitest run` (174 testů), `npx vue-tsc -b`,
-  `npx eslint . --max-warnings 0`, `npx prettier --check .` — bez chyb.
-  Nové testy: `internal/access` (`TestRenameKeepsTokenAndTimesAndPersists`,
-  `TestRenameRejectsInvalidNamesAndUnknownDevices` včetně vypršelého
-  zařízení a hranice 64 znaků, `TestRenameKeepsTheOldNameWhenSavingFails`),
-  `internal/server` (`TestPairedDeviceRenamesDevices`: 200 s `current`,
-  422 s `fields.name`, 404, 400 pro neznámé pole, 401 bez cookie, 403
-  z cizího originu; `PATCH /api/devices/{id}` přidán do seznamu
-  chráněných rout), Vitest `api.spec.ts` a `DevicesView.spec.ts`
-  (přejmenování, synchronizace session u vlastního zařízení, zrušení
-  tlačítkem i Escape, Enter, chyba 422 a prázdný název u pole), E2E
-  `pairing.e2e.ts` (samostatný prohlížeč se přejmenuje, nový název je vidět
-  po obnovení i na ostatních zařízeních, pak se odebere).
-- **Odchylky od návrhu**: žádné věcné. Upřesnění: odpověď `PATCH` má tvar
-  `{"device": {…}}` jako `POST /api/pairing`; řádek zařízení se
-  přejmenováním vyčlenil do komponenty `web/src/components/DeviceRow.vue`,
-  aby `DevicesView.vue` zůstal pod 300 řádky; prázdný název odmítne už
-  klient (stejná hláška jako na obrazovce párování) bez požadavku na
-  server; po přejmenování vlastního zařízení se aktualizuje i stav session
-  v SPA. Existující E2E test odebrání vlastního zařízení hledá tlačítko
-  podle názvu, protože řádek má nově dvě tlačítka.
-- **Dokumentace aktualizována**: UX specifikace §7.4, tabulka endpointů
-  v `docs/architecture/overview.md`, README (Pairing devices), slovník
-  `ACCESS` ve `web/src/ui/vocabulary.ts`.
+- **Status after implementation**: Done (2026-09-27). `make verify` and
+  `make e2e` (17 scenarios including the new rename) passed in the final
+  verification together with blocks 0050 and 0051.
+- **Verification**: `go test -race ./internal/...`, `go vet ./...`,
+  `gofumpt -l`, `golangci-lint run ./...` — no errors; in `web/`
+  `npx vitest run` (174 tests), `npx vue-tsc -b`,
+  `npx eslint . --max-warnings 0`, `npx prettier --check .` — no errors.
+  New tests: `internal/access` (`TestRenameKeepsTokenAndTimesAndPersists`,
+  `TestRenameRejectsInvalidNamesAndUnknownDevices` including an expired
+  device and the 64-character boundary,
+  `TestRenameKeepsTheOldNameWhenSavingFails`), `internal/server`
+  (`TestPairedDeviceRenamesDevices`: 200 with `current`, 422 with
+  `fields.name`, 404, 400 for an unknown field, 401 without a cookie, 403
+  from a foreign origin; `PATCH /api/devices/{id}` added to the list of
+  protected routes), Vitest `api.spec.ts` and `DevicesView.spec.ts`
+  (rename, session sync for one's own device, cancel by button and by
+  Escape, Enter, 422 error and empty name at the field), E2E
+  `pairing.e2e.ts` (a separate browser renames itself, the new name is
+  visible after a reload and on the other devices, then it is removed).
+- **Deviations from the plan**: none of substance. Clarification: the
+  `PATCH` response has the shape `{"device": {…}}` like
+  `POST /api/pairing`; the device row with renaming was extracted into the
+  component `web/src/components/DeviceRow.vue` so that `DevicesView.vue`
+  stays under 300 lines; an empty name is already rejected by the client
+  (the same message as on the pairing screen) without a request to the
+  server; after renaming one's own device, the session state in the SPA is
+  updated too. The existing E2E test for removing one's own device looks
+  up the button by name, because the row now has two buttons.
+- **Documentation updated**: UX specification §7.4, the endpoint table in
+  `docs/architecture/overview.md`, README (Pairing devices), the `ACCESS`
+  vocabulary in `web/src/ui/vocabulary.ts`.

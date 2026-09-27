@@ -1,28 +1,30 @@
 ---
-description: "Zapíše nebo upraví jeden požadavek v docs/requirements/requirements.md"
-name: "Nový požadavek"
+description: "Records or updates one requirement in docs/requirements/requirements.md"
+name: "New requirement"
 agent: "agent"
 ---
 
-Zaznamenej nový nebo upravený požadavek do
+Record a new or updated requirement in
 [docs/requirements/requirements.md](../../docs/requirements/requirements.md).
 
-Dodrž [jednotný vývojový workflow](../../docs/devops/development-workflow.md).
-Tento krok pouze připravuje dokumentaci; neplánuj ani neimplementuj kód.
-Postup:
+Follow the [unified development workflow](../../docs/devops/development-workflow.md).
+This step only prepares documentation; do not plan or implement code.
+Procedure:
 
-1. Zjisti od uživatele (pokud to není zřejmé ze zadání), zda jde o funkční
-   (FR) nebo nefunkční (NFR) požadavek a do které sekce patří.
-2. Přiděl další volné ID v rámci dané sekce (např. další `FR-1x`), nepřečíslovávej existující ID.
-3. Zapiš požadavek stručně, jednoznačně a testovatelně (jedna věta/odstavec),
-   ve stejném stylu jako okolní položky.
-4. Pokud požadavek mění nebo ruší existující položku, existující položku
-   neproříznout beze stopy — označ ji jako nahrazenou/aktualizovanou s
-   odkazem na nové ID, ať zůstává historie.
-5. Pokud požadavek implikuje architektonické rozhodnutí (nová závislost,
-   způsob perzistence, protokol...), uprozorni uživatele, že by mělo vzniknout
-   i ADR (`/new-adr`), ale sám ho nevytvářej bez potvrzení.
-6. Zkontroluj, jestli požadavek nekoliduje s existujícím ADR — pokud ano,
-   upozorni na rozpor místo tichého zapsání.
-7. Na konci uveď, zda požadavek vyžaduje ADR a implementační blok; žádný z nich
-   automaticky neschvaluj.
+1. Find out from the user (if it is not clear from the request) whether it is
+   a functional (FR) or non-functional (NFR) requirement and which section it
+   belongs to.
+2. Assign the next free ID within that section (e.g. the next `FR-1x`), do not renumber existing IDs.
+3. Write the requirement concisely, unambiguously and testably (one
+   sentence/paragraph), in the same style as the surrounding items.
+4. If the requirement changes or cancels an existing item, do not cut the
+   existing item without a trace — mark it as superseded/updated with a
+   reference to the new ID, so the history is preserved.
+5. If the requirement implies an architecture decision (a new dependency, a
+   persistence approach, a protocol...), warn the user that an ADR should be
+   created as well (`/new-adr`), but do not create it yourself without
+   confirmation.
+6. Check whether the requirement conflicts with an existing ADR — if so,
+   point out the conflict instead of silently recording it.
+7. At the end, state whether the requirement requires an ADR and an
+   implementation block; do not approve either of them automatically.

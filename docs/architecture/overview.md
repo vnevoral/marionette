@@ -1,280 +1,294 @@
-# Architektura — přehled
+# Architecture — overview
 
-## Kontextový diagram
+## Context diagram
 
 ```mermaid
 flowchart LR
-    Operator["Operátor / Administrátor\n(prohlížeč)"] -->|HTTP/HTTPS| Marionette
+    Operator["Operator / Administrator\n(browser)"] -->|HTTP/HTTPS| Marionette
     subgraph Host["Host (Raspberry Pi / Ubuntu)"]
-        Marionette["Marionette\n(jeden Go proces)"]
-        ConfigFile[("marionette.json\n(konfigurace karet)")]
-        Marionette -->|čte/zapisuje| ConfigFile
-        Marionette -->|spouští příkazy| OS["OS příkazy / procesy hosta\n(wakeonlan, ping, ...)"]
+        Marionette["Marionette\n(single Go process)"]
+        ConfigFile[("marionette.json\n(card configuration)")]
+        Marionette -->|reads/writes| ConfigFile
+        Marionette -->|runs commands| OS["OS commands / host processes\n(wakeonlan, ping, ...)"]
     end
 ```
 
-## Komponenty (dnešní stav + plánované)
+## Components (current state + planned)
 
-| Komponenta             | Umístění          | Odpovědnost                                                     | Stav                                        |
+| Component              | Location          | Responsibility                                                  | Status                                      |
 | ---------------------- | ----------------- | --------------------------------------------------------------- | ------------------------------------------- |
-| HTTP server / routing  | `internal/server` | API routy, SPA fallback                                         | Implementováno (CRUD, enqueue, status read) |
-| Embed vestavěného UI   | `internal/webui`  | `go:embed` `web/dist`                                           | Implementováno                              |
-| SPA (Vue 3 + PrimeVue) | `web/src`         | Dashboard, detail a editor karet; sdílený SSE stream s REST fallbackem (`composables/`), slovník stavů a formátování (`ui/`), sdílené komponenty (`components/`), PrimeVue preset (`theme/`) | Implementováno — fáze 5–8 (0029, 0032, 0033) |
-| Config store           | `internal/config` | In-memory karty, Settings, JSON perzistence a historie (viz [Ochrana konfiguračního souboru](#ochrana-konfiguračního-souboru)) | Implementováno — fáze 2                     |
-| Execution engine       | `internal/execengine` | Bezpečné spouštění akcí na hostu (procesní skupina, timeout, minimální prostředí), capture výstupu, limit souběžnosti | Implementováno — fáze 3, zpevněno 0024/0034 |
-| Status/health engine   | `internal/status` | Vyhodnocení stavu karty, transition historie, volitelný polling | Implementováno — fáze 4                     |
-| Fronta akcí            | `internal/actions` | Asynchronní běh přijatých akcí, omezená fronta, deduplikace, drain při shutdownu (FR-18, FR-35) | Implementováno — 0027, vyčleněno 0034      |
-| Broker událostí        | `internal/events` | Fan-out změn statusu a zapsaných běhů pro SSE, uzavření při shutdownu (ADR-0008)  | Implementováno — 0022, vyčleněno 0034      |
-| REST API domény        | `internal/server` | CRUD karet/akcí, enqueue, čtení stavu, SSE zápis — čistě HTTP vrstva bez vlastních goroutin | Implementováno — fáze 5                     |
+| HTTP server / routing  | `internal/server` | API routes, SPA fallback                                        | Implemented (CRUD, enqueue, status read)    |
+| Embedded UI            | `internal/webui`  | `go:embed` `web/dist`                                           | Implemented                                 |
+| SPA (Vue 3 + PrimeVue) | `web/src`         | Dashboard, card detail and card editor; shared SSE stream with REST fallback (`composables/`), status vocabulary and formatting (`ui/`), shared components (`components/`), PrimeVue preset (`theme/`) | Implemented — phases 5–8 (0029, 0032, 0033) |
+| Config store           | `internal/config` | In-memory cards, Settings, JSON persistence and history (see [Protecting the configuration file](#protecting-the-configuration-file)) | Implemented — phase 2                       |
+| Execution engine       | `internal/execengine` | Safe execution of actions on the host (process group, timeout, minimal environment), output capture, concurrency limit | Implemented — phase 3, hardened 0024/0034   |
+| Status/health engine   | `internal/status` | Card status evaluation, transition history, optional polling    | Implemented — phase 4                       |
+| Action queue           | `internal/actions` | Asynchronous execution of accepted actions, bounded queue, deduplication, drain on shutdown (FR-18, FR-35) | Implemented — 0027, extracted 0034         |
+| Event broker           | `internal/events` | Fan-out of status changes and recorded runs for SSE, closing on shutdown (ADR-0008)  | Implemented — 0022, extracted 0034         |
+| Domain REST API        | `internal/server` | Card/action CRUD, enqueue, status reads, SSE writing — a pure HTTP layer with no goroutines of its own | Implemented — phase 5                       |
 
-## Vztah k dokumentaci
+## Relation to the documentation
 
-- Požadavky, které komponenty naplňují: [../requirements/requirements.md](../requirements/requirements.md)
-- Zdůvodnění klíčových rozhodnutí: [decisions/](decisions)
-- Kdy a v jakém pořadí se komponenty staví: [../plans/roadmap.md](../plans/roadmap.md)
+- Requirements the components fulfill: [../requirements/requirements.md](../requirements/requirements.md)
+- Rationale for key decisions: [decisions/](decisions)
+- When and in what order the components are built: [../plans/roadmap.md](../plans/roadmap.md)
 
-## Bezpečnostní poznámka
+## Security note
 
-Execution engine spouští procesy na hostu na základě uživatelské konfigurace.
-Návrh musí od začátku počítat s: absencí shell interpolace uživatelského
-vstupu (spouštět přes `exec.Command(name, args...)`, ne přes shell string),
-timeoutem pro každý běh, a omezením přístupu k UI/API (viz NFR-01). Spouštění
-je popsáno v ADR-0005; ochrana API před cizími weby níže (NFR-12);
-přístup jen ze spárovaných zařízení v sekci „Přístup ze spárovaných
-zařízení“ (NFR-01, ADR-0011).
+The execution engine runs processes on the host based on user configuration.
+The design must account from the start for: no shell interpolation of user
+input (run via `exec.Command(name, args...)`, not via a shell string), a
+timeout for every run, and restricted access to the UI/API (see NFR-01).
+Execution is described in ADR-0005; protection of the API against foreign
+websites below (NFR-12); access only from paired devices in the section
+"Access from paired devices" (NFR-01, ADR-0011).
 
-## Ochrana před cross-site požadavky
+## Protection against cross-site requests
 
-NFR-01 předpokládá důvěryhodnou síť, ne důvěryhodný prohlížeč: cizí webová
-stránka otevřená operátorem by jinak mohla z jeho prohlížeče poslat
-`POST /api/cards/{id}/actions/primary` (tzv. simple request bez preflightu)
-nebo formulář `enctype=text/plain` na `POST /api/cards`. Proto middleware
-`requireSameOrigin` v `internal/server` (blok 0026, NFR-12) chrání všechny
-mutující API routy (`POST`, `PUT`, `PATCH`, `DELETE` pod `/api/`) v tomto
-pořadí:
+NFR-01 assumes a trusted network, not a trusted browser: a foreign web page
+opened by the operator could otherwise send, from the operator's browser,
+`POST /api/cards/{id}/actions/primary` (a so-called simple request without
+a preflight) or an `enctype=text/plain` form to `POST /api/cards`. That is
+why the `requireSameOrigin` middleware in `internal/server` (block 0026,
+NFR-12) protects all mutating API routes (`POST`, `PUT`, `PATCH`, `DELETE`
+under `/api/`) in this order:
 
-1. požadavek s tělem nebo s hlavičkou `Content-Type` musí deklarovat
-   `application/json` (jinak `415`) — HTML formulář tento typ nedokáže
-   poslat;
+1. a request with a body or with a `Content-Type` header must declare
+   `application/json` (otherwise `415`) — an HTML form cannot send this
+   type;
 2. `Sec-Fetch-Site: cross-site` → `403`;
-3. je-li přítomna hlavička `Origin`, její host se musí shodovat s `Host`
-   požadavku, jinak `403`; `Origin: null` je odmítnut; požadavek bez
-   `Origin` i bez `Sec-Fetch-Site` projde, aby fungovali non-browser klienti
-   (`curl`);
-4. je-li nastaven `MARIONETTE_ALLOWED_HOSTS` (čárkou oddělený seznam hostů,
-   volitelně s portem), musí být `Host` v seznamu, jinak `403`; prázdná
-   proměnná (výchozí) kontrolu vypíná.
+3. if an `Origin` header is present, its host must match the request's
+   `Host`, otherwise `403`; `Origin: null` is rejected; a request with
+   neither `Origin` nor `Sec-Fetch-Site` passes, so that non-browser
+   clients (`curl`) work;
+4. if `MARIONETTE_ALLOWED_HOSTS` is set (a comma-separated list of hosts,
+   optionally with a port), `Host` must be in the list, otherwise `403`; an
+   empty variable (the default) disables the check.
 
-Hosty v krocích 3 a 4 se porovnávají kanonicky (`canonicalHost`): bez ohledu
-na velikost písmen a výchozí porty `80`, `443` a chybějící port jsou
-rovnocenné, jiný explicitní port se musí shodovat přesně. Server totiž
-nezná schéma spolehlivě — za TLS-terminující proxy prohlížeč posílá
-`Origin: https://pi.local`, zatímco služba dostane `Host: pi.local` po
-plain HTTP; obě hodnoty jsou operátorův host. Jiná služba na stejném
-hostname s vlastním portem (`pi.local:9000`) zůstává cizím originem
-(blok 0036).
+Hosts in steps 3 and 4 are compared canonically (`canonicalHost`):
+case-insensitively, and the default ports `80`, `443` and a missing port
+are equivalent; any other explicit port must match exactly. The server
+cannot reliably know the scheme — behind a TLS-terminating proxy the
+browser sends `Origin: https://pi.local`, while the service receives
+`Host: pi.local` over plain HTTP; both values are the operator's host.
+Another service on the same hostname with its own port (`pi.local:9000`)
+remains a foreign origin (block 0036).
 
-Read-only routy, `GET /api/events` (SSE) a SPA fallback zůstávají bez
-omezení. Chyby mají stejnou JSON obálku `{"error": "..."}` jako ostatní
-odpovědi API. SPA proto posílá `Content-Type: application/json` u všech
-mutujících volání včetně těch bez těla. Žádné CORS hlavičky se nevydávají
-(jiné originy se záměrně nepovolují).
+Read-only routes, `GET /api/events` (SSE) and the SPA fallback remain
+unrestricted. Errors have the same JSON envelope `{"error": "..."}` as other
+API responses. The SPA therefore sends `Content-Type: application/json` on
+all mutating calls, including those without a body. No CORS headers are
+issued (other origins are intentionally not allowed).
 
-## Přístup ze spárovaných zařízení
+## Access from paired devices
 
-Balíček `internal/access` (blok 0043, FR-50..FR-56, NFR-13, ADR-0011) drží
-spárovaná zařízení v `devices.json` (výchozí vedle `MARIONETTE_CONFIG`,
-práva `0600`, zápis přes `fsutil.WriteFileAtomic`) a nejvýš jeden párovací
-kód v paměti. Middleware `requireDevice` v `internal/server` stojí za
-`requireSameOrigin` (NFR-12) a pro každý požadavek pod `/api/` kromě
-`GET /api/health`, `GET /api/session` a `POST /api/pairing` vyžaduje cookie
-`marionette_device` s platným tokenem, jinak `401`
-`{"error","code":"pairing_required"}`. Soubory SPA zůstávají veřejné.
+The `internal/access` package (block 0043, FR-50..FR-56, NFR-13, ADR-0011)
+keeps paired devices in `devices.json` (by default next to
+`MARIONETTE_CONFIG`, permissions `0600`, written via
+`fsutil.WriteFileAtomic`) and at most one pairing code in memory. The
+`requireDevice` middleware in `internal/server` sits behind
+`requireSameOrigin` (NFR-12) and, for every request under `/api/` except
+`GET /api/health`, `GET /api/session` and `POST /api/pairing`, requires a
+`marionette_device` cookie with a valid token, otherwise `401`
+`{"error","code":"pairing_required"}`. The SPA files remain public.
 
-| Endpoint                     | Popis                                                                                       |
+| Endpoint                     | Description                                                                                 |
 | ---------------------------- | ------------------------------------------------------------------------------------------- |
-| `GET /api/session`           | `200 {device, expiryDays}`, nebo `401` s `bootstrap: true`, když není spárované nic          |
-| `POST /api/pairing`          | `{code, name}` → `201 {device}` + cookie; neplatný kód `400`, prázdné jméno `422`           |
-| `POST /api/pairing/code`     | kód pro další zařízení `201 {code, expiresAt}` (jen spárované zařízení)                      |
-| `GET /api/devices`           | seznam `{id, name, pairedAt, lastSeenAt, current}` bez hashe tokenu                           |
-| `DELETE /api/devices/{id}`   | `204`; u vlastního zařízení smaže cookie (odhlášení)                                          |
-| `PATCH /api/devices/{id}`    | `{name}` → `200 {device}` (FR-57); neplatné jméno `422` s `fields.name`, neznámé `404`         |
+| `GET /api/session`           | `200 {device, expiryDays}`, or `401` with `bootstrap: true` when nothing is paired           |
+| `POST /api/pairing`          | `{code, name}` → `201 {device}` + cookie; invalid code `400`, empty name `422`              |
+| `POST /api/pairing/code`     | code for another device `201 {code, expiresAt}` (paired device only)                         |
+| `GET /api/devices`           | list of `{id, name, pairedAt, lastSeenAt, current}` without the token hash                   |
+| `DELETE /api/devices/{id}`   | `204`; for the device itself, clears the cookie (sign-out)                                    |
+| `PATCH /api/devices/{id}`    | `{name}` → `200 {device}` (FR-57); invalid name `422` with `fields.name`, unknown `404`       |
 
-- **Token**: 32 bajtů z `crypto/rand` (base64url); na disku jen SHA-256
-  hash; nikdy v logu ani v těle odpovědi. Cookie `HttpOnly`,
-  `SameSite=Strict`, `Path=/`, `Max-Age` = platnost zařízení, `Secure` podle
-  `MARIONETTE_COOKIE_SECURE` (`auto` = TLS spojení, `always`, `never`).
-- **Platnost**: `MARIONETTE_DEVICE_EXPIRY_DAYS` (výchozí 60, 1–400).
-  Poslední použití se drží v paměti; na disk se zapíše a cookie se obnoví
-  nejvýš jednou denně na zařízení a při shutdownu (krok „save devices“) —
-  šetří SD kartu. Zařízení nepoužité déle než platnost se při příštím
-  dotazu nebo načtení odstraní.
-- **Kód**: 8 znaků Crockford Base32 (normalizace velikosti písmen, pomlček
-  a znaků I/L/O), 10 minut, jednorázový, po 5 chybách zneplatněn, nový kód
-  ruší starý, porovnání v konstantním čase. Bez spárovaného zařízení se kód
-  zapíše do logu při startu a znovu při `GET /api/session`, pokud žádný
-  neplatí — obrazovka párování tak vždy najde aktuální kód v
+- **Token**: 32 bytes from `crypto/rand` (base64url); only the SHA-256 hash
+  is stored on disk; never in the log or in a response body. The cookie is
+  `HttpOnly`, `SameSite=Strict`, `Path=/`, `Max-Age` = device validity,
+  `Secure` according to `MARIONETTE_COOKIE_SECURE` (`auto` = TLS
+  connection, `always`, `never`).
+- **Validity**: `MARIONETTE_DEVICE_EXPIRY_DAYS` (default 60, 1–400).
+  Last use is kept in memory; it is written to disk and the cookie is
+  renewed at most once a day per device and on shutdown (the "save
+  devices" step) — this spares the SD card. A device unused for longer
+  than its validity is removed on the next request or load.
+- **Code**: 8 characters of Crockford Base32 (normalization of letter
+  case, hyphens and the characters I/L/O), 10 minutes, single-use,
+  invalidated after 5 failures, a new code cancels the old one,
+  constant-time comparison. With no paired device, the code is written to
+  the log at startup and again on `GET /api/session` if none is valid — so
+  the pairing screen can always find the current code in
   `journalctl -u marionette`.
-- **Odebrání** platí pro REST okamžitě; SSE stream odebraného zařízení
-  skončí při dalším heartbeatu (15 s).
-- **Selhání**: poškozený `devices.json` se karanténuje (`.corrupt-<čas>`)
-  a služba startuje bez zařízení (nový kód v logu); nečitelný soubor
-  zastaví start (přístup se nikdy tiše neotevře). Obnova ztraceného
-  přístupu: smazat `devices.json` a restartovat službu.
-- `MARIONETTE_AUTH=off` ověřování vypne (vývoj); start to zaloguje jako
-  varování.
+- **Removal** takes effect for REST immediately; the SSE stream of a
+  removed device ends at the next heartbeat (15 s).
+- **Failure**: a corrupted `devices.json` is quarantined
+  (`.corrupt-<time>`) and the service starts with no devices (a new code in
+  the log); an unreadable file stops startup (access is never silently
+  opened). Recovering lost access: delete `devices.json` and restart the
+  service.
+- `MARIONETTE_AUTH=off` disables authentication (development); startup logs
+  it as a warning.
 
-## Ochrana konfiguračního souboru
+## Protecting the configuration file
 
-Konfigurace (`MARIONETTE_CONFIG`, FR-30..FR-35) se při startu načítá takto
-(blok 0025):
+The configuration (`MARIONETTE_CONFIG`, FR-30..FR-35) is loaded at startup
+as follows (block 0025):
 
-- **soubor neexistuje** — aplikace startuje s prázdnou konfigurací a soubor
-  vytvoří při první změně;
-- **soubor je poškozený** (neplatný JSON, neplatná nastavení, karta bez
-  ID/názvu/příkazu, nulový timeout, neplatné pravidlo výstupu, záporný
-  polling, duplicitní ID — tj. selhání `ValidateEssential`) — soubor se před
-  jakýmkoli zápisem přejmenuje na `<cesta>.corrupt-<UTC čas>` (při kolizi
-  s číselným sufixem), do logu se zapíše varování s novou cestou a aplikace
-  startuje s prázdnou konfigurací; původní obsah tak nikdy nepřepíše; pokud
-  přejmenování selže, aplikace odmítne nastartovat;
-- **karta porušuje jen aktuální limity** (délky, znaky ID, třída ikony,
-  `MaxTimeoutSec`, vztah intervalů — plná `Validate`) — karta se načte tak,
-  jak je uložená, s varováním `card violates current limits`; zpřísnění
-  limitu v nové verzi tedy nikdy nezpůsobí zmizení konfigurace. Plná
-  validace platí na hranici API (vytvoření/úprava karty), takže se karta
-  opraví při první editaci; engine i scheduler pracují s `ValidateEssential`
-  (blok 0038);
-- **soubor nelze přečíst** (např. oprávnění) — aplikace startuje s prázdnou
-  konfigurací v režimu jen pro čtení: každá změna přes API vrátí 500 a v paměti
-  se vrátí zpět, dokud operátor soubor nezpřístupní a službu nerestartuje;
-- **neplatný runtime stav** (status, historie) uvnitř jinak platného souboru se
-  ignoruje s varováním (FR-35), soubor se nepovažuje za poškozený.
+- **the file does not exist** — the application starts with an empty
+  configuration and creates the file on the first change;
+- **the file is corrupted** (invalid JSON, invalid settings, a card without
+  ID/name/command, zero timeout, invalid output rule, negative polling,
+  duplicate ID — i.e. a `ValidateEssential` failure) — before any write,
+  the file is renamed to `<path>.corrupt-<UTC time>` (with a numeric suffix
+  on collision), a warning with the new path is logged and the application
+  starts with an empty configuration; the original content is thus never
+  overwritten; if the rename fails, the application refuses to start;
+- **a card violates only the current limits** (lengths, ID characters,
+  icon class, `MaxTimeoutSec`, interval relation — full `Validate`) — the
+  card is loaded as stored, with a `card violates current limits` warning;
+  tightening a limit in a new version therefore never makes configuration
+  disappear. Full validation applies at the API boundary (card
+  creation/update), so the card gets fixed on its first edit; the engine
+  and the scheduler work with `ValidateEssential` (block 0038);
+- **the file cannot be read** (e.g. permissions) — the application starts
+  with an empty configuration in read-only mode: every change via the API
+  returns 500 and is rolled back in memory until the operator makes the file
+  accessible and restarts the service;
+- **invalid runtime state** (status, history) inside an otherwise valid file
+  is ignored with a warning (FR-35); the file is not considered corrupted.
 
-Každá persistovaná mutace store (vytvoření, úprava, smazání karty, nastavení)
-je atomická vůči paměti (`Store.mutate`, blok 0038): pokud zápis na disk
-selže, změna se v paměti vrátí zpět a API vrátí 500, takže stav v paměti
-vždy odpovídá poslednímu úspěšně uloženému souboru. Zápis probíhá do
-unikátního dočasného souboru `<název>.<náhodné>.tmp` ve stejném adresáři
-(`os.CreateTemp`) s `fsync`, přejmenováním přes cílový soubor a `fsync`
-adresáře; existující soubor si zachová práva (explicitní `chmod`), nový
-vzniká s `0600`. Unikátní název chrání před dvěma zapisovateli (druhá
-instance nad stejným souborem, uložení historie při vypnutí souběžně
-s mutací) — poslední `rename` vyhraje úplným souborem; uložení historie je
-navíc serializované s mutacemi (`persistMu`). Selhání `fsync` adresáře až po
-úspěšném `rename` (`ErrDirectorySync`) se jen zaloguje jako varování: soubor
-už změnu obsahuje, a proto se v paměti nevrací zpět.
+Every persisted store mutation (creating, updating, deleting a card,
+settings) is atomic with respect to memory (`Store.mutate`, block 0038): if
+the write to disk fails, the change is rolled back in memory and the API
+returns 500, so the in-memory state always matches the last successfully
+saved file. The write goes to a unique temporary file
+`<name>.<random>.tmp` in the same directory (`os.CreateTemp`) with `fsync`,
+a rename over the target file and an `fsync` of the directory; an existing
+file keeps its permissions (explicit `chmod`), a new one is created with
+`0600`. The unique name protects against two writers (a second instance on
+the same file, a history save on shutdown concurrent with a mutation) —
+the last `rename` wins with a complete file; the history save is also
+serialized with mutations (`persistMu`). A failure of the directory
+`fsync` only after a successful `rename` (`ErrDirectorySync`) is merely
+logged as a warning: the file already contains the change, so it is not
+rolled back in memory.
 
-## Řízené ukončení (shutdown)
+## Graceful shutdown
 
-Po přijetí `SIGINT`/`SIGTERM` proběhne v `cmd/marionette` (funkce
-`shutdown`, blok 0027) pevně daná sekvence s celkovým limitem
-`MARIONETTE_SHUTDOWN_TIMEOUT` (výchozí 20 s, musí být menší než systemd
-`TimeoutStopSec`); každý krok se zaloguje s dobou trvání:
+After receiving `SIGINT`/`SIGTERM`, `cmd/marionette` (function `shutdown`,
+block 0027) runs a fixed sequence with an overall limit of
+`MARIONETTE_SHUTDOWN_TIMEOUT` (default 20 s, must be less than systemd's
+`TimeoutStopSec`); each step is logged with its duration:
 
-1. **Zastavení HTTP** — `http.Server.Shutdown` zavře listener a přes
-   `RegisterOnShutdown` uzavře `StatusEventBroker`, takže všechny SSE streamy
-   (`/api/events`) skončí okamžitě a shutdown na ně nečeká. Rozpracované
-   běžné požadavky doběhnou.
-2. **Uložení historie (první průchod)** — konfigurace, historie běhů a
-   status projekce se uloží hned, dříve než by čekání na akce mohlo narazit
-   na limit (FR-35). V režimu jen pro čtení (nečitelný soubor, viz výše) se
-   krok přeskočí, aby se původní soubor nepřepsal.
-3. **Uzavření fronty akcí** — čekající joby se zahodí (počet se zaloguje),
-   běžící mohou doběhnout do zbytku limitu minus rezerva 3 s; poté se jejich
-   kontext zruší a execution engine procesy ukončí (blok 0024).
-4. **Zastavení scheduleru** — zruší probíhající kontroly a počká na workery.
-5. **Uložení historie (druhý průchod)** — jen pokud se od prvního průchodu
-   stav změnil (`Store.Dirty`), typicky doběhlá nebo zrušená akce.
+1. **Stop HTTP** — `http.Server.Shutdown` closes the listener and, via
+   `RegisterOnShutdown`, closes the `StatusEventBroker`, so all SSE streams
+   (`/api/events`) end immediately and shutdown does not wait for them.
+   In-flight regular requests complete.
+2. **Save history (first pass)** — the configuration, run history and
+   status projection are saved right away, before waiting for actions
+   could hit the limit (FR-35). In read-only mode (unreadable file, see
+   above) the step is skipped so the original file is not overwritten.
+3. **Close the action queue** — pending jobs are discarded (the count is
+   logged), running ones may finish within the remaining limit minus a 3 s
+   reserve; after that their context is canceled and the execution engine
+   terminates the processes (block 0024).
+4. **Stop the scheduler** — cancels in-progress checks and waits for the
+   workers.
+5. **Save history (second pass)** — only if the state has changed since the
+   first pass (`Store.Dirty`), typically a finished or canceled action.
 
-Druhý signál během shutdownu proces ukončí okamžitě (výchozí obsluha
-signálu se po zahájení shutdownu obnoví).
+A second signal during shutdown terminates the process immediately (the
+default signal handling is restored once shutdown begins).
 
-Fronta akcí (`BackgroundActions`) je omezená na `4 × MaxConcurrentActions`
-(FR-18): plná fronta vrací `503` s hlavičkou `Retry-After` (odhad
-z délky fronty na jednoho workera, min. 1 s), požadavek na kartu a druh
-akce, které už ve frontě čekají, se nezařadí znovu a API vrátí `202`
-idempotentně; deduplikace platí jen pro čekající joby, běžící job nový
-požadavek neblokuje. Po zahájení shutdownu fronta vrací `503` s
-`Retry-After: 1`. Tělo `202` (`{"cardId","actionKind","status":"accepted",
-"checkedAt"?}`) nese čas posledního známého status checku v okamžiku
-přijetí (čte se před zařazením do fronty): SPA jej používá jako baseline
-pro čekání na „check novější než ten před mou akcí“, takže plánovaná
-kontrola dokončená během požadavku není zaměněna za výsledek; u nikdy
-nekontrolované karty pole chybí (blok 0039).
+The action queue (`BackgroundActions`) is bounded to
+`4 × MaxConcurrentActions` (FR-18): a full queue returns `503` with a
+`Retry-After` header (estimated from the queue length per worker, min.
+1 s); a request for a card and action kind that is already waiting in the
+queue is not enqueued again and the API returns `202` idempotently;
+deduplication applies only to pending jobs, a running job does not block a
+new request. After shutdown begins, the queue returns `503` with
+`Retry-After: 1`. The `202` body (`{"cardId","actionKind","status":"accepted",
+"checkedAt"?}`) carries the time of the last known status check at the
+moment of acceptance (read before enqueueing): the SPA uses it as the
+baseline for waiting for "a check newer than the one before my action", so
+a scheduled check completed during the request is not mistaken for the
+result; for a card that has never been checked the field is absent (block
+0039).
 
-## API kontrakt — chybové odpovědi a limity hodnot
+## API contract — error responses and value limits
 
-Každá chybová odpověď na `/api/*` má JSON obálku `{"error": "…"}`
-(blok 0028); žádná odpověď API není `text/plain`. Stavové kódy:
+Every error response on `/api/*` has the JSON envelope `{"error": "…"}`
+(block 0028); no API response is `text/plain`. Status codes:
 
-| Kód | Kdy                                                                                                     |
+| Code | When                                                                                                    |
 | --- | ------------------------------------------------------------------------------------------------------- |
-| 400 | tělo není přesně jedna JSON hodnota očekávaného tvaru; zpráva uvádí pole nebo offset, ne interní typy   |
-| 403 | cross-site požadavek nebo nepovolený `Host` (NFR-12)                                                    |
-| 404 | neznámá karta nebo neznámá cesta pod `/api/`                                                            |
-| 405 | známá cesta, nepodporovaná metoda; hlavička `Allow` vyjmenovává povolené metody                         |
-| 409 | karta se stejným ID už existuje                                                                         |
-| 413 | tělo přesahuje 1 MiB                                                                                    |
-| 415 | mutující požadavek bez `Content-Type: application/json` (NFR-12)                                        |
-| 422 | validace selhala; obálka má navíc `"fields": {"<json cesta>": "<důvod>"}` se všemi chybami najednou     |
-| 503 | fronta akcí je plná nebo probíhá shutdown; hlavička `Retry-After` (FR-18)                                |
-| 500 | persistence selhala (změna vrácena zpět) nebo jiná vnitřní chyba                                        |
+| 400 | the body is not exactly one JSON value of the expected shape; the message states the field or offset, not internal types |
+| 403 | cross-site request or disallowed `Host` (NFR-12)                                                        |
+| 404 | unknown card or unknown path under `/api/`                                                              |
+| 405 | known path, unsupported method; the `Allow` header lists the allowed methods                            |
+| 409 | a card with the same ID already exists                                                                  |
+| 413 | the body exceeds 1 MiB                                                                                  |
+| 415 | mutating request without `Content-Type: application/json` (NFR-12)                                      |
+| 422 | validation failed; the envelope additionally has `"fields": {"<json path>": "<reason>"}` with all errors at once |
+| 503 | the action queue is full or shutdown is in progress; `Retry-After` header (FR-18)                       |
+| 500 | persistence failed (change rolled back) or another internal error                                       |
 
-`GET /api/health` vrací `{"status":"ok","version":"<git describe>","uptimeSec":n}`;
-verze se vkládá při buildu (`-ldflags -X main.version`, `make build`).
+`GET /api/health` returns `{"status":"ok","version":"<git describe>","uptimeSec":n}`;
+the version is embedded at build time (`-ldflags -X main.version`, `make build`).
 
-Tvar stavových dat: `StatusSnapshot` karty, která ještě nebyla kontrolována,
-je jen `{"state":"unknown"}` — `checkedAt` a `lastCheck` se vynechávají
-(`StatusSnapshot.MarshalJSON`, blok 0032), klient tedy nerozpoznává nulový
-čas Go. Pole `duration` u běhů a přechodů stavu je v **nanosekundách**
-(Go `time.Duration`); frontend je převádí při zobrazení.
+Shape of status data: the `StatusSnapshot` of a card that has not been
+checked yet is just `{"state":"unknown"}` — `checkedAt` and `lastCheck` are
+omitted (`StatusSnapshot.MarshalJSON`, block 0032), so the client does not
+have to recognize Go's zero time. The `duration` field of runs and status
+transitions is in **nanoseconds** (Go `time.Duration`); the frontend
+converts it for display.
 
-Události SSE streamu `GET /api/events` (ADR-0008):
+Events of the SSE stream `GET /api/events` (ADR-0008):
 
-| Událost          | Kdy                                                    | `data`                                         |
+| Event            | When                                                   | `data`                                         |
 | ---------------- | ------------------------------------------------------ | ---------------------------------------------- |
-| `status.changed` | změna interpretovaného stavu karty                     | `{"cardId": "…", "snapshot": StatusSnapshot}`  |
-| `run.recorded`   | běh primární akce zapsaný do historie (FR-42a, blok 0058) | `{"cardId": "…", "run": Run}`, `Run` jako položka `GET /api/cards/{id}/runs` |
+| `status.changed` | change in the card's interpreted status                | `{"cardId": "…", "snapshot": StatusSnapshot}`  |
+| `run.recorded`   | a primary action run recorded in the history (FR-42a, block 0058) | `{"cardId": "…", "run": Run}`, `Run` as an item of `GET /api/cards/{id}/runs` |
 
-Obě události sdílejí jednu řadu `id`. Pomalý odběratel ztrácí nejstarší
-události, takže klient po znovupřipojení načítá stav a běhy přes REST.
+Both events share one `id` sequence. A slow subscriber loses the oldest
+events, so after reconnecting the client loads status and runs via REST.
 
-Limity hodnot karty (konstanty `config.Max*`, ADR-0004 „Limity hodnot“):
+Card value limits (constants `config.Max*`, ADR-0004 "Value limits"):
 
-| Pole                                  | Limit                                                              |
+| Field                                 | Limit                                                              |
 | ------------------------------------- | ------------------------------------------------------------------ |
-| `id`                                  | `^[A-Za-z0-9_-]{1,64}$`; serverem generovaná ID (`card-<32 hex>`) vyhovují |
-| `name`                                | 1–120 znaků                                                        |
-| `description`                         | ≤ 2000 znaků                                                       |
-| `icon`                                | prázdné nebo `pi pi-<název>` (malá písmena, číslice, `-`), ≤ 64 znaků |
-| `color`                               | prázdné nebo `black`, `blue`, `teal`, `purple`, `pink`, `orange`, `yellow` (FR-10a) |
-| `*.command`                           | 1–512 znaků                                                        |
-| `*.args`                              | ≤ 64 položek, každá ≤ 1024 znaků                                   |
-| `*.dir`                               | ≤ 1024 znaků                                                       |
-| `*.env`                               | ≤ 64 položek; klíč `^[A-Za-z_][A-Za-z0-9_]*$` ≤ 128, hodnota ≤ 4096 |
+| `id`                                  | `^[A-Za-z0-9_-]{1,64}$`; server-generated IDs (`card-<32 hex>`) comply |
+| `name`                                | 1–120 characters                                                   |
+| `description`                         | ≤ 2000 characters                                                  |
+| `icon`                                | empty or `pi pi-<name>` (lowercase letters, digits, `-`), ≤ 64 characters |
+| `color`                               | empty or `black`, `blue`, `teal`, `purple`, `pink`, `orange`, `yellow` (FR-10a) |
+| `*.command`                           | 1–512 characters                                                   |
+| `*.args`                              | ≤ 64 items, each ≤ 1024 characters                                 |
+| `*.dir`                               | ≤ 1024 characters                                                  |
+| `*.env`                               | ≤ 64 items; key `^[A-Za-z_][A-Za-z0-9_]*$` ≤ 128, value ≤ 4096     |
 | `*.timeoutSec`                        | 1–3600 (`MaxTimeoutSec`)                                           |
-| `*.rule`                              | typ `exit_code`, `match`, `not_match`; `pattern` platný regex      |
-| `pollingIntervalSeconds` a rychlé     | ≥ 0; rychlý interval < standardní interval                         |
+| `*.rule`                              | type `exit_code`, `match`, `not_match`; `pattern` a valid regex    |
+| `pollingIntervalSeconds` and fast     | ≥ 0; fast interval < standard interval                             |
 
-Statické soubory SPA: `index.html` a klientské cesty se vydávají s
-`Cache-Control: no-cache`, hashované soubory pod `/assets/` s
-`public, max-age=31536000, immutable`; adresáře se nevypisují (vrací se
-`index.html`).
+SPA static files: `index.html` and client-side paths are served with
+`Cache-Control: no-cache`, hashed files under `/assets/` with
+`public, max-age=31536000, immutable`; directories are not listed
+(`index.html` is returned).
 
-## Kompozice a logování
+## Composition and logging
 
-`cmd/marionette` je jediné místo, kde se služby skládají (blok 0034):
-`config.LoadFile` → `events.Broker` (`store.OnStatusChange = broker.Publish`,
+`cmd/marionette` is the only place where services are composed (block
+0034): `config.LoadFile` → `events.Broker`
+(`store.OnStatusChange = broker.Publish`,
 `store.OnRunAppended = broker.PublishRun`)
-→ `execengine.Runner` → `status.StatusCheckService` a `status.Scheduler` →
-`actions.Queue` → `server.NewRouter(server.Dependencies{…})`. Router
-předaný store nemutuje a `internal/server` nedrží žádné goroutiny mimo
-HTTP handlery; rozhraní (`ActionQueue`, `EventSource`, …) definuje
-konzument.
+→ `execengine.Runner` → `status.StatusCheckService` and `status.Scheduler` →
+`actions.Queue` → `server.NewRouter(server.Dependencies{…})`. The router
+does not mutate the store it is given and `internal/server` holds no
+goroutines outside HTTP handlers; interfaces (`ActionQueue`,
+`EventSource`, …) are defined by the consumer.
 
-Logování používá `log/slog` bez globálního stavu: logger vzniká v `main`
-podle `MARIONETTE_LOG_FORMAT` (`text` pro journald, `json`) a
-`MARIONETTE_LOG_LEVEL` a předává se explicitně (`Dependencies.Logger`,
-`actions.New`, `config.LoadFile`). Záznamy o akcích nesou atributy `card`,
-`action`, `outcome`, `duration`; kroky shutdownu `step` a `duration`.
+Logging uses `log/slog` without global state: the logger is created in
+`main` according to `MARIONETTE_LOG_FORMAT` (`text` for journald, `json`)
+and `MARIONETTE_LOG_LEVEL` and is passed explicitly
+(`Dependencies.Logger`, `actions.New`, `config.LoadFile`). Action records
+carry the attributes `card`, `action`, `outcome`, `duration`; shutdown
+steps carry `step` and `duration`.

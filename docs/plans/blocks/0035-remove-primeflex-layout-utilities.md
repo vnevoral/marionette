@@ -1,89 +1,91 @@
-# Implementační blok: Náhrada PrimeFlex vlastní utility vrstvou
+# Implementation block: Replacing PrimeFlex with a custom utility layer
 
-- **Fáze**: 8 — Zpevnění (dodatek po uzavření fáze)
-- **Vazba na požadavky**: FR-25, NFR-03, NFR-08, NFR-10
-- **Vazba na ADR**: ADR-0003, ADR-0009 (nahrazeno), ADR-0010
-- **Stav**: Hotovo
-- **Závislosti**: Bloky 0019, 0020, 0033
+- **Phase**: 8 — Hardening (addendum after the phase was closed)
+- **Requirements**: FR-25, NFR-03, NFR-08, NFR-10
+- **ADRs**: ADR-0003, ADR-0009 (superseded), ADR-0010
+- **Status**: Done
+- **Dependencies**: Blocks 0019, 0020, 0033
 
-## Cíl bloku
+## Goal
 
-Po dokončení frontend nezávisí na zamrzlém PrimeFlexu: čtrnáct layout tříd,
-které kód skutečně používá, definuje vlastní `layout.css` se stejnými názvy
-a hodnotami, šablony se nemění a CSS bundle se zmenší o balík PrimeFlex.
-PrimeVue zůstává na MIT větvi v4.
+After this block, the frontend does not depend on the frozen PrimeFlex:
+the fourteen layout classes the code actually uses are defined in a
+custom `layout.css` with the same names and values, templates do not
+change, and the CSS bundle shrinks by the PrimeFlex package. PrimeVue
+stays on the MIT v4 branch.
 
-## Rozsah
+## Scope
 
-- **Uvnitř**:
-  - `web/src/styles/layout.css` s třídami `grid`, `col-12`, `md:col-4`,
+- **In scope**:
+  - `web/src/styles/layout.css` with the classes `grid`, `col-12`, `md:col-4`,
     `md:col-6`, `lg:col-4`, `flex`, `flex-column`, `flex-wrap`,
     `align-items-center`, `justify-content-between`, `gap-2`, `gap-3`,
-    `p-2`, `mt-4` — hodnoty a breakpointy (768 px, 992 px) shodné
-    s PrimeFlex 4.0.0, bez `!important`;
-  - odstranění `primeflex` z `package.json`, lockfile, `main.ts`
-    a z ignore seznamu Dependabotu;
-  - ADR-0010 (nahrazuje ADR-0009), doplnění ADR-0003 o licenční změnu
-    PrimeVue 5 a rozhodnutí zůstat na v4;
-  - aktualizace `docs/devops/ci-cd.md`, `docs/requirements/requirements.md`
-    (sekce 13), UX spec §8, roadmapy.
-- **Mimo rozsah**:
-  - Tailwind CSS nebo jiná utility knihovna (ADR-0010);
-  - upgrade na PrimeVue 5 (licence PrimeUI, ADR-0003);
-  - vizuální změny — layout musí zůstat pixelově stejný.
+    `p-2`, `mt-4` — values and breakpoints (768 px, 992 px) identical
+    to PrimeFlex 4.0.0, without `!important`;
+  - removing `primeflex` from `package.json`, the lockfile, `main.ts`
+    and from the Dependabot ignore list;
+  - ADR-0010 (supersedes ADR-0009), extending ADR-0003 with the PrimeVue 5
+    license change and the decision to stay on v4;
+  - updating `docs/devops/ci-cd.md`, `docs/requirements/requirements.md`
+    (section 13), UX spec §8, the roadmap.
+- **Out of scope**:
+  - Tailwind CSS or another utility library (ADR-0010);
+  - upgrading to PrimeVue 5 (PrimeUI license, ADR-0003);
+  - visual changes — the layout must stay pixel-identical.
 
-## Schválení
+## Approval
 
-- **Schválil**: projektový vlastník
-- **Datum schválení**: 2026-09-26
-- **Poznámky k rozhodnutí**: Schváleno na základě analýzy 2026-09-26:
-  PrimeFlex 4.0.0 je poslední verze (únor 2025), kód používá 14 tříd v ~60
-  výskytech, PrimeFlex tahá 446 kB CSS. PrimeVue 5.0.x (7–8/2026) přešlo na
-  komerční PrimeUI License s licenčním klíčem; v4 zůstává MIT.
+- **Approved by**: project owner
+- **Approval date**: 2026-09-26
+- **Decision notes**: Approved based on the 2026-09-26 analysis:
+  PrimeFlex 4.0.0 is the last version (February 2025), the code uses 14
+  classes in ~60 occurrences, PrimeFlex pulls in 446 kB of CSS. PrimeVue
+  5.0.x (7–8/2026) moved to the commercial PrimeUI License with a license
+  key; v4 stays MIT.
 
-## Návrh řešení
+## Proposed solution
 
-- `layout.css`: `.grid` (flex, wrap, záporné okraje 0.5 rem), `.col-12`
-  a responzivní `md:`/`lg:` varianty (`flex: 0 0 auto; padding: 0.5rem;
-  width`), flex/gap/spacing utility s hodnotami PrimeFlex (`gap-2` 0.5 rem,
+- `layout.css`: `.grid` (flex, wrap, negative margins 0.5 rem), `.col-12`
+  and responsive `md:`/`lg:` variants (`flex: 0 0 auto; padding: 0.5rem;
+  width`), flex/gap/spacing utilities with PrimeFlex values (`gap-2` 0.5 rem,
   `gap-3` 1 rem, `p-2` 0.5 rem, `mt-4` 1.5 rem).
-- `main.ts`: `import "./styles/layout.css"` místo `primeflex/primeflex.css`.
-- Přidání nové utility třídy vyžaduje zápis do `layout.css`; nepoužívané
-  třídy se nezavádějí (ADR-0010).
+- `main.ts`: `import "./styles/layout.css"` instead of `primeflex/primeflex.css`.
+- Adding a new utility class requires an entry in `layout.css`; unused
+  classes are not introduced (ADR-0010).
 
-## Testovací plán
+## Test plan
 
-- `make verify` (lint, typy, Vitest, build, Go).
-- `grep -rn primeflex web/src web/package.json .github` vrací 0 řádků.
-- Porovnání velikosti `internal/webui/dist/assets/*.css` před a po.
-- Manuální screenshot smoke test tří obrazovek v 320 px, 768 px a desktopu
-  (layout beze změny) — referenční host.
+- `make verify` (lint, types, Vitest, build, Go).
+- `grep -rn primeflex web/src web/package.json .github` returns 0 lines.
+- Comparing the size of `internal/webui/dist/assets/*.css` before and after.
+- Manual screenshot smoke test of three screens at 320 px, 768 px and
+  desktop (layout unchanged) — reference host.
 
-## Kritérium hotovosti
+## Done criteria
 
-Viz [Definition of Done](../../devops/definition-of-done.md) +:
+See [Definition of Done](../../devops/definition-of-done.md) plus:
 
-- `primeflex` není v závislostech ani v kódu;
-- žádná šablona se nemění (jen CSS a import);
-- ADR-0009 má stav „Nahrazeno ADR-0010“.
+- `primeflex` is in neither the dependencies nor the code;
+- no template changes (only CSS and the import);
+- ADR-0009 has the status "Superseded by ADR-0010".
 
-## Uzavření
+## Closure
 
-- **Stav po implementaci**: Hotovo (2026-09-26)
-- **Ověření**: `make verify` prošel (lint, `vue-tsc`, Prettier, Vitest 77
-  testů, `vite build`, `go test -race`, `go vet`). `primeflex` odstraněn
-  z `package.json`, lockfile (`npm uninstall`), `main.ts` i Dependabot
-  ignore; `grep -rni primeflex web/src web/package.json .github` nachází jen
-  vysvětlující komentář v `layout.css`. Žádná šablona se nezměnila (diff
-  obsahuje jen CSS, import a dokumentaci). CSS bundle
+- **Status after implementation**: Done (2026-09-26)
+- **Verification**: `make verify` passed (lint, `vue-tsc`, Prettier, Vitest 77
+  tests, `vite build`, `go test -race`, `go vet`). `primeflex` removed
+  from `package.json`, the lockfile (`npm uninstall`), `main.ts` and the
+  Dependabot ignore; `grep -rni primeflex web/src web/package.json .github`
+  finds only an explanatory comment in `layout.css`. No template changed
+  (the diff contains only CSS, the import and documentation). CSS bundle
   `internal/webui/dist/assets/*.css`: 367 604 B → 30 381 B (gzip
-  39 859 B → 6 846 B). Vizuální screenshot smoke test v 320/768 px a na
-  desktopu zůstává na referenční host; hodnoty i breakpointy jsou převzaté
-  1:1 z PrimeFlex 4.0.0, takže se změna layoutu neočekává.
-- **Odchylky od návrhu**: žádné. Třída `.grid > [class*="col"]`
-  s `box-sizing: border-box` je zachována kvůli shodě s PrimeFlex, i když
-  globální reset `* { box-sizing }` ji činí redundantní.
-- **Dokumentace aktualizována**: ano — ADR-0010 (nové), ADR-0009 (stav
-  „Nahrazeno ADR-0010“), ADR-0003 (dodatek o licenci PrimeVue 5 a setrvání
-  na v4), `docs/devops/ci-cd.md`, `docs/requirements/requirements.md`
-  sekce 13, UX spec §8.2, roadmapa, `.github/dependabot.yml`.
+  39 859 B → 6 846 B). The visual screenshot smoke test at 320/768 px and
+  on desktop remains for the reference host; values and breakpoints are
+  taken 1:1 from PrimeFlex 4.0.0, so no layout change is expected.
+- **Deviations from the plan**: none. The `.grid > [class*="col"]` class
+  with `box-sizing: border-box` is kept for parity with PrimeFlex, even
+  though the global reset `* { box-sizing }` makes it redundant.
+- **Documentation updated**: yes — ADR-0010 (new), ADR-0009 (status
+  "Superseded by ADR-0010"), ADR-0003 (addendum on the PrimeVue 5 license
+  and staying on v4), `docs/devops/ci-cd.md`, `docs/requirements/requirements.md`
+  section 13, UX spec §8.2, roadmap, `.github/dependabot.yml`.

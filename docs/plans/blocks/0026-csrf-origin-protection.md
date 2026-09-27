@@ -1,122 +1,127 @@
-# Implementační blok: Ochrana mutujících endpointů před cross-site požadavky
+# Implementation block: Protecting mutating endpoints against cross-site requests
 
-- **Fáze**: 8 — Zpevnění
-- **Vazba na požadavky**: NFR-01, NFR-12, FR-40
-- **Vazba na ADR**: žádné nové; rozšiřuje bezpečnostní část ADR-0005 (spouštění akcí)
-- **Stav**: Hotovo
-- **Závislosti**: NFR-12 (přijato 2026-09-26); blok 0010 (REST API); blok 0022 (SSE)
+- **Phase**: 8 — Hardening
+- **Requirements**: NFR-01, NFR-12, FR-40
+- **ADRs**: none new; extends the security part of ADR-0005 (action execution)
+- **Status**: Done
+- **Dependencies**: NFR-12 (accepted 2026-09-26); block 0010 (REST API); block 0022 (SSE)
 
-## Cíl bloku
+## Goal
 
-Po dokončení nelze z cizí webové stránky otevřené v prohlížeči operátora
-vytvořit, změnit ani spustit akční kartu; API odmítne mutující požadavky
-bez správného `Content-Type` nebo s cizím původem. Autentizace zůstává mimo
-MVP (NFR-01).
+Once complete, a foreign web page opened in the operator's browser cannot
+create, change or run an action card; the API rejects mutating requests
+without the correct `Content-Type` or with a foreign origin. Authentication
+remains outside the MVP (NFR-01).
 
-## Rozsah
+## Scope
 
-- **Uvnitř**:
-  - middleware pro `POST/PUT/DELETE` na `/api/*`:
-    1. požadavek s tělem musí mít `Content-Type: application/json`
-       (jinak 415);
+- **In scope**:
+  - middleware for `POST/PUT/DELETE` on `/api/*`:
+    1. a request with a body must have `Content-Type: application/json`
+       (otherwise 415);
     2. `Sec-Fetch-Site: cross-site` → 403;
-    3. je-li přítomna hlavička `Origin`, její host se musí shodovat s
-       `r.Host` (jinak 403); chybějící `Origin` u požadavku bez
-       `Sec-Fetch-Site` je povolen kvůli non-browser klientům (curl);
-  - volitelný allowlist hostů `MARIONETTE_ALLOWED_HOSTS` (čárkou oddělený);
-    prázdný = bez kontroly `Host` (výchozí, zachovává dnešní chování);
-  - SPA posílá u mutujících volání `Content-Type: application/json` i pro
-    prázdné tělo (enqueue endpointy), aby procházela pravidlem 1;
-  - JSON chybová obálka pro 403/415 shodná s ostatními chybami;
-  - dokumentace v `docs/architecture/overview.md` (sekce bezpečnost).
-- **Mimo rozsah**:
-  - autentizace, session, tokeny, RBAC (roadmapa fáze 8, samostatný blok);
-  - CORS hlavičky pro povolení jiných originů (záměrně žádné);
-  - TLS, reverzní proxy, rate limiting.
+    3. if an `Origin` header is present, its host must match `r.Host`
+       (otherwise 403); a missing `Origin` on a request without
+       `Sec-Fetch-Site` is allowed for non-browser clients (curl);
+  - optional host allowlist `MARIONETTE_ALLOWED_HOSTS` (comma-separated);
+    empty = no `Host` check (default, preserves today's behavior);
+  - the SPA sends `Content-Type: application/json` on mutating calls even
+    for an empty body (enqueue endpoints), so that they pass rule 1;
+  - JSON error envelope for 403/415 identical to other errors;
+  - documentation in `docs/architecture/overview.md` (security section).
+- **Out of scope**:
+  - authentication, session, tokens, RBAC (roadmap phase 8, separate block);
+  - CORS headers allowing other origins (intentionally none);
+  - TLS, reverse proxy, rate limiting.
 
-## Schválení
+## Approval
 
-- **Schválil**: projektový vlastník
-- **Datum schválení**: 2026-09-26
-- **Poznámky k rozhodnutí**: Nález revize 2026-09-26 (H-2). `POST
-  /api/cards/{id}/actions/primary` je „simple request“ bez preflightu; `POST
-  /api/cards` lze poslat přes `enctype=text/plain` formulář. NFR-12 byl přijat
-  2026-09-26 společně se schválením bloku.
+- **Approved by**: project owner
+- **Approval date**: 2026-09-26
+- **Decision notes**: Finding of the 2026-09-26 review (H-2). `POST
+  /api/cards/{id}/actions/primary` is a "simple request" without a preflight;
+  `POST /api/cards` can be sent via an `enctype=text/plain` form. NFR-12 was
+  accepted on 2026-09-26 together with the approval of the block.
 
-## Návrh řešení
+## Proposed solution
 
 - `internal/server/origin.go`: `func requireSameOrigin(allowedHosts []string,
-  next http.Handler) http.Handler`. Aplikuje se v `NewRouterWithDependencies`
-  na `/api/` subrouter pouze pro mutující metody; `GET`, `HEAD`, SSE a SPA
-  fallback zůstávají beze změny.
-- Porovnání originu: `url.Parse(origin).Host` vs `r.Host` (včetně portu);
-  `Host` se porovnává case-insensitive.
-- `cmd/marionette/main.go`: čtení `MARIONETTE_ALLOWED_HOSTS`, předání do
-  routeru; `deploy/marionette.default` dostane zakomentovaný příklad.
-- `web/src/api.ts`: `enqueuePrimary/enqueueStatus` posílají
-  `Content-Type: application/json` (tělo `null` nebo prázdný objekt dle
-  serverového dekodéru — server u enqueue tělo nečte, hlavičku ale vyžaduje).
+  next http.Handler) http.Handler`. Applied in `NewRouterWithDependencies`
+  to the `/api/` subrouter only for mutating methods; `GET`, `HEAD`, SSE and
+  the SPA fallback remain unchanged.
+- Origin comparison: `url.Parse(origin).Host` vs `r.Host` (including the
+  port); `Host` is compared case-insensitively.
+- `cmd/marionette/main.go`: reading `MARIONETTE_ALLOWED_HOSTS`, passing it to
+  the router; `deploy/marionette.default` gets a commented-out example.
+- `web/src/api.ts`: `enqueuePrimary/enqueueStatus` send
+  `Content-Type: application/json` (body `null` or an empty object depending
+  on the server decoder — the server does not read the body on enqueue, but
+  requires the header).
 
-## Testovací plán
+## Test plan
 
-- Jednotkové testy (`internal/server`, `httptest`):
-  - `POST /api/cards` bez `Content-Type` → 415; s `text/plain` → 415;
-  - `Sec-Fetch-Site: cross-site` → 403; `same-origin` → průchod;
-  - `Origin: http://evil.example` proti `Host: pi.local:8080` → 403;
-    shodný origin → průchod; bez `Origin` a bez `Sec-Fetch-Site` → průchod;
-  - `MARIONETTE_ALLOWED_HOSTS=pi.local:8080` a `Host: 192.168.1.5:8080` → 403;
-  - `GET /api/cards` a `GET /api/events` s cizím `Origin` → beze změny (200);
-  - tabulkový test funkce porovnání originů (port, velikost písmen, IPv6).
-- Frontend: existující volání procházejí (`npm run build` + manuální smoke
-  test dashboardu: run/check/create/edit/delete).
-- Manuální ověření: lokální HTML stránka na jiném portu s formulářem
-  `POST` na `/api/cards/{id}/actions/primary` dostane 403 a akce se
-  nespustí.
+- Unit tests (`internal/server`, `httptest`):
+  - `POST /api/cards` without `Content-Type` → 415; with `text/plain` → 415;
+  - `Sec-Fetch-Site: cross-site` → 403; `same-origin` → passes;
+  - `Origin: http://evil.example` against `Host: pi.local:8080` → 403;
+    matching origin → passes; without `Origin` and without `Sec-Fetch-Site`
+    → passes;
+  - `MARIONETTE_ALLOWED_HOSTS=pi.local:8080` and `Host: 192.168.1.5:8080` → 403;
+  - `GET /api/cards` and `GET /api/events` with a foreign `Origin` →
+    unchanged (200);
+  - table test of the origin comparison function (port, letter case, IPv6).
+- Frontend: existing calls pass (`npm run build` + manual smoke test of the
+  dashboard: run/check/create/edit/delete).
+- Manual verification: a local HTML page on a different port with a form
+  `POST` to `/api/cards/{id}/actions/primary` gets 403 and the action does
+  not run.
 
-## Kritérium hotovosti
+## Done criteria
 
-Viz [Definition of Done](../../devops/definition-of-done.md) +:
+See [Definition of Done](../../devops/definition-of-done.md) plus:
 
-- NFR-12 odkazuje na tento blok a `overview.md` na NFR-12;
-- všechny mutující endpointy jsou pokryté middlewarem (test iteruje přes
-  registrované routy);
-- `overview.md` má sekci „Ochrana před cross-site požadavky“.
+- NFR-12 links to this block and `overview.md` to NFR-12;
+- all mutating endpoints are covered by the middleware (the test iterates
+  over the registered routes);
+- `overview.md` has a section "Protection against cross-site requests".
 
-## Uzavření
+## Closure
 
-- **Stav po implementaci**: Hotovo (2026-09-26)
-- **Ověření**: `make verify` prošel (golangci-lint, eslint, vue-tsc, prettier,
-  `go test -race -count=1 ./...`, build, vet). Nové testy v
+- **Status after implementation**: Done (2026-09-26)
+- **Verification**: `make verify` passed (golangci-lint, eslint, vue-tsc,
+  prettier, `go test -race -count=1 ./...`, build, vet). New tests in
   `internal/server/origin_test.go`: `TestMutatingRoutesRejectCrossSiteRequests`
-  (tabulka všech pěti mutujících rout × `Sec-Fetch-Site: cross-site`, cizí
-  `Origin`, `Origin: null`, formulářový a `text/plain` obsah, tělo bez
-  `Content-Type`), `TestMutatingRoutesAcceptSameOriginAndNonBrowserClients`
-  (same-origin, `charset` parametr, `Sec-Fetch-Site: none`, holý `curl`),
+  (a table of all five mutating routes × `Sec-Fetch-Site: cross-site`,
+  foreign `Origin`, `Origin: null`, form and `text/plain` content, body
+  without `Content-Type`), `TestMutatingRoutesAcceptSameOriginAndNonBrowserClients`
+  (same-origin, `charset` parameter, `Sec-Fetch-Site: none`, bare `curl`),
   `TestReadOnlyRoutesIgnoreForeignOrigin` (GET, SSE, SPA fallback),
   `TestAllowedHostsRestrictMutatingRequests`, `TestSameOriginComparison`
-  (port, výchozí port, velikost písmen, IPv6, `null`, cizí schéma);
-  `TestLoadEnvironmentDefaultsAndShutdownTimeout` rozšířen o
-  `MARIONETTE_ALLOWED_HOSTS`. Upraven
-  `TestRouterRejectsInvalidJSONAndDuplicateCard` (tělo bez `Content-Type`
-  je nyní správně 415). Ověřeno na skutečné binárce přes `curl`: POST
-  s `Origin: http://evil.example` → 403, s formulářovým obsahem → 415,
-  `Sec-Fetch-Site: cross-site` → 403, holý `curl -X POST` → prošel
-  middlewarem; s `MARIONETTE_ALLOWED_HOSTS=pi.local:8080` vrací cizí `Host`
-  403 a `Host: pi.local:8080` 202. Manuální smoke test dashboardu
-  (run/check/create/edit/delete) zbývá provést na referenčním hostu.
-- **Odchylky od návrhu**: (1) middleware obaluje celý mux a sám rozhoduje
-  podle metody a prefixu `/api/`, protože Go 1.22 `ServeMux` nemá subrouter;
-  (2) pravidlo 1 vyžaduje `application/json` také tehdy, když je hlavička
-  `Content-Type` přítomna u prázdného těla (např. `curl -d ''` posílá
-  formulářový typ) — přísnější než návrh, holý `curl -X POST` bez hlavičky
-  dál projde; (3) `Origin: null` a `Origin` s jiným schématem než
-  `http`/`https` se odmítají; (4) chybějící port v `Origin` nebo `Host` se
-  doplní výchozím portem schématu, takže `http://pi.local` odpovídá
-  `pi.local:80`; (5) SPA posílá `Content-Type: application/json` i u
-  `DELETE`, nejen u enqueue volání; (6) allowlist hostů se uplatňuje jen na
-  mutující routy (v souladu s rozsahem), ne na čtení.
-- **Dokumentace aktualizována**: ano — `docs/architecture/overview.md`
-  (sekce „Ochrana před cross-site požadavky“, bezpečnostní poznámka odkazuje
-  na NFR-12), README (tabulka proměnných, odstavec o ochraně),
-  `deploy/marionette.default`, godoc `requireSameOrigin`, roadmapa. NFR-12
-  už na blok 0026 odkazuje.
+  (port, default port, letter case, IPv6, `null`, foreign scheme);
+  `TestLoadEnvironmentDefaultsAndShutdownTimeout` extended with
+  `MARIONETTE_ALLOWED_HOSTS`. Adjusted
+  `TestRouterRejectsInvalidJSONAndDuplicateCard` (a body without
+  `Content-Type` is now correctly 415). Verified on the real binary via
+  `curl`: POST with `Origin: http://evil.example` → 403, with form content →
+  415, `Sec-Fetch-Site: cross-site` → 403, bare `curl -X POST` → passed the
+  middleware; with `MARIONETTE_ALLOWED_HOSTS=pi.local:8080` a foreign `Host`
+  returns 403 and `Host: pi.local:8080` 202. The manual smoke test of the
+  dashboard (run/check/create/edit/delete) remains to be done on the
+  reference host.
+- **Deviations from the plan**: (1) the middleware wraps the whole mux and
+  decides by itself based on the method and the `/api/` prefix, because the
+  Go 1.22 `ServeMux` has no subrouter; (2) rule 1 requires
+  `application/json` also when the `Content-Type` header is present on an
+  empty body (e.g. `curl -d ''` sends the form type) — stricter than the
+  plan, a bare `curl -X POST` without the header still passes; (3)
+  `Origin: null` and an `Origin` with a scheme other than `http`/`https` are
+  rejected; (4) a missing port in `Origin` or `Host` is filled in with the
+  scheme's default port, so `http://pi.local` matches `pi.local:80`; (5) the
+  SPA sends `Content-Type: application/json` also on `DELETE`, not only on
+  enqueue calls; (6) the host allowlist applies only to mutating routes (in
+  line with the scope), not to reads.
+- **Documentation updated**: yes — `docs/architecture/overview.md`
+  (section "Protection against cross-site requests", the security note links
+  to NFR-12), README (variables table, paragraph on the protection),
+  `deploy/marionette.default`, godoc of `requireSameOrigin`, roadmap. NFR-12
+  already links to block 0026.

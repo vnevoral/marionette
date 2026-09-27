@@ -1,61 +1,62 @@
-# Implementační blok: UX-01 — Design tokeny a AppShell
+# Implementation block: UX-01 — Design tokens and AppShell
 
-- **Fáze**: 9 — UX redesign a sdílený design systém
-- **Vazba na požadavky**: FR-24, FR-25, FR-26, FR-28, FR-29, NFR-08, NFR-09
-- **Vazba na ADR**: ADR-0003, ADR-0007
-- **Stav**: Hotovo
-- **Závislosti**: Fáze 6, ADR-0007, [UX specifikace](../../ux/ui-ux-specification.md)
+- **Phase**: 9 — UX redesign and shared design system
+- **Requirements**: FR-24, FR-25, FR-26, FR-28, FR-29, NFR-08, NFR-09
+- **ADRs**: ADR-0003, ADR-0007
+- **Status**: Done
+- **Dependencies**: Phase 6, ADR-0007, [UX specification](../../ux/ui-ux-specification.md)
 
-## Cíl bloku
+## Goal
 
-Aplikace dostane jednotný vizuální základ: semantic design tokeny, PrimeVue
-theme mapping, typografii, globální focus/spacing pravidla a sdílený AppShell
-s navigací Overview / Manage cards. Stávající obsah obrazovek zůstane funkčně
-beze změny; jejich postupné převedení je v UX-02 a UX-03.
+The application gets a unified visual foundation: semantic design tokens,
+PrimeVue theme mapping, typography, global focus/spacing rules and a shared
+AppShell with Overview / Manage cards navigation. The existing content of
+the screens stays functionally unchanged; converting them step by step is
+in UX-02 and UX-03.
 
-## Rozsah
+## Scope
 
-- **Uvnitř**:
-  - centrální CSS tokeny pro canvas, surface, text, border, accent a stavy;
-  - společné spacing, radius, focus a body typography pravidla;
-  - PrimeVue Aura semantic overrides bez změny major verze;
-  - `AppShell` s názvem aplikace, aktivní navigací a responzivním layoutem;
-  - navigace na `/` a `/manage` dostupná klávesnicí;
-  - globální anglické UI labels pro shell.
-- **Mimo rozsah**:
-  - redesign obsahu dashboardových karet;
-  - redesign management formuláře;
-  - detail karty, běhy, status timeline a nové API;
-  - změna PrimeVue, routeru nebo přidání runtime závislosti.
+- **In scope**:
+  - central CSS tokens for canvas, surface, text, border, accent and states;
+  - common spacing, radius, focus and body typography rules;
+  - PrimeVue Aura semantic overrides without changing the major version;
+  - `AppShell` with the application name, active navigation and a responsive layout;
+  - navigation to `/` and `/manage` accessible from the keyboard;
+  - global English UI labels for the shell.
+- **Out of scope**:
+  - redesign of the dashboard card content;
+  - redesign of the management form;
+  - card detail, runs, status timeline and new API;
+  - changing PrimeVue, the router or adding a runtime dependency.
 
-## Schválení
+## Approval
 
-- **Schválil**: projektový vlastník
-- **Datum schválení**: 2026-09-25
-- **Poznámky k rozhodnutí**: První implementační řez UX fáze; angličtina je jediný jazyk UI a palette je quiet botanical green-first.
+- **Approved by**: project owner
+- **Approval date**: 2026-09-25
+- **Decision notes**: The first implementation slice of the UX phase; English is the only UI language and the palette is quiet botanical green-first.
 
-## Návrh řešení
+## Proposed solution
 
-Přidat `web/src/styles/tokens.css` a načíst jej v `main.ts`. AppShell bude
-sdílená komponenta obalující `RouterView`; aktivní route se zvýrazní přes
-`RouterLink`. PrimeVue konfigurace dostane semantic color/content surface
-mapping odpovídající tokenům. Globální CSS nesmí používat lokální hex hodnoty
-pro semantic stavové barvy.
+Add `web/src/styles/tokens.css` and load it in `main.ts`. AppShell will be
+a shared component wrapping `RouterView`; the active route is highlighted
+via `RouterLink`. The PrimeVue configuration gets a semantic color/content
+surface mapping matching the tokens. Global CSS must not use local hex
+values for semantic state colors.
 
-## Testovací plán
+## Test plan
 
 - `npm run format`, `npm run lint`, `npm run build`.
-- Manuálně ověřit navigaci klávesnicí, aktivní route a viewport 320 px / desktop.
-- Ověřit, že původní `/` a `/manage` se načtou uvnitř shellu bez změny API chování.
+- Manually verify keyboard navigation, the active route and a 320 px / desktop viewport.
+- Verify that the original `/` and `/manage` load inside the shell without changing API behavior.
 
-## Kritérium hotovosti
+## Done criteria
 
-Viz [Definition of Done](../../devops/definition-of-done.md). Specificky:
-obě existující obrazovky používají stejný shell, žádná navigace nezmizí na
-mobilu a tokeny jsou definované na jednom místě.
+See [Definition of Done](../../devops/definition-of-done.md). Specifically:
+both existing screens use the same shell, no navigation disappears on
+mobile and the tokens are defined in one place.
 
-## Uzavření
+## Closure
 
-- **Stav po implementaci**: Hotovo
-- **Ověření**: `npm run format`, `npm run lint`, `npm run build` — úspěšné; 320px browser smoke test bez horizontálního overflow
-- **Dokumentace aktualizována**: ano; roadmapa a UX specifikace
+- **Status after implementation**: Done
+- **Verification**: `npm run format`, `npm run lint`, `npm run build` — successful; 320px browser smoke test without horizontal overflow
+- **Documentation updated**: yes; roadmap and UX specification

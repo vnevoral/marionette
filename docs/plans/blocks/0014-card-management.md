@@ -1,74 +1,82 @@
-# Implementační blok: Správa akčních karet
+# Implementation block: Action card management
 
-- **Fáze**: 6 — Dashboard UI
-- **Vazba na požadavky**: FR-10, FR-11, FR-12, FR-14, FR-15, FR-23, FR-40
-- **Vazba na ADR**: ADR-0003, ADR-0004, ADR-0006
-- **Stav**: Hotovo
-- **Závislosti**: Bloky 0010–0013, existující CRUD API v `internal/server`
+- **Phase**: 6 — Dashboard UI
+- **Requirements**: FR-10, FR-11, FR-12, FR-14, FR-15, FR-23, FR-40
+- **ADRs**: ADR-0003, ADR-0004, ADR-0006
+- **Status**: Done
+- **Dependencies**: Blocks 0010–0013, the existing CRUD API in `internal/server`
 
-## Cíl bloku
+## Goal
 
-Administrátor bude moci v UI vytvořit, upravit a smazat akční kartu včetně
-primární akce, volitelné status akce a polling nastavení. Formulář bude odesílat
-strukturovaný JSON přes existující CRUD API; serverová validace zůstává
-autoritativní.
+The administrator will be able to create, edit and delete an action card in
+the UI, including the primary action, the optional status action and the
+polling settings. The form will send structured JSON via the existing CRUD
+API; server-side validation remains authoritative.
 
-## Rozsah
+## Scope
 
-- **Uvnitř**:
-  - samostatná route `/manage` dostupná z dashboardu;
-  - seznam existujících karet s akcemi upravit a smazat;
-  - formulář pro novou kartu a editaci existující karty;
-  - pole identity karty: ID při vytvoření, název, popis a ikona;
-  - editor primární a volitelné status akce: příkaz, argumenty, pracovní
-    adresář, proměnné prostředí a timeout;
-  - volba pravidla výsledku: exit code, match a not match včetně regex vzoru;
-  - polling interval, fast-polling interval a fast-polling window;
-  - klientská validace povinných polí a čísel před odesláním;
-  - zpracování stavů `201`, `200`, `204`, `400`, `404`, `409` a `500`;
-  - potvrzovací dialog před smazáním a návrat na dashboard po úspěšné změně;
-  - PrimeVue formulářové komponenty, loading, empty a error stavy.
-- **Mimo rozsah**:
-  - nové backendové endpointy nebo změny doménové validace;
-  - autentizace a autorizace;
-  - editace historie běhů a status transition historie;
-  - import/export karet, hromadné operace a drag-and-drop řazení;
-  - testovací spuštění příkazu přímo z formuláře.
+- **In scope**:
+  - a separate route `/manage` reachable from the dashboard;
+  - a list of existing cards with edit and delete actions;
+  - a form for a new card and for editing an existing card;
+  - card identity fields: ID on creation, name, description and icon;
+  - an editor for the primary and the optional status action: command,
+    arguments, working directory, environment variables and timeout;
+  - choice of result rule: exit code, match and not match including a
+    regex pattern;
+  - polling interval, fast-polling interval and fast-polling window;
+  - client-side validation of required fields and numbers before
+    submitting;
+  - handling of statuses `201`, `200`, `204`, `400`, `404`, `409` and
+    `500`;
+  - a confirmation dialog before deletion and a return to the dashboard
+    after a successful change;
+  - PrimeVue form components, loading, empty and error states.
+- **Out of scope**:
+  - new backend endpoints or changes to domain validation;
+  - authentication and authorization;
+  - editing run history and status transition history;
+  - card import/export, bulk operations and drag-and-drop ordering;
+  - test-running a command directly from the form.
 
-## Schválení
+## Approval
 
-- **Schválil**: projektový vlastník
-- **Datum schválení**: 2026-09-25
-- **Poznámky k rozhodnutí**: Schváleno vlastníkem 2026-09-25; implementace probíhá.
+- **Approved by**: project owner
+- **Approval date**: 2026-09-25
+- **Decision notes**: Approved by the owner 2026-09-25; implementation in progress.
 
-## Návrh řešení
+## Proposed solution
 
-Rozšířit `web/src/api.ts` o typované funkce `createCard`, `updateCard` a
-`deleteCard`. Přidat management view a znovupoužitelné komponenty pro editor
-akce a dynamické řádky argumentů/proměnných prostředí. Formulář bude pracovat
-s lokální kopií `ActionCard`, při editaci zachová ID z URL/stavu a při vypnutí
-status akce odešle `status: undefined` tak, aby odpovídal `omitempty` kontraktu.
-Po úspěšném zápisu se dashboard znovu načte; při chybě zůstane formulář
-otevřený a zobrazí serverovou zprávu.
+Extend `web/src/api.ts` with typed functions `createCard`, `updateCard` and
+`deleteCard`. Add a management view and reusable components for the action
+editor and dynamic rows of arguments/environment variables. The form will
+work with a local copy of `ActionCard`, keep the ID from the URL/state when
+editing, and when the status action is turned off send `status: undefined`
+so that it matches the `omitempty` contract. After a successful write the
+dashboard is reloaded; on error the form stays open and shows the server
+message.
 
-## Testovací plán
+## Test plan
 
-- TypeScript build ověří typy requestů, response dat a Vue šablon.
-- ESLint a Prettier ověří frontendové konvence.
-- Manuálně ověřit vytvoření, editaci, zapnutí/vypnutí status akce a smazání.
-- Manuálně ověřit validaci prázdného příkazu, timeoutu, regexu a neplatného
-  pollingového vztahu.
-- Integračně přes běžící backend ověřit konfliktní ID, serverovou `400`,
-  úspěšné `201/200/204` a obnovení dashboardu po změně.
+- The TypeScript build verifies the types of requests, response data and
+  Vue templates.
+- ESLint and Prettier verify frontend conventions.
+- Manually verify creation, editing, turning the status action on/off and
+  deletion.
+- Manually verify validation of an empty command, timeout, regex and an
+  invalid polling relation.
+- Via a running backend, verify a conflicting ID, a server `400`,
+  successful `201/200/204` and the dashboard refresh after a change.
 
-## Kritérium hotovosti
+## Done criteria
 
-Viz [Definition of Done](../../devops/definition-of-done.md). Specificky:
-všechny mutace používají existující `/api/cards` endpointy, formulář nepřijde
-o neuložené změny při chybě a `npm run lint` i `npm run build` projdou.
+See [Definition of Done](../../devops/definition-of-done.md). Specifically:
+all mutations use the existing `/api/cards` endpoints, the form does not
+lose unsaved changes on error, and both `npm run lint` and `npm run build`
+pass.
 
-## Uzavření
+## Closure
 
-- **Stav po implementaci**: Hotovo
-- **Ověření**: `npm run format`, `npm run lint`, `npm run build` — úspěšné; CRUD smoke test `201 → 200 → 204 → 404` — úspěšný
-- **Dokumentace aktualizována**: ano; roadmapa odkazuje na tento blok
+- **Status after implementation**: Done
+- **Verification**: `npm run format`, `npm run lint`, `npm run build` — successful; CRUD smoke test `201 → 200 → 204 → 404` — successful
+- **Documentation updated**: yes; the roadmap links to this block

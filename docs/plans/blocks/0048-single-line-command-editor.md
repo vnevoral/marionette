@@ -1,118 +1,121 @@
-# Implementační blok: Příkaz akce jako jeden řádek v editoru
+# Implementation block: Action command as a single line in the editor
 
-- **Fáze**: 8 — Zpevnění (dodatek po uzavření fáze)
-- **Vazba na požadavky**: FR-22a, FR-11, FR-22, FR-26, FR-27, FR-28,
+- **Phase**: 8 — Hardening (addendum after the phase was closed)
+- **Requirements**: FR-22a, FR-11, FR-22, FR-26, FR-27, FR-28,
   NFR-01 a
-- **Vazba na ADR**: [ADR-0012](../../architecture/decisions/0012-single-line-command-editor.md)
-  (musí být `Přijato`), ADR-0004, ADR-0007
-- **Stav**: Hotovo
-- **Závislosti**: Bloky 0014, 0017, 0032 (editor karty a mapování chyb),
+- **ADRs**: [ADR-0012](../../architecture/decisions/0012-single-line-command-editor.md)
+  (must be `Accepted`), ADR-0004, ADR-0007
+- **Status**: Done
+- **Dependencies**: Blocks 0014, 0017, 0032 (card editor and error mapping),
   0041 (E2E)
 
-## Cíl bloku
+## Goal
 
-Uživatel zadá primární i status akci jako jeden řádek, stejně jako
-v terminálu (`/usr/bin/ping -c 1 -W 2 192.168.1.10`), a pod polem vidí,
-jak se řádek rozloží na příkaz a argumenty. Uložený tvar akce
-(`command` + `args`) a API se nemění.
+The user enters both the primary and the status action as a single line,
+just like in a terminal (`/usr/bin/ping -c 1 -W 2 192.168.1.10`), and sees
+below the field how the line splits into the command and the arguments. The
+stored form of the action (`command` + `args`) and the API do not change.
 
-## Rozsah
+## Scope
 
-- **Uvnitř**:
-  - čistý modul `web/src/views/commandLine.ts`:
-    `parseCommandLine(line)` → `{ command, args }` nebo chyba s pozicí
-    a zprávou; `formatCommandLine(command, args)` → řádek; gramatika,
-    zakázané znaky a pravidla uvozování přesně podle ADR-0012;
-  - `ActionEditor.vue`: pole **Command line** místo Command a
-    Arguments, živý náhled rozkladu (příkaz + argumenty jako čitelné
-    položky, přístupné čtečce), chyba rozkladu u pole; Working directory,
-    Environment, Timeout a Output rule beze změny;
-  - `cardEditModel.ts`: formulář drží řádek místo `ArgumentRow[]`;
-    klientská validace (prázdný řádek, chyba rozkladu) blokuje uložení;
-    serverové chyby `primary.command`, `primary.args`,
-    `primary.args[N]` (a totéž pro `status`) se mapují na pole Command
-    line; odstranění `ArgumentRow` a `argumentRows`, pokud nezůstane jiné
-    použití;
-  - slovník textů v `src/ui/vocabulary.ts` (FR-26): popisek, nápověda,
-    chybové zprávy (neukončená uvozovka, shellový znak s nápovědou
-    `/bin/sh -c '…'`, proměnná s odkazem na Environment);
-  - UX specifikace §7.2 a scénáře v §10 podle ADR-0012;
-  - E2E scénáře, které dnes vyplňují řádky argumentů.
-- **Mimo rozsah**:
-  - jakákoli změna API, backendu, validace na serveru nebo perzistence;
-  - migrace uložené konfigurace (není potřeba);
-  - expanze proměnných, `~` nebo globů; spouštění přes shell;
-  - zadání Environment jako `KEY=value` na začátku řádku (proměnné zůstávají
-    v samostatném poli).
+- **In scope**:
+  - a pure module `web/src/views/commandLine.ts`:
+    `parseCommandLine(line)` → `{ command, args }` or an error with a
+    position and a message; `formatCommandLine(command, args)` → line; the
+    grammar, forbidden characters and quoting rules exactly per ADR-0012;
+  - `ActionEditor.vue`: a **Command line** field instead of Command and
+    Arguments, a live preview of the split (command + arguments as readable
+    items, accessible to a screen reader), a split error at the field;
+    Working directory, Environment, Timeout and Output rule unchanged;
+  - `cardEditModel.ts`: the form holds a line instead of `ArgumentRow[]`;
+    client-side validation (empty line, split error) blocks saving;
+    server errors `primary.command`, `primary.args`,
+    `primary.args[N]` (and the same for `status`) are mapped to the Command
+    line field; removal of `ArgumentRow` and `argumentRows` if no other use
+    remains;
+  - the text vocabulary in `src/ui/vocabulary.ts` (FR-26): label, hint,
+    error messages (unterminated quote, shell character with the hint
+    `/bin/sh -c '…'`, variable with a pointer to Environment);
+  - UX specification §7.2 and the scenarios in §10 per ADR-0012;
+  - E2E scenarios that currently fill in argument rows.
+- **Out of scope**:
+  - any change to the API, backend, server-side validation or persistence;
+  - migration of the stored configuration (not needed);
+  - expansion of variables, `~` or globs; execution through a shell;
+  - entering Environment as `KEY=value` at the start of the line (variables
+    stay in a separate field).
 
-## Schválení
+## Approval
 
-- **Schválil**: projektový vlastník
-- **Datum schválení**: 2026-09-26
-- **Poznámky k rozhodnutí**: Schváleno vlastníkem („vše schvaluji“) spolu s přijetím ADR-0012. Shellové znaky mimo uvozovky jsou chyba, ne text.
+- **Approved by**: project owner
+- **Approval date**: 2026-09-26
+- **Decision notes**: Approved by the owner ("I approve everything") together with the acceptance of ADR-0012. Shell characters outside quotes are an error, not text.
 
-## Návrh řešení
+## Proposed solution
 
-- Parser je ruční stavový automat nad znaky (stavy: mimo uvozovky,
-  v `'…'`, v `"…"`, po `\`), bez regulárních výrazů na celý řádek a bez
-  závislostí. Vrací první chybu s indexem znaku, aby šla zobrazit
-  srozumitelná zpráva.
-- `formatCommandLine` uvozuje podle ADR-0012 bod 5; pro načtení existující
-  akce se volá jednou při inicializaci formuláře, během psaní se řádek
-  nepřeformátovává (kurzor uživateli neskáče).
-- Dirty-check formuláře porovnává rozložený tvar, ne text: přidání mezery
-  navíc formulář nezašpiní.
+- The parser is a hand-written state machine over characters (states:
+  outside quotes, in `'…'`, in `"…"`, after `\`), with no regular
+  expressions over the whole line and no dependencies. It returns the first
+  error with a character index, so that a clear message can be shown.
+- `formatCommandLine` quotes per ADR-0012 point 5; it is called once when
+  the form is initialized to load an existing action, the line is not
+  reformatted while typing (the user's cursor does not jump).
+- The form's dirty check compares the split form, not the text: adding an
+  extra space does not make the form dirty.
 
-## Testovací plán
+## Test plan
 
-- Jednotkové testy `commandLine.ts`: jednoduchý příkaz; více mezer
-  a tabulátory; `'…'`, `"…"` s `\"` a `\\`; `\ ` mimo uvozovky; spojování
-  částí (`a'b c'd`); prázdný argument `''`; neukončená uvozovka; `\` na
-  konci; každý zakázaný znak mimo uvozovky i v nich; `~`, `*`, `?` jako
-  text; prázdný a jen-mezerový řádek; konec řádku ve vstupu; vlastnost
-  `parse(format(c, a)) = (c, a)` na sadě případů včetně argumentů s mezerou,
-  `'`, `"`, `\`, `$`, `|` a prázdných.
-- Testy `ActionEditor` a `cardEditModel`: náhled rozkladu, chyba u pole,
-  mapování serverových chyb `args[N]` na Command line, načtení existující
-  karty a uložení bez změn pošle stejné `command` + `args`.
-- `make e2e`: vytvoření karty jedním řádkem, úprava existující karty
-  s argumentem obsahujícím mezeru, odmítnutí `ping host | grep ttl`.
+- Unit tests of `commandLine.ts`: a simple command; multiple spaces
+  and tabs; `'…'`, `"…"` with `\"` and `\\`; `\ ` outside quotes; joining
+  parts (`a'b c'd`); an empty argument `''`; an unterminated quote; `\` at
+  the end; every forbidden character both outside and inside quotes; `~`,
+  `*`, `?` as text; an empty and a whitespace-only line; a line break in the
+  input; the property `parse(format(c, a)) = (c, a)` on a set of cases
+  including arguments with a space, `'`, `"`, `\`, `$`, `|` and empty ones.
+- Tests of `ActionEditor` and `cardEditModel`: split preview, error at the
+  field, mapping server errors `args[N]` to Command line, loading an
+  existing card and saving without changes sends the same `command` +
+  `args`.
+- `make e2e`: creating a card with a single line, editing an existing card
+  with an argument containing a space, rejecting `ping host | grep ttl`.
 - `make verify`.
 
-## Kritérium hotovosti
+## Done criteria
 
-Viz [Definition of Done](../../devops/definition-of-done.md) +:
+See [Definition of Done](../../devops/definition-of-done.md) plus:
 
-- akci `/usr/bin/ping -c 1 -W 2 192.168.1.10` lze zadat jedním řádkem
-  a uloží se jako `command: /usr/bin/ping`, `args: [-c, 1, -W, 2,
+- the action `/usr/bin/ping -c 1 -W 2 192.168.1.10` can be entered as a
+  single line and is saved as `command: /usr/bin/ping`, `args: [-c, 1, -W, 2,
   192.168.1.10]`;
-- API kontrakt a backend jsou beze změny (`git diff` bez změn v `internal/`
-  a `cmd/`).
+- the API contract and the backend are unchanged (`git diff` without
+  changes in `internal/` and `cmd/`).
 
-## Uzavření
+## Closure
 
-- **Stav po implementaci**: Hotovo (2026-09-26)
-- **Ověření**: `make verify` prošel (mj. 30 testů `commandLine.spec.ts`
-  včetně vlastnosti `parse(format(c, a)) = (c, a)`); `make e2e` prošel
-  včetně nového scénáře `edits a stored action as one command line`
-  (načtení `echo 'hello from' quoted`, odmítnutí `echo hi | grep hi`,
-  uložení `echo 'hello again' done` → `args: [hello again, done]`).
-  `git diff` v `internal/` a `cmd/` obsahuje jen vygenerovaný
-  `internal/webui/dist/index.html` z buildu UI; backend a API se nemění.
-- **Implementace**: `web/src/views/commandLine.ts`
-  (`parseCommandLine`, `formatCommandLine`, `quoteWord`) podle ADR-0012;
-  `ActionEditor` má pole **Command line** s nápovědou, živým náhledem
-  (seznam „Command and arguments“) a chybou rozkladu; `cardEditModel`
-  drží řádek místo `ArgumentRow[]` (`commandLineOf`, `actionFrom`,
-  `validate` přijímá stav editoru), serverové chyby `args` / `args[N]`
-  patří k poli Command line; typ `ArgumentRow` odstraněn.
-- **Odchylky od návrhu**:
-  - popisky a nápověda pole zůstaly přímo v `ActionEditor.vue` jako
-    ostatní popisky editoru; chybové zprávy rozkladu jsou v
-    `commandLine.ts` vedle gramatiky, ne ve `vocabulary.ts`;
-  - opravena vazba, kterou změna odhalila: zapnutá status akce, u které
-    uživatel vyplnil jen příkazový řádek, by se neuložila (`form.status`
-    zůstal nedefinovaný); payload, dirty-check i validace teď použijí
-    `emptyAction()` jako výchozí hodnoty (test v `CardEditView.spec.ts`).
-- **Dokumentace aktualizována**: ano — UX specifikace §7.2, ADR-0012
-  (Přijato), roadmapa.
+- **Status after implementation**: Done (2026-09-26)
+- **Verification**: `make verify` passed (among others 30 tests in
+  `commandLine.spec.ts` including the property `parse(format(c, a)) = (c, a)`);
+  `make e2e` passed including the new scenario `edits a stored action as one
+  command line` (loading `echo 'hello from' quoted`, rejecting
+  `echo hi | grep hi`, saving `echo 'hello again' done` →
+  `args: [hello again, done]`). `git diff` in `internal/` and `cmd/`
+  contains only the generated `internal/webui/dist/index.html` from the UI
+  build; the backend and the API do not change.
+- **Implementation**: `web/src/views/commandLine.ts`
+  (`parseCommandLine`, `formatCommandLine`, `quoteWord`) per ADR-0012;
+  `ActionEditor` has a **Command line** field with a hint, a live preview
+  (the list "Command and arguments") and a split error; `cardEditModel`
+  holds a line instead of `ArgumentRow[]` (`commandLineOf`, `actionFrom`,
+  `validate` accepts the editor state), server errors `args` / `args[N]`
+  belong to the Command line field; the `ArgumentRow` type was removed.
+- **Deviations from the plan**:
+  - the field's labels and hint stayed directly in `ActionEditor.vue` like
+    the other editor labels; the split error messages are in
+    `commandLine.ts` next to the grammar, not in `vocabulary.ts`;
+  - fixed a coupling that the change revealed: an enabled status action for
+    which the user filled in only the command line would not be saved
+    (`form.status` stayed undefined); the payload, dirty check and
+    validation now use `emptyAction()` as default values (test in
+    `CardEditView.spec.ts`).
+- **Documentation updated**: yes — UX specification §7.2, ADR-0012
+  (Accepted), roadmap.

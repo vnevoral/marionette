@@ -1,50 +1,56 @@
-# Implementační blok: Stavová projekce a historie přechodů
+# Implementation block: Status projection and transition history
 
-- **Fáze**: 4 — Status/health-check engine
-- **Vazba na požadavky**: FR-12, FR-17, FR-20, FR-35
-- **Vazba na ADR**: ADR-0006
-- **Stav**: Hotovo
+- **Phase**: 4 — Status/health-check engine
+- **Requirements**: FR-12, FR-17, FR-20, FR-35
+- **ADRs**: ADR-0006
+- **Status**: Done
 
-## Cíl bloku
+## Goal
 
-Po dokončení config vrstva umí držet poslední status kontrolu odděleně od
-historie změn stavu. Opakovaná kontrola stejného stavu nezvětší historii;
-při změně se předchozí stav uzavře a lze spočítat jeho trvání.
+After completion, the config layer can keep the last status check separate
+from the history of status changes. A repeated check of the same status
+does not grow the history; on a change, the previous status is closed and
+its duration can be computed.
 
-## Rozsah
+## Scope
 
-- **Uvnitř**:
-  - `StatusState` (`unknown`, `ok`, `fail`) a `StatusChange` s novým stavem,
-    `StartedAt`, uzavřením/trváním;
-  - poslední status projekce včetně posledního `Run` a času kontroly;
-  - thread-safe Store API pro načtení projekce a atomické zpracování nové
-    kontroly;
-  - samostatný limit historie přechodů a ořezání nejstarších změn;
-  - hluboké kopie návratových hodnot a JSON tagy;
-  - aktualizace persistence snapshotu pro poslední status a přechody.
-- **Mimo rozsah**:
-  - spuštění status příkazu (0008);
-  - časovače a polling (0009);
-  - HTTP API, dashboard a migrace starého `history.status` formátu.
+- **In scope**:
+  - `StatusState` (`unknown`, `ok`, `fail`) and `StatusChange` with the
+    new state, `StartedAt`, closing/duration;
+  - the last status projection including the last `Run` and the check
+    time;
+  - a thread-safe Store API for reading the projection and atomically
+    processing a new check;
+  - a separate limit for the transition history and trimming of the
+    oldest changes;
+  - deep copies of return values and JSON tags;
+  - updating the persistence snapshot for the last status and
+    transitions.
+- **Out of scope**:
+  - running the status command (0008);
+  - timers and polling (0009);
+  - HTTP API, dashboard and migration of the old `history.status` format.
 
-## Návrh řešení
+## Proposed solution
 
-Rozšířit `internal/config` o `StatusState`, `StatusChange` a projekci poslední
-kontroly. Store bude při nové kontrole porovnávat předchozí stav; stejný stav
-pouze nahradí poslední kontrolu, zatímco změna uzavře předchozí interval a
-vloží nový otevřený interval. Historie bude vracet kopie v pořadí od
-nejnovější změny.
+Extend `internal/config` with `StatusState`, `StatusChange` and a projection
+of the last check. On a new check the store compares the previous state; the
+same state only replaces the last check, whereas a change closes the
+previous interval and inserts a new open interval. The history returns
+copies ordered from the newest change.
 
-## Testovací plán
+## Test plan
 
-- první kontrola vytvoří počáteční změnu z `unknown`;
-- opakované `ok`/`fail` kontroly nevytvoří další změnu;
-- `ok -> fail -> ok` uzavře intervaly správnou dobou trvání;
-- ořezání historie zachová posledních N přechodů;
-- souběžné kontroly jedné karty nezpůsobí race ani nekonzistentní interval;
-- JSON round-trip poslední projekce a historie změn.
+- the first check creates an initial change from `unknown`;
+- repeated `ok`/`fail` checks do not create another change;
+- `ok -> fail -> ok` closes the intervals with the correct duration;
+- trimming the history keeps the last N transitions;
+- concurrent checks of one card cause neither a race nor an inconsistent
+  interval;
+- JSON round-trip of the last projection and the change history.
 
-## Kritérium hotovosti
+## Done criteria
 
-Viz Definition of Done. Specificky: `go test -race ./...` prochází a testy
-prokazují, že počet status kontrol neovlivňuje počet historických změn.
+See Definition of Done. Specifically: `go test -race ./...` passes and the
+tests prove that the number of status checks does not affect the number of
+historical changes.
