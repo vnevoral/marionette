@@ -13,12 +13,14 @@ one or more concrete implementation blocks (see the
 ## Current state
 
 As of 2026-09-27 all phases below are **Done**, the last closed block is
-[0060](blocks/0060-toolchain-go-and-golangci-lint-v2.md) and the current release is
-**v1.2.1** (tags `v1.0.0`, `v1.1.0`, `v1.2.0`, `v1.2.1`; `v1.2.0` has no
-GitHub Release because its CI run failed, fixed by block 0059). The
-requirements are at v0.11. `v1.2.1` runs on the reference Raspberry Pi;
-the upgrade and rollback procedure from the README was verified there by
-the owner on 2026-09-27. New work starts as a new requirement and block
+[0061](blocks/0061-sse-subscribe-order-and-timing-tests.md) and the current release is
+**v1.2.2** (tags `v1.0.0`, `v1.1.0`, `v1.2.0`, `v1.2.1`, `v1.2.2`; `v1.2.0` has no
+GitHub Release because its CI run failed, fixed by block 0059). `v1.2.2`
+contains blocks 0060 and 0061 (Go 1.27, golangci-lint v2, SSE subscription
+order). The requirements are at v0.11. `v1.2.2` runs on the reference
+Raspberry Pi; the owner deployed it and verified it there on 2026-09-27
+(the upgrade and rollback procedure from the README was verified with
+`v1.2.1`). New work starts as a new requirement and block
 per the development workflow.
 
 ## Phase overview
@@ -269,6 +271,8 @@ per the development workflow.
      — **Done** (2026-09-27); the SSE handler subscribes before
      `: connected` (ADR-0008 addendum), the shutdown test limit follows the
      budget.
+
+  Both blocks were released as `v1.2.2` (GitHub Release from CI, 2026-09-27).
 
   The open questions from the review are decided in
   [requirements.md, section 13](../requirements/requirements.md#13-decisions--project-review-2026-09-26)
