@@ -12,6 +12,7 @@ import RequestState from "@/components/RequestState.vue";
 import SaveBar from "@/components/SaveBar.vue";
 import { useNotify } from "@/composables/useNotify";
 import { useUnsavedChangesGuard } from "@/composables/useUnsavedChangesGuard";
+import { knownCardColor } from "@/ui/cardColors";
 import { ACTIONS, FEEDBACK, LOADING } from "@/ui/vocabulary";
 import {
 	actionFrom,
@@ -74,7 +75,8 @@ function markClean() {
 function applyCard(card: ActionCard) {
 	Object.assign(form, {
 		...card,
-		color: card.color ?? "",
+		// A colour outside the palette (edited file) shows and saves as None.
+		color: knownCardColor(card.color),
 		primary: copyAction(card.primary),
 		status: card.status ? copyAction(card.status) : undefined,
 	});

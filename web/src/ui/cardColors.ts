@@ -14,8 +14,13 @@ export const CARD_COLOR_OPTIONS = [
 	{ label: "Yellow", value: "yellow" },
 ] as const;
 
+/** A stored card colour if it is in the palette, otherwise "" (none). */
+export function knownCardColor(color: string | undefined): string {
+	return CARD_COLOR_OPTIONS.some((option) => option.value === color) ? (color ?? "") : "";
+}
+
 /** The CSS colour of a stored card colour, or undefined for none or an unknown name. */
 export function cardColorValue(color: string | undefined): string | undefined {
-	if (!color || !CARD_COLOR_OPTIONS.some((option) => option.value === color)) return undefined;
-	return `var(--card-color-${color})`;
+	const known = knownCardColor(color);
+	return known ? `var(--card-color-${known})` : undefined;
 }

@@ -149,8 +149,10 @@ Viz [Definition of Done](../../devops/definition-of-done.md) +:
 - **Odchylky od návrhu**:
   - karta nese atribut `data-color` kvůli testům a ladění stylu;
   - neznámá barva načtená ze souboru (ručně upravená konfigurace) se
-    na dashboardu nezobrazí a editor ukáže **None**; API ji při uložení
-    odmítne až po změně, stejně jako jiné hodnoty mimo aktuální limity;
+    na dashboardu nezobrazí a editor ji při načtení karty převede na
+    **None** (`knownCardColor`), takže karta jde uložit a neznámá hodnota
+    se tím odstraní (nález z code review po implementaci: původně editor
+    ukázal prázdné pole a uložení skončilo chybou `422`);
   - formulář drží „bez barvy“ jako prázdný řetězec, aby načtení jiné
     karty nepřevzalo barvu předchozí.
 - **Dokumentace aktualizována**: UX specifikace §5.2, §7.2, §8.2; tabulka

@@ -186,6 +186,26 @@ describe("CardEditView", () => {
 		wrapper.unmount();
 	});
 
+	it("shows a colour outside the palette as None and saves the card without it", async () => {
+		vi.mocked(getCard).mockResolvedValue({ ...printer, color: "red" });
+		vi.mocked(updateCard).mockImplementation(async (card) => card);
+		const { wrapper, confirm } = await mountEdit("/cards/printer/edit");
+		const color = wrapper
+			.findAllComponents(Select)
+			.find((select) => select.props("ariaLabel") === "Color");
+		expect(color?.text()).toContain("None");
+
+		await inputInLabel(wrapper, "Name").setValue("Printer 2");
+		await wrapper
+			.findAll("button")
+			.find((b) => b.text().includes("Save card"))!
+			.trigger("click");
+		await flushPromises();
+		expect(vi.mocked(updateCard).mock.calls[0][0]).toMatchObject({ color: "" });
+		expect(confirm.require).not.toHaveBeenCalled();
+		wrapper.unmount();
+	});
+
 	it("shows a colour rejected by the server beside the Color field", async () => {
 		vi.mocked(updateCard).mockRejectedValue(
 			new ApiError("validation failed: color: bad", 422, {
