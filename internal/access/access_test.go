@@ -306,6 +306,73 @@ func TestRemoveListAndExists(t *testing.T) {
 	}
 }
 
+func TestRenameKeepsTokenAndTimesAndPersists(t *testing.T) {
+	c := newClock()
+	path := filepath.Join(t.TempDir(), "devices.json")
+	var logs bytes.Buffer
+	registry := openRegistry(t, path, c, &logs)
+	laptop, token := pair(t, registry, "Chrome on Linux")
+	c.Advance(time.Hour)
+
+	renamed, err := registry.Rename(laptop.ID, "  Kitchen tablet  ")
+	if err != nil {
+		t.Fatalf("Rename() error = %v", err)
+	}
+	if renamed.Name != "Kitchen tablet" || renamed.ID != laptop.ID || renamed.TokenHash != laptop.TokenHash ||
+		!renamed.PairedAt.Equal(laptop.PairedAt) || !renamed.LastSeenAt.Equal(laptop.LastSeenAt) {
+		t.Fatalf("Rename() = %#v, from %#v", renamed, laptop)
+	}
+	if !strings.Contains(logs.String(), "renamed paired device") || !strings.Contains(logs.String(), "Kitchen tablet") {
+		t.Fatalf("rename log = %s", logs.String())
+	}
+
+	reopened := openRegistry(t, path, c, nil)
+	devices := reopened.List()
+	if len(devices) != 1 || devices[0].Name != "Kitchen tablet" || !devices[0].PairedAt.Equal(laptop.PairedAt) ||
+		!devices[0].LastSeenAt.Equal(laptop.LastSeenAt) {
+		t.Fatalf("after reopening = %#v", devices)
+	}
+	if session, ok := reopened.Authenticate(token); !ok || session.Device.Name != "Kitchen tablet" {
+		t.Fatal("the token stopped working after renaming")
+	}
+}
+
+func TestRenameRejectsInvalidNamesAndUnknownDevices(t *testing.T) {
+	c := newClock()
+	registry := openRegistry(t, filepath.Join(t.TempDir(), "devices.json"), c, nil)
+	laptop, _ := pair(t, registry, "Laptop")
+
+	for _, name := range []string{"", "   ", strings.Repeat("é", MaxDeviceNameLength+1)} {
+		if _, err := registry.Rename(laptop.ID, name); !errors.Is(err, ErrInvalidName) {
+			t.Fatalf("Rename(%q) error = %v, want ErrInvalidName", name, err)
+		}
+	}
+	if _, err := registry.Rename(laptop.ID, strings.Repeat("é", MaxDeviceNameLength)); err != nil {
+		t.Fatalf("Rename() with the maximum length error = %v", err)
+	}
+	if _, err := registry.Rename("unknown", "Phone"); !errors.Is(err, ErrDeviceNotFound) {
+		t.Fatalf("Rename() of an unknown device error = %v", err)
+	}
+	c.Advance(DefaultExpiry + time.Minute)
+	if _, err := registry.Rename(laptop.ID, "Phone"); !errors.Is(err, ErrDeviceNotFound) {
+		t.Fatalf("Rename() of an expired device error = %v", err)
+	}
+}
+
+func TestRenameKeepsTheOldNameWhenSavingFails(t *testing.T) {
+	c := newClock()
+	registry := openRegistry(t, filepath.Join(t.TempDir(), "devices.json"), c, nil)
+	laptop, _ := pair(t, registry, "Laptop")
+	registry.path = filepath.Join(t.TempDir(), "missing", "devices.json")
+
+	if _, err := registry.Rename(laptop.ID, "Phone"); err == nil {
+		t.Fatal("Rename() succeeded although the file could not be written")
+	}
+	if devices := registry.List(); len(devices) != 1 || devices[0].Name != "Laptop" {
+		t.Fatalf("after a failed rename = %#v", devices)
+	}
+}
+
 func TestCorruptDevicesFileIsQuarantined(t *testing.T) {
 	c := newClock()
 	dir := t.TempDir()

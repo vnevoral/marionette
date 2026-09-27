@@ -1,6 +1,16 @@
-import { ref, type Ref } from "vue";
-import { getRuns, getStatusHistory, type Run, type StatusChange } from "@/api";
+import { onBeforeUnmount, ref, type Ref } from "vue";
+import { getRuns, getStatusHistory, type ActionCard, type Run, type StatusChange } from "@/api";
+import { runPollIntervalMs, runWaitBudgetMs } from "@/composables/useCardStatus";
 import { FEEDBACK } from "@/ui/vocabulary";
+
+export type RunWaitResult = "found" | "timeout" | "aborted";
+
+/** True when `run` started after the newest run known before the action. */
+function isNewerRun(run: Run | undefined, previousStartedAt: string | undefined): boolean {
+	if (!run) return false;
+	if (!previousStartedAt) return true;
+	return Date.parse(run.startedAt) > Date.parse(previousStartedAt);
+}
 
 // Recent runs and status history of one card. reset() starts a new generation
 // so responses for a previous card or an older load are ignored.
@@ -11,9 +21,11 @@ export function useCardActivity(cardID: Ref<string>) {
 	const historyLoading = ref(true);
 	const errors = ref<{ runs?: string; history?: string }>({});
 	let generation = 0;
+	let runWait: AbortController | undefined;
 
 	function reset() {
 		generation++;
+		stopWaitingForRun();
 		runs.value = [];
 		history.value = [];
 		runsLoading.value = true;
@@ -21,20 +33,23 @@ export function useCardActivity(cardID: Ref<string>) {
 		errors.value = {};
 	}
 
-	async function loadRuns(current: number) {
+	/** Reads the runs; true when the answer still belongs to `current`. */
+	async function loadRuns(current: number): Promise<boolean> {
 		try {
 			const loaded = await getRuns(cardID.value);
-			if (current !== generation) return;
+			if (current !== generation) return false;
 			runs.value = loaded ?? [];
 			delete errors.value.runs;
+			return true;
 		} catch {
 			if (current === generation) errors.value.runs = FEEDBACK.runsUnavailable;
+			return false;
 		} finally {
 			if (current === generation) runsLoading.value = false;
 		}
 	}
 
-	async function loadHistory(current: number) {
+	async function loadHistory(current = generation) {
 		try {
 			const loaded = await getStatusHistory(cardID.value);
 			if (current !== generation) return;
@@ -53,5 +68,62 @@ export function useCardActivity(cardID: Ref<string>) {
 		return Promise.allSettled([loadRuns(current), loadHistory(current)]);
 	}
 
-	return { runs, history, runsLoading, historyLoading, errors, reset, load };
+	function stopWaitingForRun() {
+		runWait?.abort();
+		runWait = undefined;
+	}
+
+	/**
+	 * After an accepted primary action (block 0050): re-reads the runs at the
+	 * card's fast polling interval (2 s without one) until a run newer than the
+	 * newest one known before the action appears, or the action's timeout plus
+	 * the queue margin passes. Comparing server timestamps keeps a skewed
+	 * browser clock out of it. A new wait, reset() or unmounting ends the
+	 * previous one; a failed read is shown and the wait goes on.
+	 */
+	function waitForNewRun(card: ActionCard, previousStartedAt: string | undefined) {
+		stopWaitingForRun();
+		const controller = new AbortController();
+		runWait = controller;
+		const current = generation;
+		const intervalMs = runPollIntervalMs(card);
+
+		return new Promise<RunWaitResult>((resolve) => {
+			let timer: ReturnType<typeof setTimeout> | undefined;
+			let settled = false;
+			const finish = (result: RunWaitResult) => {
+				if (settled) return;
+				settled = true;
+				clearTimeout(timer);
+				clearTimeout(deadline);
+				controller.signal.removeEventListener("abort", onAbort);
+				if (runWait === controller) runWait = undefined;
+				resolve(result);
+			};
+			const onAbort = () => finish("aborted");
+			const poll = async () => {
+				const fresh = await loadRuns(current);
+				if (settled) return;
+				if (fresh && isNewerRun(runs.value[0], previousStartedAt)) return finish("found");
+				timer = setTimeout(poll, intervalMs);
+			};
+			const deadline = setTimeout(() => finish("timeout"), runWaitBudgetMs(card));
+			controller.signal.addEventListener("abort", onAbort);
+			timer = setTimeout(poll, intervalMs);
+		});
+	}
+
+	onBeforeUnmount(stopWaitingForRun);
+
+	return {
+		runs,
+		history,
+		runsLoading,
+		historyLoading,
+		errors,
+		reset,
+		load,
+		loadHistory,
+		waitForNewRun,
+	};
 }

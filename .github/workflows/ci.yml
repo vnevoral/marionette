@@ -20,6 +20,7 @@ jobs:
       - run: go vet ./...
       - run: go test -race -count=1 ./...
       - run: bash -n deploy/install.sh && bash deploy/install_test.sh
+      - run: bash -n deploy/release_version.sh && bash deploy/release_version_test.sh
 
   web:
     runs-on: ubuntu-latest

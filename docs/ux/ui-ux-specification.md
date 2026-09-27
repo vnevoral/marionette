@@ -197,10 +197,14 @@ The body contains:
   **Running**), and recent runs and status history are refetched once a
   newer check is visible; an outcome the badge cannot show (**Result not
   available yet**, an enqueue error, or **Action accepted** when no check
-  follows, §4) replaces the panel's asynchronous note in place; after
-  **Action accepted** the runs are refetched right away. The page-level
+  follows, §4) replaces the panel's asynchronous note in place. The page-level
   line above the summary is used only for deleting the card;
-- **Recent runs**: time, outcome, duration, and expandable output;
+- **Recent runs**: time, outcome, duration, and expandable output. After
+  **Run action** is accepted the list is re-read at the card's fast polling
+  interval (2 s when the card has none) until the new run appears, at most
+  for the action's timeout plus the 30 s queue margin; the buttons do not
+  wait for it, and a failed read shows **Run history is unavailable** while
+  the wait goes on;
 - **Status history**: chronological transition timeline with duration;
 - **Configuration**: link to edit, not inline configuration in diagnostics.
 
@@ -270,6 +274,12 @@ that.
     browser allows the clipboard, which plain HTTP does not). When the new
     device pairs, the code disappears and the page says so inline; an
     expired code offers **New code**.
+  - **Rename** (pencil icon, accessible name "Rename <name>") replaces the
+    name with a **Device name** field (up to 64 characters) and **Save** /
+    **Cancel**; Enter saves, Escape cancels. A rejected name is shown under
+    the field; a saved one updates the list and the page says
+    **"<name>" saved.** inline. Any paired device can rename any device;
+    names need not be unique (FR-57).
   - **Remove device** asks for confirmation naming the device. Removing
     another device reports inline; removing this device signs it out, opens
     the pairing screen and shows the toast **This device was removed**.

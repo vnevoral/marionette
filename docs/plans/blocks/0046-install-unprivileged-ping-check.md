@@ -83,8 +83,9 @@ Viz [Definition of Done](../../devops/definition-of-done.md) +:
   prošly (varianty `1 0` → návod, `0 2147483647` → bez návodu, chybějící
   soubor → bez návodu, existující uživatel `root` s rozsahem
   `1 2147483647` → návod). `shellcheck` v prostředí není k dispozici.
-  `make verify` prošel (včetně `install_test`). Manuální ověření na referenčním
-  Raspberry Pi zbývá provést při příští instalaci.
+  `make verify` prošel (včetně `install_test`). Na referenčním Raspberry Pi
+  (2026-09-26, release `25a0094`) vlastník projektu potvrdil instalaci
+  a funkční status akci `ping` (karta WoL + ping **Healthy**).
 - **Odchylky od návrhu**:
   - proměnná prostředí pro test se jmenuje `PING_GROUP_RANGE_FILE` (v
     souladu s `DATA_DIR`, `UNIT_FILE` …);

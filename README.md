@@ -52,18 +52,26 @@ uptime in seconds.
 
 ## Installation on Linux with systemd
 
-Create the ARM64 release archive on a build host:
+Releases are versioned `vMAJOR.MINOR.PATCH` by git tags (rules in
+[docs/devops/ci-cd.md](docs/devops/ci-cd.md)). Create the ARM64 release
+archive on a build host from a clean, tagged commit; without a matching tag
+on `HEAD`, or with uncommitted changes, the target fails and explains how to
+tag:
 
 ```bash
+git tag -a v1.0.0 -m "Marionette v1.0.0"
 make release-arm64
 ```
 
-Copy `bin/marionette-linux-arm64.tar.gz` to the target Linux host, extract it,
-and run the installer as root:
+Copy `bin/marionette-v1.0.0-linux-arm64.tar.gz` and its `.sha256` file to the
+target Linux host, verify and extract the archive, and run the installer as
+root:
 
 ```bash
-tar -xzf marionette-linux-arm64.tar.gz
+sha256sum -c marionette-v1.0.0-linux-arm64.tar.gz.sha256
+tar -xzf marionette-v1.0.0-linux-arm64.tar.gz
 sudo ./install.sh ./marionette-linux-arm64
+curl -s http://localhost:8080/api/health   # "version" reports the tag
 ```
 
 The installer creates the `marionette` service account, preserves an existing
@@ -126,6 +134,8 @@ one-time code and is never asked again; there is no password.
    a fresh one while no device is paired.
 2. **More devices.** On a paired device open **Devices** → **Pair a new
    device** and enter the shown code (or open the link) on the new device.
+   Any device can be renamed later on the Devices page (pencil icon), for
+   example to tell two "Chrome on Linux" apart.
 3. **Removing a device** on the Devices page ends its access at once.
    A device that is not used for `MARIONETTE_DEVICE_EXPIRY_DAYS` (60 by
    default) expires; a device in use is renewed automatically.

@@ -1,4 +1,4 @@
-# Požadavky na Marionette (SRS) — v0.8
+# Požadavky na Marionette (SRS) — v0.9
 
 > Stav: **zpřesněno** (fáze 1 a UX specifikace, 2026-09-25; doplněno o SSE stream
 > pro živé změny statusů, 2026-09-25; doplněno o dva polling intervaly a
@@ -7,7 +7,8 @@
 > 2026-09-25; doplněno o UX požadavky FR-24 až FR-29 a NFR-08 až NFR-10,
 > 2026-09-25; revize projektu a kódu 2026-09-26: NFR-12, upřesnění FR-18 a
 > NFR-01, viz [Rozhodnutí — revize 2026-09-26](#13-rozhodnutí-revize-projektu-2026-09-26);
-> doplněno FR-05, FR-21a a FR-22a po validaci na Raspberry Pi, 2026-09-26).
+> doplněno FR-05, FR-21a a FR-22a po validaci na Raspberry Pi, 2026-09-26;
+> FR-57 přejmenování zařízení, 2026-09-27).
 > Otevřené otázky z v0.1 byly rozhodnuty
 > s vlastníkem projektu, viz [Rozhodnutí fáze 1](#7-rozhodnutí-fáze-1),
 > [Rozhodnutí — polling a terminace](#9-rozhodnutí-polling-a-terminace-2026-09-25)
@@ -251,6 +252,14 @@ nezadává. Služba běží ve vnitřní síti, zvenčí přes VPN.
 - **FR-56 Obnova přístupu**: Při ztrátě všech zařízení operátor na hostu
   smaže soubor se zařízeními a restartuje službu; při startu se pak
   vygeneruje nový kód podle FR-53. Postup je v README.
+- **FR-57 Přejmenování zařízení** _(doplněno 2026-09-27)_: Název zařízení
+  se zadává při párování (FR-52) a spárované zařízení ho může později
+  změnit na stránce **Devices**, a to u kteréhokoli spárovaného zařízení
+  včetně vlastního (stejně jako odebrání, FR-55). Pro nový název platí
+  stejná pravidla jako při párování (povinný, po oříznutí mezer nejvýš
+  64 znaků); neplatný název server odmítne `422` s chybou u pole. Změna se
+  okamžitě uloží do souboru zařízení a neovlivní token, platnost ani čas
+  posledního použití. Názvy nemusí být unikátní.
 
 ## 4. Nefunkční požadavky
 

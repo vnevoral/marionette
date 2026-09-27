@@ -213,10 +213,7 @@ func (api *accessAPI) pair(w http.ResponseWriter, request *http.Request) {
 	device, token, err := api.registry.Pair(body.Code, body.Name)
 	switch {
 	case errors.Is(err, access.ErrInvalidName):
-		writeJSON(w, http.StatusUnprocessableEntity, struct {
-			Error  string            `json:"error"`
-			Fields map[string]string `json:"fields"`
-		}{Error: err.Error(), Fields: map[string]string{"name": err.Error()}})
+		writeInvalidName(w, err)
 		return
 	case errors.Is(err, access.ErrInvalidCode):
 		api.logger.Warn("pairing attempt with an invalid code", "remote", request.RemoteAddr)
@@ -274,4 +271,38 @@ func (api *accessAPI) removeDevice(w http.ResponseWriter, request *http.Request)
 		api.clearCookie(w, request)
 	}
 	w.WriteHeader(http.StatusNoContent)
+}
+
+func (api *accessAPI) renameDevice(w http.ResponseWriter, request *http.Request) {
+	var body struct {
+		Name string `json:"name"`
+	}
+	if err := decodeJSON(w, request, &body); err != nil {
+		return
+	}
+	device, err := api.registry.Rename(request.PathValue("id"), body.Name)
+	switch {
+	case errors.Is(err, access.ErrInvalidName):
+		writeInvalidName(w, err)
+		return
+	case errors.Is(err, access.ErrDeviceNotFound):
+		writeError(w, http.StatusNotFound, err)
+		return
+	case err != nil:
+		writeError(w, http.StatusInternalServerError, err)
+		return
+	}
+	current, _ := currentDevice(request)
+	writeJSON(w, http.StatusOK, struct {
+		Device deviceView `json:"device"`
+	}{Device: viewDevice(device, current.ID)})
+}
+
+// writeInvalidName answers 422 with the message under fields.name, like the
+// validation errors of cards.
+func writeInvalidName(w http.ResponseWriter, err error) {
+	writeJSON(w, http.StatusUnprocessableEntity, struct {
+		Error  string            `json:"error"`
+		Fields map[string]string `json:"fields"`
+	}{Error: err.Error(), Fields: map[string]string{"name": err.Error()}})
 }

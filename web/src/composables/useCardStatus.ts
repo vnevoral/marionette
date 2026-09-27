@@ -60,6 +60,19 @@ export function expectsFollowUpCheck(card: ActionCard, action: ActionKind): bool
  * other actions before it starts. */
 export const statusCheckQueueMarginMs = 30_000;
 
+/** How often a view re-reads a card after an action: the card's fast polling
+ * interval, or defaultPollIntervalMs when it has none (block 0050). */
+export function runPollIntervalMs(card: ActionCard): number {
+	const seconds = card.fastPollingIntervalSeconds ?? 0;
+	return seconds > 0 ? seconds * 1000 : defaultPollIntervalMs;
+}
+
+/** How long a view waits for the run of an accepted primary action: its
+ * timeout plus the queue margin. */
+export function runWaitBudgetMs(card: ActionCard): number {
+	return card.primary.timeoutSec * 1000 + statusCheckQueueMarginMs;
+}
+
 /**
  * How long a view waits for the follow-up check. A manual status check is
  * bounded by the status action's own timeout plus the queue margin; after a

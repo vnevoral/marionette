@@ -98,6 +98,7 @@ kód v paměti. Middleware `requireDevice` v `internal/server` stojí za
 | `POST /api/pairing/code`     | kód pro další zařízení `201 {code, expiresAt}` (jen spárované zařízení)                      |
 | `GET /api/devices`           | seznam `{id, name, pairedAt, lastSeenAt, current}` bez hashe tokenu                           |
 | `DELETE /api/devices/{id}`   | `204`; u vlastního zařízení smaže cookie (odhlášení)                                          |
+| `PATCH /api/devices/{id}`    | `{name}` → `200 {device}` (FR-57); neplatné jméno `422` s `fields.name`, neznámé `404`         |
 
 - **Token**: 32 bajtů z `crypto/rand` (base64url); na disku jen SHA-256
   hash; nikdy v logu ani v těle odpovědi. Cookie `HttpOnly`,

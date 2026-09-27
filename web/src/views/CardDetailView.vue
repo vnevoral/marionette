@@ -102,6 +102,7 @@ async function runAction(action: ActionKind) {
 	const generation = loadGeneration;
 	const controller = new AbortController();
 	pendingWait = controller;
+	const newestRun = activity.runs.value[0]?.startedAt;
 	try {
 		const outcome = await requestAction(current, action, {
 			signal: controller.signal,
@@ -109,6 +110,8 @@ async function runAction(action: ActionKind) {
 				pending.value = { action, phase };
 				showActionResult(null);
 			},
+			// The run shows up in Recent runs once the server records it (block 0050).
+			onAccepted: () => void (action === "primary" && activity.waitForNewRun(current, newestRun)),
 			onSnapshot: (snapshot) => cardStatus.apply(current.id, snapshot),
 			onError: () => cardStatus.fail(current.id),
 		});
@@ -119,7 +122,7 @@ async function runAction(action: ActionKind) {
 		});
 		if (!result) return;
 		showActionResult(result);
-		if (outcome.kind !== "failed") void activity.load();
+		if (outcome.kind !== "failed") void activity.loadHistory();
 	} finally {
 		if (pendingWait === controller) pendingWait = undefined;
 		if (generation === loadGeneration) pending.value = null;

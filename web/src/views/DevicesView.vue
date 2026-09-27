@@ -3,22 +3,22 @@ import { computed, onBeforeUnmount, onMounted, ref } from "vue";
 import { useRouter } from "vue-router";
 import Button from "primevue/button";
 import ProgressSpinner from "primevue/progressspinner";
-import Tag from "primevue/tag";
 import { useConfirm } from "primevue/useconfirm";
 import { createPairingCode, listDevices, removeDevice, type Device, type PairingCode } from "@/api";
 import DetailPanel from "@/components/DetailPanel.vue";
+import DeviceRow from "@/components/DeviceRow.vue";
 import EmptyState from "@/components/EmptyState.vue";
 import InlineError from "@/components/InlineError.vue";
 import PageHeader from "@/components/PageHeader.vue";
 import PairingCodePanel from "@/components/PairingCodePanel.vue";
 import RequestState from "@/components/RequestState.vue";
 import { useNotify } from "@/composables/useNotify";
-import { markUnpaired, useSession } from "@/composables/useSession";
+import { markUnpaired, setSession, useSession } from "@/composables/useSession";
 import { useTransientMessage } from "@/composables/useTransientMessage";
-import { formatDate } from "@/ui/format";
 import { ACCESS, ACTIONS, FEEDBACK, LOADING } from "@/ui/vocabulary";
 
-// Paired devices (FR-54, FR-55): list, remove, and a code for another device.
+// Paired devices (FR-54, FR-55, FR-57): list, rename, remove, and a code for
+// another device.
 const router = useRouter();
 const confirm = useConfirm();
 const notify = useNotify();
@@ -124,6 +124,16 @@ async function remove(device: Device) {
 	showMessage(ACCESS.removed(device.name), "success");
 }
 
+function renamed(device: Device) {
+	devices.value = devices.value.map((candidate) =>
+		candidate.id === device.id ? device : candidate,
+	);
+	if (device.current && session.value.status === "paired") {
+		setSession({ ...session.value, device });
+	}
+	showMessage(ACCESS.renamed(device.name), "success");
+}
+
 onMounted(() => {
 	if (accessDisabled.value) loading.value = false;
 	else void load();
@@ -176,29 +186,13 @@ onBeforeUnmount(stopWatching);
 
 			<DetailPanel v-else :title="ACCESS.devicesTitle" :count="devices.length">
 				<ul class="device-list">
-					<li v-for="device in devices" :key="device.id" class="device-row">
-						<div class="device-identity">
-							<i class="pi pi-desktop" aria-hidden="true" />
-							<div>
-								<p class="device-name">
-									<span>{{ device.name }}</span>
-									<Tag v-if="device.current" :value="ACCESS.thisDevice" severity="secondary" />
-								</p>
-								<p class="device-dates">
-									{{ ACCESS.pairedAt }} {{ formatDate(device.pairedAt) }} · {{ ACCESS.lastUsed }}
-									{{ formatDate(device.lastSeenAt) }}
-								</p>
-							</div>
-						</div>
-						<Button
-							icon="pi pi-trash"
-							text
-							rounded
-							severity="danger"
-							:aria-label="`${ACCESS.removeDevice} ${device.name}`"
-							@click="confirmRemove(device)"
-						/>
-					</li>
+					<DeviceRow
+						v-for="device in devices"
+						:key="device.id"
+						:device="device"
+						@remove="confirmRemove"
+						@renamed="renamed"
+					/>
 				</ul>
 			</DetailPanel>
 		</template>
@@ -216,38 +210,5 @@ onBeforeUnmount(stopWatching);
 	margin: 0;
 	padding: 0;
 	list-style: none;
-}
-.device-row {
-	display: flex;
-	align-items: center;
-	justify-content: space-between;
-	gap: var(--space-3);
-	padding: var(--space-3) 0;
-	border-top: 1px solid var(--color-border);
-}
-.device-identity {
-	display: flex;
-	align-items: flex-start;
-	gap: var(--space-3);
-	min-width: 0;
-}
-.device-identity > i {
-	margin-top: 0.2rem;
-	color: var(--color-accent);
-}
-.device-name {
-	display: flex;
-	flex-wrap: wrap;
-	align-items: center;
-	gap: var(--space-2);
-	margin: 0;
-	color: var(--color-ink);
-	font-weight: var(--font-weight-medium);
-	overflow-wrap: anywhere;
-}
-.device-dates {
-	margin: var(--space-1) 0 0;
-	color: var(--color-muted);
-	font-size: 0.85rem;
 }
 </style>

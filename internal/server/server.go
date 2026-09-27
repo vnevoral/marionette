@@ -89,6 +89,7 @@ func NewRouter(dependencies Dependencies) http.Handler {
 		routes.add(http.MethodGet, "/api/devices", accessHandler.listDevices)
 		routes.add(http.MethodPost, "/api/pairing/code", accessHandler.createPairingCode)
 		routes.add(http.MethodDelete, "/api/devices/{id}", accessHandler.removeDevice)
+		routes.add(http.MethodPatch, "/api/devices/{id}", accessHandler.renameDevice)
 	}
 	if dependencies.Store != nil {
 		eventSource := dependencies.Events

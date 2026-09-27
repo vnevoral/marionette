@@ -1,6 +1,7 @@
 import { expect, test, type Browser, type Page } from "@playwright/test";
 
-// Pairing and device management with access control on (FR-50..FR-55). The
+// Pairing and device management with access control on (FR-50..FR-55,
+// FR-57). The
 // suite's own browser stays paired; extra browsers are fresh contexts.
 
 /** A browser that was never paired: contexts inherit the project's saved
@@ -100,7 +101,7 @@ test("a pairing link fills the code in", async ({ page, browser, baseURL }) => {
 	// Removing the device you are using signs it out.
 	await other.goto("/devices");
 	const own = other.locator(".device-row").filter({ hasText: "This device" });
-	await own.getByRole("button").click();
+	await own.getByRole("button", { name: /^Remove device / }).click();
 	const dialog = other.getByRole("alertdialog");
 	await expect(dialog).toContainText("This is the device you are using");
 	await dialog.getByRole("button", { name: "Remove device" }).click();
@@ -109,5 +110,51 @@ test("a pairing link fills the code in", async ({ page, browser, baseURL }) => {
 		other.getByRole("alert").filter({ hasText: "This device was removed" }),
 	).toBeVisible();
 	expect((await context.request.get("/api/cards")).status()).toBe(401);
+	await context.close();
+});
+
+test("a browser renames itself and the new name survives a reload", async ({
+	page,
+	browser,
+	baseURL,
+}) => {
+	// A separate browser, so the suite's own "E2E browser" keeps its name.
+	const code = await codeFromDevicesPage(page);
+	const context = await freshBrowser(browser, baseURL!);
+	const other = await context.newPage();
+	await pairWithCode(other, code, "Suggested name");
+
+	await other.goto("/devices");
+	const own = other.locator(".device-row").filter({ hasText: "This device" });
+	await own.getByRole("button", { name: "Rename Suggested name" }).click();
+	// While editing, the row shows the field in place of the name and tag.
+	const field = other.getByLabel("Device name");
+	await expect(field).toHaveValue("Suggested name");
+	await field.fill("   ");
+	await field.press("Enter");
+	await expect(other.getByText("Device name is required")).toBeVisible();
+	await field.fill("Renamed browser");
+	await field.press("Enter");
+	await expect(other.getByText('"Renamed browser" saved.')).toBeVisible();
+	await expect(other.getByLabel("Device name")).toHaveCount(0);
+	await expect(own).toContainText("Renamed browser");
+
+	await other.reload();
+	await expect(other.locator(".device-row").filter({ hasText: "This device" })).toContainText(
+		"Renamed browser",
+	);
+	// Every paired device sees the new name.
+	await page.goto("/devices");
+	await expect(page.locator(".device-row").filter({ hasText: "Renamed browser" })).toBeVisible();
+	await expect(page.locator(".device-row").filter({ hasText: "Suggested name" })).toHaveCount(0);
+
+	// Clean up: the renamed browser removes itself.
+	await other
+		.locator(".device-row")
+		.filter({ hasText: "This device" })
+		.getByRole("button", { name: "Remove device Renamed browser" })
+		.click();
+	await other.getByRole("alertdialog").getByRole("button", { name: "Remove device" }).click();
+	await expect(other).toHaveURL(/\/pair/);
 	await context.close();
 });

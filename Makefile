@@ -5,8 +5,12 @@ DEV_CONFIG := ./marionette.json
 DEV_FIXTURE := deploy/dev-fixture.json
 VERSION ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo dev)
 LDFLAGS := -X main.version=$(VERSION)
+# Release version from the tag on HEAD; expanded only by release-arm64, which
+# checks it first (the stderr hint is printed by that check).
+override RELEASE_VERSION = $(shell bash deploy/release_version.sh 2>/dev/null)
+override RELEASE_ARCHIVE = $(APP_NAME)-$(RELEASE_VERSION)-linux-arm64.tar.gz
 
-.PHONY: ui-install ui-build ui-dev ui-lint ui-test deploy-test e2e dev-config backend-run backend-dev build build-arm64 release-arm64 test lint verify clean
+.PHONY: ui-install ui-build ui-dev ui-lint ui-test deploy-test release-test e2e dev-config backend-run backend-dev build build-arm64 release-arm64 test lint verify clean
 
 ## Install UI dependencies
 ui-install:
@@ -50,16 +54,27 @@ build-arm64: ui-build
 	mkdir -p bin
 	CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build -ldflags "$(LDFLAGS)" -o bin/$(APP_NAME)-linux-arm64 ./cmd/marionette
 
-## Build and package the linux/arm64 release with systemd installation files
-release-arm64: build-arm64
-	tar -czf bin/$(APP_NAME)-linux-arm64.tar.gz \
+## Build and package the linux/arm64 release with systemd installation files.
+## The version comes only from the vMAJOR.MINOR.PATCH tag on a clean HEAD
+## (deploy/release_version.sh); VERSION or RELEASE_VERSION overrides are
+## ignored on purpose, so a release always matches its tag.
+release-arm64:
+	@bash deploy/release_version.sh >/dev/null
+	$(MAKE) --no-print-directory build-arm64 VERSION=$(RELEASE_VERSION)
+	tar -czf bin/$(RELEASE_ARCHIVE) \
 		-C bin $(APP_NAME)-linux-arm64 \
 		-C ../deploy marionette.service marionette.default marionette.example.json install.sh
+	cd bin && sha256sum $(RELEASE_ARCHIVE) >$(RELEASE_ARCHIVE).sha256
 
 ## Staged test of the installer against the systemd unit (no root, no systemd)
 deploy-test:
 	bash -n deploy/install.sh
 	bash deploy/install_test.sh
+
+## Test of the release version rule (tag vMAJOR.MINOR.PATCH on a clean HEAD)
+release-test:
+	bash -n deploy/release_version.sh
+	bash deploy/release_version_test.sh
 
 ## End-to-end tests: real binary with the embedded SPA in headless Chromium
 ## (Playwright). Needs `npx playwright install chromium` once; not part of
@@ -67,8 +82,9 @@ deploy-test:
 e2e: build
 	cd web && npx playwright test
 
-## Run all automated tests (UI unit tests, installer, then Go with the race detector)
-test: ui-test deploy-test
+## Run all automated tests (UI unit tests, installer, release version, then Go
+## with the race detector)
+test: ui-test deploy-test release-test
 	go test -race -count=1 ./...
 
 ## Run all linters and format checks (Go + UI)

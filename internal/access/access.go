@@ -38,7 +38,7 @@ const (
 	MaxCodeAttempts = 5
 	// CodeLength is the number of characters of a pairing code.
 	CodeLength = 8
-	// MaxDeviceNameLength limits the name given at pairing.
+	// MaxDeviceNameLength limits the name given at pairing or renaming.
 	MaxDeviceNameLength = 64
 	// seenPersistInterval bounds how often the last use of a device is
 	// written to disk (and its cookie renewed), to spare SD cards.
@@ -54,7 +54,7 @@ var (
 	// ErrInvalidCode covers a wrong, expired, used or exhausted pairing code;
 	// callers show one message for all of them.
 	ErrInvalidCode = errors.New("the pairing code is invalid or has expired")
-	// ErrDeviceNotFound is returned when removing an unknown device.
+	// ErrDeviceNotFound is returned when removing or renaming an unknown device.
 	ErrDeviceNotFound = errors.New("device not found")
 	// ErrInvalidName is returned for an empty or too long device name.
 	ErrInvalidName = fmt.Errorf("device name is required and must be at most %d characters", MaxDeviceNameLength)
@@ -343,6 +343,31 @@ func (registry *Registry) Remove(id string) error {
 		return err
 	}
 	return nil
+}
+
+// Rename changes the name of a paired device (FR-57) and saves it at once.
+// The name is validated like at pairing; the token and the times stay
+// unchanged. An unknown or expired device is ErrDeviceNotFound.
+func (registry *Registry) Rename(id, name string) (Device, error) {
+	name = strings.TrimSpace(name)
+	if name == "" || utf8.RuneCountInString(name) > MaxDeviceNameLength {
+		return Device{}, ErrInvalidName
+	}
+	registry.mu.Lock()
+	defer registry.mu.Unlock()
+	registry.dropExpiredLocked(registry.now())
+	device, found := registry.devices[id]
+	if !found {
+		return Device{}, ErrDeviceNotFound
+	}
+	previous := device.Name
+	device.Name = name
+	if err := registry.saveLocked(); err != nil && !errors.Is(err, fsutil.ErrDirectorySync) {
+		device.Name = previous
+		return Device{}, err
+	}
+	registry.logger.Info("renamed paired device", "device", id, "name", name)
+	return *device, nil
 }
 
 // Save writes the devices, including the last use kept in memory (called at

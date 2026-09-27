@@ -17,6 +17,7 @@ import {
 	listDevices,
 	pairDevice,
 	removeDevice,
+	renameDevice,
 	setUnauthorizedHandler,
 	updateCard,
 	type ActionCard,
@@ -361,6 +362,24 @@ describe("access API", () => {
 		[url, init] = fetchMock.mock.calls.at(-1)!;
 		expect(url).toBe("/api/devices/a%2Fb");
 		expect(init?.method).toBe("DELETE");
+	});
+
+	it("renames a device with PATCH and exposes a rejected name as a field error", async () => {
+		const renamed = { ...device, name: "Work laptop" };
+		fetchMock.mockResolvedValueOnce(jsonResponse(200, { device: renamed }));
+		await expect(renameDevice("a/b", "Work laptop")).resolves.toEqual(renamed);
+		const [url, init] = fetchMock.mock.calls.at(-1)!;
+		expect(url).toBe("/api/devices/a%2Fb");
+		expect(init?.method).toBe("PATCH");
+		expect((init?.headers as Record<string, string>)["Content-Type"]).toBe("application/json");
+		expect(JSON.parse(String(init?.body))).toEqual({ name: "Work laptop" });
+
+		fetchMock.mockResolvedValueOnce(
+			jsonResponse(422, { error: "name required", fields: { name: "name required" } }),
+		);
+		const failure = await renameDevice("d1", " ").catch((error: unknown) => error);
+		expect(failure).toBeInstanceOf(ApiError);
+		expect((failure as ApiError).fields).toEqual({ name: "name required" });
 	});
 
 	it("reports a 401 from the API to the handler, but not from session or pairing", async () => {

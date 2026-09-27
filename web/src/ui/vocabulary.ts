@@ -72,6 +72,7 @@ export const FEEDBACK = {
 	unableToPair: "Unable to pair this device",
 	unableToLoadDevices: "Unable to load devices",
 	unableToRemoveDevice: "Unable to remove device",
+	unableToRenameDevice: "Unable to rename device",
 	unableToCreateCode: "Unable to create a pairing code",
 	deleting: "Deleting card...",
 	unableToQueue: "Unable to queue action",
@@ -136,4 +137,9 @@ export const ACCESS = {
 			: `Remove "${name}"? It will need a new pairing code to open Marionette again.`,
 	nowPaired: (name: string) => `"${name}" is now paired.`,
 	removed: (name: string) => `"${name}" was removed.`,
+	rename: "Rename",
+	renameDevice: (name: string) => `Rename ${name}`,
+	saveName: "Save",
+	nameRequired: "Device name is required",
+	renamed: (name: string) => `"${name}" saved.`,
 } as const;

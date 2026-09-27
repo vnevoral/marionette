@@ -7,7 +7,8 @@ Na každý push a pull request:
 1. **backend** — `golangci-lint` (verze připnutá shodně s devcontainerem,
    konfigurace `.golangci.yml`), `go build ./...`, `go vet ./...`,
    `go test -race -count=1 ./...` na linux/amd64, `bash -n` a staged test
-   instalačního skriptu (`deploy/install_test.sh`).
+   instalačního skriptu (`deploy/install_test.sh`) a test pravidla verze
+   releasu (`deploy/release_version_test.sh`).
 2. **web** — `npm ci`, `npm audit --omit=dev --audit-level=high`,
    `npm run lint` (`--max-warnings 0`), `npm run format:check`,
    `npm run build` (zahrnuje type-check přes `vue-tsc`) ve `web/`. Verze Node
@@ -23,18 +24,46 @@ mergem do hlavní větve. Dependabot (`.github/dependabot.yml`) otevírá týden
 PR pro Go moduly, npm a GitHub Actions; major verze klíčových UI závislostí
 jsou vyloučené (ADR-0003, ADR-0010).
 
-## Release proces (cílový stav, viz roadmapa fáze 7)
+## Release proces (ověřeno na Raspberry Pi 2026-09-26, fáze 7)
 
-1. `make release-arm64` vyprodukuje archiv
-   `bin/marionette-linux-arm64.tar.gz` s binárkou a instalačními soubory.
-2. Archiv se nahraje na cílový Linux host; referenční ověření probíhá na
-   Raspberry Pi ARM64 s Ubuntu 24.x.
-3. Po rozbalení se spustí `sudo ./install.sh ./marionette-linux-arm64`.
+### Verzování releasů (blok 0051)
+
+Každý release má verzi `vMAJOR.MINOR.PATCH` z git tagu (první release je
+`v1.0.0`):
+
+- **PATCH** — opravy chyb bez změny chování konfigurace, API a instalace;
+- **MINOR** — nová funkčnost, která je zpětně kompatibilní (včetně nových
+  volitelných položek konfigurace a nových endpointů API);
+- **MAJOR** — nekompatibilní změna konfigurace, API nebo instalačního
+  postupu.
+
+Tag vytváří a pushuje vlastník projektu. `make release-arm64` přebírá verzi
+výhradně z tagu tvaru `vMAJOR.MINOR.PATCH` přesně na `HEAD`
+(`deploy/release_version.sh`) a odmítne sestavit release, pokud `HEAD`
+takový tag nemá nebo pracovní strom obsahuje necommitnuté změny (včetně
+nesledovaných souborů). Ruční přepsání `VERSION=… make release-arm64` se
+ignoruje. Vývojové buildy (`make build`, `make build-arm64`) omezení nemají
+a verzi berou z `git describe`.
+
+### Postup
+
+1. Na čistém stromu vytvořit tag: `git tag -a vX.Y.Z -m "…"`.
+2. `make release-arm64` vyprodukuje archiv
+   `bin/marionette-vX.Y.Z-linux-arm64.tar.gz` s binárkou
+   (`marionette-linux-arm64`) a instalačními soubory a vedle něj
+   `bin/marionette-vX.Y.Z-linux-arm64.tar.gz.sha256`.
+3. `git push origin vX.Y.Z`.
+4. Archiv i `.sha256` se nahrají na cílový Linux host; referenční ověření
+   probíhá na Raspberry Pi ARM64 s Ubuntu 24.x. V adresáři s oběma soubory
+   se integrita ověří `sha256sum -c marionette-vX.Y.Z-linux-arm64.tar.gz.sha256`.
+5. Po rozbalení se spustí `sudo ./install.sh ./marionette-linux-arm64`.
    Skript nainstaluje unit, zachová existující konfiguraci a provede
    `systemctl enable` + start/restart služby.
-4. Aktualizace používá stejný skript s novou binárkou. Rollback používá
+6. Nasazená verze se ověří přes `curl -s http://localhost:8080/api/health`
+   (pole `version` musí odpovídat tagu).
+7. Aktualizace používá stejný skript s novou binárkou. Rollback používá
    předchozí binárku a nemaže `/var/lib/marionette/marionette.json`.
-5. Žádný krok nevyžaduje instalaci Go, Node.js ani jiného runtime na cíli.
+8. Žádný krok nevyžaduje instalaci Go, Node.js ani jiného runtime na cíli.
 
 ## Verzování závislostí
 

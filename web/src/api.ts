@@ -334,6 +334,16 @@ export function listDevices(): Promise<Device[]> {
 	return request<Device[]>("/api/devices");
 }
 
+/** Renames a paired device (FR-57); a 422 carries the message in `fields.name`. */
+export async function renameDevice(id: string, name: string): Promise<Device> {
+	const renamed = await request<{ device: Device }>(`/api/devices/${encodeURIComponent(id)}`, {
+		method: "PATCH",
+		headers: { "Content-Type": "application/json" },
+		body: JSON.stringify({ name }),
+	});
+	return renamed.device;
+}
+
 export function removeDevice(id: string): Promise<void> {
 	return request<void>(`/api/devices/${encodeURIComponent(id)}`, {
 		method: "DELETE",

@@ -105,6 +105,7 @@ var protectedRoutes = []struct{ method, path string }{
 	{http.MethodGet, "/api/devices"},
 	{http.MethodPost, "/api/pairing/code"},
 	{http.MethodDelete, "/api/devices/some-id"},
+	{http.MethodPatch, "/api/devices/some-id"},
 	{http.MethodGet, "/api/unknown"},
 }
 
@@ -346,6 +347,97 @@ func TestPairedDeviceUsesTheAPIAndManagesDevices(t *testing.T) {
 	}
 	if response := fixture.do(http.MethodGet, "/api/cards", "", laptop); response.Code != http.StatusUnauthorized {
 		t.Fatalf("after signing out = %d, want 401", response.Code)
+	}
+}
+
+func TestPairedDeviceRenamesDevices(t *testing.T) {
+	fixture := newAccessFixture(t, CookieSecureAuto)
+	laptop := fixture.pairDevice(t, "Laptop")
+	fixture.pairDevice(t, "Phone")
+
+	list := fixture.do(http.MethodGet, "/api/devices", "", laptop)
+	var devices []deviceView
+	if err := json.Unmarshal(list.Body.Bytes(), &devices); err != nil || len(devices) != 2 {
+		t.Fatalf("devices = %s", list.Body.String())
+	}
+	ids := map[string]string{}
+	for _, device := range devices {
+		ids[device.Name] = device.ID
+	}
+
+	type renamed struct {
+		ID         string    `json:"id"`
+		Name       string    `json:"name"`
+		PairedAt   time.Time `json:"pairedAt"`
+		LastSeenAt time.Time `json:"lastSeenAt"`
+		Current    bool      `json:"current"`
+		TokenHash  string    `json:"tokenHash"`
+	}
+	own := fixture.do(http.MethodPatch, "/api/devices/"+ids["Laptop"], `{"name":"  Work laptop "}`, laptop)
+	var ownBody struct {
+		Device renamed `json:"device"`
+	}
+	if err := json.Unmarshal(own.Body.Bytes(), &ownBody); own.Code != http.StatusOK || err != nil {
+		t.Fatalf("rename own device = %d %s", own.Code, own.Body.String())
+	}
+	if device := ownBody.Device; device.ID != ids["Laptop"] || device.Name != "Work laptop" || !device.Current || device.TokenHash != "" ||
+		device.PairedAt.IsZero() || device.LastSeenAt.IsZero() {
+		t.Fatalf("renamed own device = %s", own.Body.String())
+	}
+	other := fixture.do(http.MethodPatch, "/api/devices/"+ids["Phone"], `{"name":"Kitchen phone"}`, laptop)
+	var otherBody struct {
+		Device renamed `json:"device"`
+	}
+	if err := json.Unmarshal(other.Body.Bytes(), &otherBody); other.Code != http.StatusOK || err != nil ||
+		otherBody.Device.Name != "Kitchen phone" || otherBody.Device.Current {
+		t.Fatalf("rename other device = %d %s", other.Code, other.Body.String())
+	}
+	if len(other.Result().Cookies()) != 0 {
+		t.Fatal("renaming set a cookie")
+	}
+	if !strings.Contains(fixture.logs.String(), "renamed paired device") {
+		t.Fatalf("rename log = %s", fixture.logs.String())
+	}
+	after := fixture.do(http.MethodGet, "/api/devices", "", laptop).Body.String()
+	if !strings.Contains(after, `"Work laptop"`) || !strings.Contains(after, `"Kitchen phone"`) {
+		t.Fatalf("devices after renaming = %s", after)
+	}
+
+	invalid := fixture.do(http.MethodPatch, "/api/devices/"+ids["Phone"], `{"name":"   "}`, laptop)
+	var invalidBody struct {
+		Error  string            `json:"error"`
+		Fields map[string]string `json:"fields"`
+	}
+	if err := json.Unmarshal(invalid.Body.Bytes(), &invalidBody); invalid.Code != http.StatusUnprocessableEntity || err != nil ||
+		invalidBody.Fields["name"] == "" || invalidBody.Error == "" {
+		t.Fatalf("blank name = %d %s", invalid.Code, invalid.Body.String())
+	}
+	long := fixture.do(http.MethodPatch, "/api/devices/"+ids["Phone"], `{"name":"`+strings.Repeat("x", access.MaxDeviceNameLength+1)+`"}`, laptop)
+	if long.Code != http.StatusUnprocessableEntity || !strings.Contains(long.Body.String(), `"fields"`) {
+		t.Fatalf("too long name = %d %s", long.Code, long.Body.String())
+	}
+	if unknown := fixture.do(http.MethodPatch, "/api/devices/unknown", `{"name":"Phone"}`, laptop); unknown.Code != http.StatusNotFound {
+		t.Fatalf("rename unknown device = %d %s", unknown.Code, unknown.Body.String())
+	}
+	if malformed := fixture.do(http.MethodPatch, "/api/devices/"+ids["Phone"], `{"name":"Phone","extra":1}`, laptop); malformed.Code != http.StatusBadRequest {
+		t.Fatalf("unknown field = %d %s", malformed.Code, malformed.Body.String())
+	}
+	if response := fixture.do(http.MethodPatch, "/api/devices/"+ids["Phone"], `{"name":"Phone"}`, nil); response.Code != http.StatusUnauthorized {
+		t.Fatalf("rename without a device = %d, want 401", response.Code)
+	}
+
+	// Renaming stays subject to the cross-site protection (NFR-12).
+	request := httptest.NewRequest(http.MethodPatch, "/api/devices/"+ids["Phone"], strings.NewReader(`{"name":"Evil"}`))
+	request.Header.Set("Content-Type", "application/json")
+	request.Header.Set("Origin", "https://evil.example")
+	request.AddCookie(laptop)
+	response := httptest.NewRecorder()
+	fixture.handler.ServeHTTP(response, request)
+	if response.Code != http.StatusForbidden {
+		t.Fatalf("cross-site rename = %d, want 403", response.Code)
+	}
+	if strings.Contains(fixture.do(http.MethodGet, "/api/devices", "", laptop).Body.String(), "Evil") {
+		t.Fatal("a cross-site request renamed a device")
 	}
 }
 

@@ -3,7 +3,14 @@ import { flushPromises, mount } from "@vue/test-utils";
 import { h } from "vue";
 import { createMemoryHistory, createRouter } from "vue-router";
 import PrimeVue from "primevue/config";
-import { createPairingCode, listDevices, removeDevice, type Device } from "@/api";
+import {
+	ApiError,
+	createPairingCode,
+	listDevices,
+	removeDevice,
+	renameDevice,
+	type Device,
+} from "@/api";
 import { setSession, useSession } from "@/composables/useSession";
 import { fakeConfirm } from "@/test/fakeConfirm";
 import { fakeToast } from "@/test/fakeToast";
@@ -16,6 +23,7 @@ vi.mock("@/api", async (importOriginal) => {
 		listDevices: vi.fn(),
 		createPairingCode: vi.fn(),
 		removeDevice: vi.fn(),
+		renameDevice: vi.fn(),
 	};
 });
 
@@ -54,6 +62,7 @@ describe("DevicesView", () => {
 		vi.mocked(listDevices).mockReset().mockResolvedValue([laptop, phone]);
 		vi.mocked(createPairingCode).mockReset();
 		vi.mocked(removeDevice).mockReset().mockResolvedValue(undefined);
+		vi.mocked(renameDevice).mockReset();
 	});
 
 	afterEach(() => {
@@ -67,13 +76,16 @@ describe("DevicesView", () => {
 		expect(rows[0].find(".p-tag").text()).toBe("This device");
 		expect(rows[1].find(".p-tag").exists()).toBe(false);
 		expect(wrapper.text()).toContain("not used for 30 days must pair again");
-		expect(rows[1].find("button").attributes("aria-label")).toBe("Remove device Phone");
+		expect(rows[1].find(".device-remove-button").attributes("aria-label")).toBe(
+			"Remove device Phone",
+		);
+		expect(rows[1].find(".device-rename-button").attributes("aria-label")).toBe("Rename Phone");
 		wrapper.unmount();
 	});
 
 	it("removes another device after confirmation and says so inline", async () => {
 		const { wrapper, confirm, toast } = await mountDevices();
-		await wrapper.findAll(".device-row")[1].find("button").trigger("click");
+		await wrapper.findAll(".device-row")[1].find(".device-remove-button").trigger("click");
 		expect(confirm.last().message).toContain('"Phone"');
 		expect(removeDevice).not.toHaveBeenCalled();
 		confirm.last().accept?.();
@@ -87,7 +99,7 @@ describe("DevicesView", () => {
 
 	it("removing this device signs it out and moves to the pairing screen", async () => {
 		const { wrapper, router, confirm, toast } = await mountDevices();
-		await wrapper.findAll(".device-row")[0].find("button").trigger("click");
+		await wrapper.findAll(".device-row")[0].find(".device-remove-button").trigger("click");
 		expect(confirm.last().message).toContain("This is the device you are using");
 		confirm.last().accept?.();
 		await flushPromises();
@@ -95,6 +107,83 @@ describe("DevicesView", () => {
 		expect(useSession().value.status).toBe("unpaired");
 		expect(router.currentRoute.value.path).toBe("/pair");
 		expect(toast.summaries()).toEqual(["This device was removed"]);
+		wrapper.unmount();
+	});
+
+	it("renames a device in place and confirms inline", async () => {
+		vi.mocked(renameDevice).mockResolvedValue({ ...phone, name: "Kitchen phone" });
+		const { wrapper, toast } = await mountDevices();
+		await wrapper.findAll(".device-row")[1].find(".device-rename-button").trigger("click");
+		const input = wrapper.find<HTMLInputElement>(".device-rename input");
+		expect(wrapper.find(".device-rename label").text()).toBe("Device name");
+		expect(input.element.value).toBe("Phone");
+		expect(input.attributes("maxlength")).toBe("64");
+		await input.setValue("  Kitchen phone ");
+		await wrapper.find(".device-rename").trigger("submit");
+		await flushPromises();
+		expect(renameDevice).toHaveBeenCalledWith("d2", "Kitchen phone");
+		expect(wrapper.find(".device-rename").exists()).toBe(false);
+		const names = wrapper.findAll(".device-row").map((row) => row.find(".device-name span").text());
+		expect(names).toEqual(["Laptop", "Kitchen phone"]);
+		expect(wrapper.find(".request-feedback").text()).toBe('"Kitchen phone" saved.');
+		expect(toast.add).not.toHaveBeenCalled();
+		wrapper.unmount();
+	});
+
+	it("keeps the session in step when this device is renamed", async () => {
+		vi.mocked(renameDevice).mockResolvedValue({ ...laptop, name: "Work laptop" });
+		const { wrapper } = await mountDevices();
+		await wrapper.findAll(".device-row")[0].find(".device-rename-button").trigger("click");
+		await wrapper.find(".device-rename input").setValue("Work laptop");
+		await wrapper.find(".device-rename input").trigger("keydown", { key: "Enter" });
+		await flushPromises();
+		expect(renameDevice).toHaveBeenCalledWith("d1", "Work laptop");
+		const session = useSession().value;
+		expect(session.status === "paired" && session.device.name).toBe("Work laptop");
+		wrapper.unmount();
+	});
+
+	it("cancels renaming with the button or Escape without saving", async () => {
+		const { wrapper } = await mountDevices();
+		const row = () => wrapper.findAll(".device-row")[1];
+		await row().find(".device-rename-button").trigger("click");
+		await row().find(".device-rename input").setValue("Something else");
+		const cancel = row()
+			.findAll("button")
+			.find((button) => button.text() === "Cancel")!;
+		await cancel.trigger("click");
+		expect(row().find(".device-rename").exists()).toBe(false);
+		expect(row().find(".device-name span").text()).toBe("Phone");
+
+		await row().find(".device-rename-button").trigger("click");
+		expect(row().find<HTMLInputElement>(".device-rename input").element.value).toBe("Phone");
+		await row().find(".device-rename input").setValue("Other");
+		await row().find(".device-rename input").trigger("keydown", { key: "Escape" });
+		expect(row().find(".device-rename").exists()).toBe(false);
+		expect(row().find(".device-name span").text()).toBe("Phone");
+		expect(renameDevice).not.toHaveBeenCalled();
+		wrapper.unmount();
+	});
+
+	it("shows a rejected name under the field and keeps editing", async () => {
+		const message = "device name is required and must be at most 64 characters";
+		vi.mocked(renameDevice).mockRejectedValue(new ApiError(message, 422, { name: message }));
+		const { wrapper } = await mountDevices();
+		await wrapper.findAll(".device-row")[1].find(".device-rename-button").trigger("click");
+		const input = wrapper.find(".device-rename input");
+		await input.setValue("x".repeat(64));
+		await input.trigger("keydown", { key: "Enter" });
+		await flushPromises();
+		const error = wrapper.find(".device-rename .field-error");
+		expect(error.text()).toBe(message);
+		expect(input.attributes("aria-invalid")).toBe("true");
+		expect(input.attributes("aria-describedby")).toBe(error.attributes("id"));
+		expect(wrapper.find(".request-feedback").exists()).toBe(false);
+
+		await input.setValue("   ");
+		await input.trigger("keydown", { key: "Enter" });
+		expect(renameDevice).toHaveBeenCalledTimes(1);
+		expect(wrapper.find(".device-rename .field-error").text()).toBe("Device name is required");
 		wrapper.unmount();
 	});
 

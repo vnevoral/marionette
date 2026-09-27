@@ -12,6 +12,7 @@ import {
 	getStatus,
 	getStatusHistory,
 	type ActionCard,
+	type Run,
 	type StatusSnapshot,
 } from "@/api";
 import CardDetailView from "@/views/CardDetailView.vue";
@@ -114,6 +115,21 @@ async function mountDetail(id: string) {
 	return { wrapper, router, confirm, toast };
 }
 
+function run(startedAt: string): Run {
+	return {
+		actionKind: "primary",
+		startedAt,
+		duration: 1,
+		exitCode: 0,
+		output: "",
+		truncated: false,
+		outcome: "ok",
+	};
+}
+
+const oldRun = run(before);
+const newRun = run(after);
+
 describe("CardDetailView", () => {
 	beforeEach(() => {
 		FakeEventSource.reset();
@@ -166,8 +182,10 @@ describe("CardDetailView", () => {
 		expect(buttonByLabel(wrapper, "Run action").attributes("disabled")).toBeUndefined();
 		expect(buttonByLabel(wrapper, "Check status").attributes("disabled")).toBeUndefined();
 		expect(wrapper.text()).toContain("Problem");
-		expect(getRuns).toHaveBeenCalledTimes(2);
+		// History follows the check; runs are re-read at the card's fast
+		// polling interval until the new run appears (block 0050).
 		expect(getStatusHistory).toHaveBeenCalledTimes(2);
+		expect(getRuns).toHaveBeenCalledTimes(1);
 		wrapper.unmount();
 		expect(FakeEventSource.last().closed).toBe(true);
 	});
@@ -254,7 +272,6 @@ describe("CardDetailView", () => {
 		await flushPromises();
 		expect(noteText(wrapper)).toBe("Action accepted");
 		expect(buttonByLabel(wrapper, "Run action").attributes("disabled")).toBeUndefined();
-		expect(getRuns).toHaveBeenCalledTimes(2);
 		wrapper.unmount();
 	});
 
@@ -338,5 +355,106 @@ describe("CardDetailView", () => {
 		} finally {
 			vi.useRealTimers();
 		}
+	});
+
+	describe("waiting for the run of an accepted primary action (block 0050)", () => {
+		beforeEach(() => {
+			vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout", "setInterval", "clearInterval"] });
+			vi.mocked(enqueuePrimary).mockResolvedValue({
+				cardId: "lamp",
+				actionKind: "primary",
+				status: "accepted",
+			});
+		});
+
+		afterEach(() => {
+			vi.useRealTimers();
+		});
+
+		// Steps through time so each read can schedule the next one.
+		async function advance(ms: number) {
+			for (let elapsed = 0; elapsed < ms; elapsed += 1000) {
+				vi.advanceTimersByTime(Math.min(1000, ms - elapsed));
+				await flushPromises();
+			}
+		}
+
+		it("re-reads the runs every 2 s until the new run appears", async () => {
+			vi.mocked(getRuns)
+				.mockResolvedValueOnce([oldRun])
+				.mockResolvedValueOnce([oldRun])
+				.mockResolvedValueOnce([newRun, oldRun]);
+			const { wrapper } = await mountDetail("lamp");
+			expect(wrapper.findAll(".run-row")).toHaveLength(1);
+
+			await buttonByLabel(wrapper, "Run action").trigger("click");
+			await flushPromises();
+			expect(getRuns).toHaveBeenCalledTimes(1);
+			await advance(2000);
+			expect(getRuns).toHaveBeenCalledTimes(2);
+			expect(wrapper.findAll(".run-row")).toHaveLength(1);
+			await advance(2000);
+			expect(getRuns).toHaveBeenCalledTimes(3);
+			expect(wrapper.findAll(".run-row")).toHaveLength(2);
+
+			await advance(10_000);
+			expect(getRuns).toHaveBeenCalledTimes(3);
+			wrapper.unmount();
+		});
+
+		it("uses the card's fast polling interval", async () => {
+			vi.mocked(getStatus).mockReset().mockResolvedValue(snapshot(before));
+			vi.mocked(getRuns).mockResolvedValue([]);
+			const { wrapper } = await mountDetail("printer");
+			await buttonByLabel(wrapper, "Run action").trigger("click");
+			await flushPromises();
+			await advance(9000);
+			expect(getRuns).toHaveBeenCalledTimes(1);
+			vi.mocked(getRuns).mockResolvedValue([newRun]);
+			await advance(1000);
+			expect(getRuns).toHaveBeenCalledTimes(2);
+			expect(wrapper.findAll(".run-row")).toHaveLength(1);
+			wrapper.unmount();
+		});
+
+		it("stops after the action timeout plus the queue margin", async () => {
+			vi.mocked(getRuns).mockResolvedValue([oldRun]);
+			const { wrapper } = await mountDetail("lamp");
+			await buttonByLabel(wrapper, "Run action").trigger("click");
+			await flushPromises();
+			// Lamp: timeout 5 s + 30 s margin, one read every 2 s.
+			await advance(40_000);
+			const reads = vi.mocked(getRuns).mock.calls.length;
+			expect(reads).toBe(1 + 17);
+			await advance(10_000);
+			expect(getRuns).toHaveBeenCalledTimes(reads);
+			wrapper.unmount();
+		});
+
+		it("shows a failed read and keeps waiting", async () => {
+			vi.mocked(getRuns)
+				.mockResolvedValueOnce([oldRun])
+				.mockRejectedValueOnce(new Error("offline"))
+				.mockResolvedValueOnce([newRun, oldRun]);
+			const { wrapper } = await mountDetail("lamp");
+			await buttonByLabel(wrapper, "Run action").trigger("click");
+			await flushPromises();
+			await advance(2000);
+			expect(wrapper.text()).toContain("Run history is unavailable");
+			await advance(2000);
+			expect(wrapper.text()).not.toContain("Run history is unavailable");
+			expect(wrapper.findAll(".run-row")).toHaveLength(2);
+			wrapper.unmount();
+		});
+
+		it("ends the wait when the page is left", async () => {
+			vi.mocked(getRuns).mockResolvedValue([oldRun]);
+			const { wrapper } = await mountDetail("lamp");
+			await buttonByLabel(wrapper, "Run action").trigger("click");
+			await flushPromises();
+			wrapper.unmount();
+			await advance(10_000);
+			expect(getRuns).toHaveBeenCalledTimes(1);
+		});
 	});
 });

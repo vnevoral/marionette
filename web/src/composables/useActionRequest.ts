@@ -20,6 +20,8 @@ export interface ActionRequestOptions {
 	signal: AbortSignal;
 	/** Called with `queued` before the request and `running` once a check is awaited. */
 	onPhase(phase: PendingPhase): void;
+	/** Called once the server accepted the request (202). */
+	onAccepted?(): void;
 	/** Every snapshot seen while waiting, so the view can show it. */
 	onSnapshot?(snapshot: StatusSnapshot): void;
 	/** A failed REST read while waiting; the wait continues. */
@@ -38,7 +40,7 @@ export async function requestAction(
 	action: ActionKind,
 	options: ActionRequestOptions,
 ): Promise<ActionOutcome> {
-	const { signal, onPhase, onSnapshot, onError } = options;
+	const { signal, onPhase, onAccepted, onSnapshot, onError } = options;
 	onPhase("queued");
 	let baseline: string | undefined;
 	try {
@@ -53,6 +55,7 @@ export async function requestAction(
 		};
 	}
 	if (signal.aborted) return { kind: "aborted" };
+	onAccepted?.();
 	if (!expectsFollowUpCheck(card, action)) return { kind: "accepted" };
 	onPhase("running");
 	const result = await waitForNewerStatus(card.id, baseline, {

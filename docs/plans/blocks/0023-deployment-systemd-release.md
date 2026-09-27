@@ -3,7 +3,7 @@
 - **Fáze**: 7 — Balíčkování a nasazení
 - **Vazba na požadavky**: FR-01..FR-04, NFR-02
 - **Vazba na ADR**: ADR-0002
-- **Stav**: Probíhá
+- **Stav**: Hotovo
 - **Závislosti**: Bloky 0001–0022, existující `make build-arm64`
 
 ## Cílové prostředí
@@ -91,7 +91,7 @@ Viz [Definition of Done](../../devops/definition-of-done.md) +:
 
 ## Uzavření
 
-- **Stav po implementaci**: Probíhá
+- **Stav po implementaci**: Hotovo (2026-09-26)
 - **Ověření**: `make release-arm64`, `go build ./...`, `go vet ./...`,
   `go test ./... -count=1`, `bash -n deploy/install.sh` a `git diff --check`
   prošly. Archiv obsahuje binárku, unit, default konfiguraci, JSON šablonu a
@@ -127,7 +127,14 @@ Viz [Definition of Done](../../devops/definition-of-done.md) +:
   devcontaineru) nemá, a bez něj se tiše přeskočila; nahrazeno kontrolou
   ELF hlavičky (`7f 45 4c 46`) bez závislostí. Kontrola architektury proti
   hostu zůstává mimo (chybný artefakt se projeví při startu služby).
-- **Zbývá ověřit na referenčním Ubuntu 24.x ARM64 hostu**: skutečné
+- **Ověřeno na referenčním Ubuntu 24.x ARM64 hostu (Raspberry Pi,
+  2026-09-26)**: vlastník projektu nainstaloval release archiv z commitu
+  `25a0094` (`make release-arm64`, SHA-256
+  `8bea40a8…6a623b`) a podle kontrolního seznamu ověřil instalaci,
+  `/api/health` s verzí, `systemctl restart`, `Restart=on-failure` po
+  `kill -9`, náběh po rebootu a kartu WoL + ping ve stavu **Healthy**;
+  vše funguje. Podrobné výstupy příkazů nebyly zaznamenány.
+- **Původně zbývalo ověřit na hostu**: skutečné
   `systemctl enable/start/stop/restart`, `Restart=on-failure` po zabití
   procesu, náběh po rebootu, běh ARM64 artefaktu a chování hardening
   direktiv (`ProtectSystem=strict`, `ReadWritePaths`) s reálným systemd.
