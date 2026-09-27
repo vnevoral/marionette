@@ -9,7 +9,7 @@
 
 ## Goal
 
-Today the release version is the commit hash (`25a0094`), because the
+Today the release version is the commit hash (`9bb21bf`), because the
 repository has no tag; neither `/api/health` nor the archive name tells
 which version it is and whether it is newer. After this block every
 release has a `vMAJOR.MINOR.PATCH` version from a git tag, the archive

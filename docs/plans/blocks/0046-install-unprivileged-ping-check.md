@@ -92,7 +92,7 @@ See [Definition of Done](../../devops/definition-of-done.md) plus:
   file → no hint, existing user `root` with range
   `1 2147483647` → hint). `shellcheck` is not available in the
   environment. `make verify` passed (including `install_test`). On the
-  reference Raspberry Pi (2026-09-26, release `25a0094`) the project
+  reference Raspberry Pi (2026-09-26, release `9bb21bf`) the project
   owner confirmed the installation and a working `ping` status action
   (WoL + ping card **Healthy**).
 - **Deviations from the plan**:

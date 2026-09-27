@@ -113,7 +113,7 @@ See [Definition of Done](../../devops/definition-of-done.md) plus:
   package, without a running PID 1) passed with no findings. The service was
   started with the unit's environment (`runuser -u marionette`,
   `EnvironmentFile`, `WorkingDirectory`, `umask 077`): `GET /api/health`
-  → `{"status":"ok","version":"e68c28d"}`, SPA `lang="en"`, `POST /api/cards`
+  → `{"status":"ok","version":"472dae3"}`, SPA `lang="en"`, `POST /api/cards`
   with `Origin: https://evil.example` → 403, `Content-Type: text/plain` → 415,
   TLS proxy scenario (`Origin: https://pi.local`, `Host: pi.local`) → 201
   (block 0036), primary action → 202 and a record in `runs`,
@@ -140,7 +140,7 @@ See [Definition of Done](../../devops/definition-of-done.md) plus:
   artifact shows up when the service starts).
 - **Verified on the reference Ubuntu 24.x ARM64 host (Raspberry Pi,
   2026-09-26)**: the project owner installed the release archive from commit
-  `25a0094` (`make release-arm64`, SHA-256
+  `9bb21bf` (`make release-arm64`, SHA-256
   `8bea40a8…6a623b`) and, following the checklist, verified installation,
   `/api/health` with version, `systemctl restart`, `Restart=on-failure` after
   `kill -9`, startup after reboot and a WoL + ping card in the **Healthy**

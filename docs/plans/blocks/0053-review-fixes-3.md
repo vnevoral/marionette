@@ -8,7 +8,7 @@
 
 ## Goal
 
-Fix two findings from `/code-review` of commits `25a0094..ccd8191`:
+Fix two findings from `/code-review` of commits `9bb21bf..75552ea`:
 
 1. **Multi-line argument in the command editor** (`commandLine.ts`,
    `ActionEditor.vue`). The review reported that the parser rejects a line

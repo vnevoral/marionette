@@ -2,6 +2,8 @@
 /bin/
 /tmp/
 *.exe
+# Delve debug binaries written next to the package by VS Code
+__debug_bin*
 
 # Local dev configuration (created from deploy/dev-fixture.json by `make dev-config`)
 /marionette.json

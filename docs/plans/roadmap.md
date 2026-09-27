@@ -105,7 +105,7 @@ per the development workflow.
   `install.sh`), health, cross-site protection, graceful stop with history
   saved, restart with data preserved and repeated installation.
   On the reference Raspberry Pi (Ubuntu, ARM64) the project owner verified
-  release `25a0094` on 2026-09-26: installation, `systemctl` restart,
+  release `9bb21bf` on 2026-09-26: installation, `systemctl` restart,
   `Restart=on-failure`, startup after reboot and a WoL + ping card. Since
   2026-09-26 the installer has an automated staged test in `make test` and
   CI.
