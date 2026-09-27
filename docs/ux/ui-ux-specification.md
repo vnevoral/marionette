@@ -205,8 +205,10 @@ management views.
 ## 6. Card detail
 
 The detail header contains the card name, icon, current state, and last check.
-A card colour (FR-10a) is a 4 px stripe along the top of the icon tile, the
-same colour as the dashboard card; the header itself is not coloured.
+A card colour (FR-10a) is a stripe along the top edge of the **Current
+status** panel, drawn the same way and in the same colour as on the
+dashboard card; the header, the icon tile and the other panels are not
+coloured.
 The body contains:
 
 - **Summary**: current state, state duration, and last check with its

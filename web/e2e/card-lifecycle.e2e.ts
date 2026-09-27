@@ -80,10 +80,16 @@ test("colours a card with a stripe that keeps the card height", async ({ page, r
 		((await card.boundingBox())?.y ?? 0);
 	expect(await titleOffset(colored)).toBe(await titleOffset(plain));
 
-	// The detail shows the same colour on its icon tile (block 0055).
+	// The detail shows the same colour on the Current status panel (block 0062).
 	await colored.getByRole("link", { name: "View details" }).click();
 	await expect(page.getByRole("heading", { name: "Lamp A", level: 1 })).toBeVisible();
-	await expect(page.locator(".identity-tile")).toHaveAttribute("data-color", "teal");
+	const statusPanel = page.locator(".detail-panel").filter({
+		has: page.getByRole("heading", { name: "Current status" }),
+	});
+	await expect(statusPanel).toHaveAttribute("data-color", "teal");
+	await expect(statusPanel).toHaveCSS("border-top-color", "rgb(42, 157, 143)");
+	await expect(page.locator(".detail-panel[data-color]")).toHaveCount(1);
+	await expect(page.locator(".identity-tile")).not.toHaveAttribute("data-color");
 });
 
 test("runs actions from the dashboard", async ({ page, request }) => {

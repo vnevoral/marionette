@@ -17,6 +17,7 @@ import {
 	type StatusSnapshot,
 } from "@/api";
 import CardIdentityTile from "@/components/CardIdentityTile.vue";
+import DetailPanel from "@/components/DetailPanel.vue";
 import CardDetailView from "@/views/CardDetailView.vue";
 import { FEEDBACK } from "@/ui/vocabulary";
 import { fakeConfirm } from "@/test/fakeConfirm";
@@ -153,11 +154,13 @@ describe("CardDetailView", () => {
 		vi.unstubAllGlobals();
 	});
 
-	it("shows the card colour on the icon tile in the header", async () => {
+	it("shows the card colour on the Current status panel, not on the icon tile", async () => {
 		vi.mocked(getCard).mockResolvedValue({ ...cards.lamp, icon: "pi pi-bolt", color: "teal" });
 		const { wrapper } = await mountDetail("lamp");
-		const tile = wrapper.findComponent(CardIdentityTile);
-		expect(tile.props()).toEqual({ icon: "pi pi-bolt", color: "teal" });
+		expect(wrapper.findComponent(CardIdentityTile).props()).toEqual({ icon: "pi pi-bolt" });
+		const panels = wrapper.findAllComponents(DetailPanel);
+		const colored = panels.filter((panel) => panel.props("color") === "teal");
+		expect(colored.map((panel) => panel.props("title"))).toEqual(["Current status"]);
 		wrapper.unmount();
 	});
 

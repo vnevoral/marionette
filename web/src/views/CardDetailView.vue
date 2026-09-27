@@ -196,7 +196,7 @@ onBeforeUnmount(() => {
 				:back-label="ACTIONS.backToOverview"
 			>
 				<template #identity>
-					<CardIdentityTile :icon="card.icon" :color="card.color" />
+					<CardIdentityTile :icon="card.icon" />
 				</template>
 				<template #actions>
 					<Button v-slot="slotProps" as-child>
@@ -224,7 +224,7 @@ onBeforeUnmount(() => {
 
 			<section class="grid" aria-label="Card summary">
 				<div class="col-12 md:col-6 p-2">
-					<DetailPanel title="Current status">
+					<DetailPanel title="Current status" :color="card.color">
 						<template #badge><StatusBadge v-bind="badge" /></template>
 						<StatusSummary
 							:has-status="Boolean(card.status)"
