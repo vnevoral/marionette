@@ -4,7 +4,7 @@
 - **Requirements**: FR-42, FR-42a, NFR-11 (live updates), NFR-05
   (testability)
 - **ADRs**: ADR-0008 (SSE status event stream)
-- **Status**: Proposed
+- **Status**: Done
 - **Dependencies**: 0022 (SSE), 0027 (shutdown), 0058 (`run.recorded`)
 
 ## Goal
@@ -39,9 +39,10 @@ Out of scope:
 
 ## Approval
 
-- **Approved by**: pending
-- **Approval date**: pending
-- **Decision notes**: —
+- **Approved by**: project owner ("pokračuj" after the proposal of blocks
+  0060 and 0061)
+- **Approval date**: 2026-09-27
+- **Decision notes**: 0061 first, then 0060.
 
 ## Proposed solution
 
@@ -77,6 +78,22 @@ See [Definition of Done](../../devops/definition-of-done.md), plus:
 
 ## Closure
 
-- **Status after implementation**: —
-- **Verification**: —
-- **Documentation updated**: —
+- **Status after implementation**: Done (2026-09-27).
+- **Verification**:
+  - the new `TestStatusEventsSubscribeBeforeConnectedComment` (a fake
+    `EventSource` and a response writer record the order of `Subscribe` and
+    the first write) failed on the old handler with
+    `["write : connected" "subscribe"]` and passes after the fix;
+  - `go test -race -count=200 -cpu 1,2,4` of that test and
+    `TestNewRouterDoesNotMutateStoreAndStreamsBrokerEvents` passed (1 200
+    runs) with extra CPU load. The original CI failure could not be
+    reproduced locally even on the old code (600 runs), so the ordering
+    test, not the repetition, is the evidence of the fix;
+  - `TestRunShutsDownQuicklyWithOpenSSEClientAndSavesHistory` now allows
+    `ShutdownTimeout + 3 s` (5 s, still far below the 30 s action);
+    `-count=5` passed;
+  - `make verify` passed (Go race tests, lint, 206 Vitest tests);
+    `make e2e` passed (20 scenarios).
+- **Deviations from the plan**: none.
+- **Documentation updated**: ADR-0008 addendum "subscription before
+  `: connected`", roadmap.

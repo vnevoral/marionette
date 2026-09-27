@@ -342,8 +342,12 @@ func TestRunShutsDownQuicklyWithOpenSSEClientAndSavesHistory(t *testing.T) {
 	case <-time.After(10 * time.Second):
 		t.Fatal("run() did not return after the context was cancelled")
 	}
-	if elapsed := time.Since(started); elapsed > 3*time.Second {
-		t.Fatalf("shutdown took %s, want under 3s", elapsed)
+	// The budget is 2 s while the action sleeps 30 s and the SSE stream stays
+	// open: finishing well below 30 s proves shutdown waits for neither. The
+	// extra 3 s absorb scheduling delays on a loaded CI runner (block 0061).
+	limit := app.env.ShutdownTimeout + 3*time.Second
+	if elapsed := time.Since(started); elapsed > limit {
+		t.Fatalf("shutdown took %s, want under %s", elapsed, limit)
 	}
 	select {
 	case <-streamClosed:

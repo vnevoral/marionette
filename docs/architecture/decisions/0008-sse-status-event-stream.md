@@ -99,3 +99,15 @@ that is not written (an action canceled on service shutdown before it got a
 slot to run, or a card deleted during the run) does not create an event; a
 run interrupted while running is recorded as `canceled`.
 Events for enqueueing and starting an action are not introduced.
+
+## Addendum 2026-09-27: subscription before `: connected` (block 0061)
+
+> Addendum status: **Accepted** (2026-09-27, by approval of block 0061).
+
+The `/api/events` handler subscribes to the broker **before** it writes and
+flushes the `: connected` comment. A client that has received the comment
+therefore gets every event published after it; the REST reload the client
+performs when the stream opens cannot miss a change that happens meanwhile.
+Before this, a change published between the comment and the subscription
+was lost for that client. Replay of events published before the connection
+(`Last-Event-ID`) is still not provided.
