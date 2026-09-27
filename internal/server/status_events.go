@@ -27,6 +27,12 @@ func (api cardAPI) events(w http.ResponseWriter, request *http.Request) {
 		return
 	}
 
+	// Subscribe before the connected comment: a client that has seen it
+	// receives every later event, so nothing published between the comment
+	// and its REST reload is lost (block 0061).
+	subscriber, unsubscribe := api.eventSource.Subscribe()
+	defer unsubscribe()
+
 	w.Header().Set("Cache-Control", "no-cache")
 	w.Header().Set("Connection", "keep-alive")
 	w.Header().Set("Content-Type", "text/event-stream")
@@ -35,8 +41,6 @@ func (api cardAPI) events(w http.ResponseWriter, request *http.Request) {
 	_, _ = fmt.Fprint(w, ": connected\n\n")
 	flusher.Flush()
 
-	subscriber, unsubscribe := api.eventSource.Subscribe()
-	defer unsubscribe()
 	heartbeat := time.NewTicker(statusEventHeartbeat)
 	defer heartbeat.Stop()
 

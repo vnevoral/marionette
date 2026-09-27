@@ -94,6 +94,44 @@ func TestStatusEventsEndpointSetsSSEHeadersAndStopsWithRequest(t *testing.T) {
 	}
 }
 
+// orderingEventSource records when the handler subscribes, relative to the
+// first bytes written to the response.
+type orderingEventSource struct {
+	log *[]string
+}
+
+func (source orderingEventSource) Subscribe() (<-chan events.Event, func()) {
+	*source.log = append(*source.log, "subscribe")
+	return make(chan events.Event), func() {}
+}
+
+func (orderingEventSource) Done() <-chan struct{} { return nil }
+
+type orderingRecorder struct {
+	*httptest.ResponseRecorder
+	log *[]string
+}
+
+func (recorder orderingRecorder) Write(data []byte) (int, error) {
+	*recorder.log = append(*recorder.log, "write "+strings.TrimSpace(string(data)))
+	return recorder.ResponseRecorder.Write(data)
+}
+
+// A client that has read ": connected" must receive every later event, so
+// the handler subscribes before it writes the comment (block 0061).
+func TestStatusEventsSubscribeBeforeConnectedComment(t *testing.T) {
+	var log []string
+	store := config.NewStore(config.Settings{HistorySize: 5, MaxConcurrentActions: 1})
+	handler := NewRouter(Dependencies{Store: store, Events: orderingEventSource{log: &log}})
+	requestContext, cancel := context.WithCancel(context.Background())
+	cancel()
+	request := httptest.NewRequest(http.MethodGet, "/api/events", nil).WithContext(requestContext)
+	handler.ServeHTTP(orderingRecorder{ResponseRecorder: httptest.NewRecorder(), log: &log}, request)
+	if len(log) < 2 || log[0] != "subscribe" || log[1] != "write : connected" {
+		t.Fatalf("handler steps = %q, want subscribe before the connected comment", log)
+	}
+}
+
 func TestBrokerCloseEndsEventsHandler(t *testing.T) {
 	store := config.NewStore(config.Settings{HistorySize: 5, MaxConcurrentActions: 1})
 	broker := events.NewBroker()
