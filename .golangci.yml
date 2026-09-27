@@ -1,27 +1,23 @@
-# golangci-lint configuration (v1.61). `make lint` is the single entry point.
-run:
-  timeout: 3m
+# golangci-lint configuration (v2.14). `make lint` is the single entry point.
+version: "2"
 
 linters:
+  # The standard set: errcheck, govet, ineffassign, staticcheck, unused.
+  default: standard
   enable:
-    - errcheck
-    - gofumpt
-    - govet
-    - ineffassign
     - revive
-    - staticcheck
-    - unused
+  settings:
+    revive:
+      rules:
+        - name: exported
+          arguments:
+            # Only require documentation of exported names, not
+            # stutter-free names (settled in block 0034).
+            - "disableStutteringCheck"
 
-linters-settings:
-  gofumpt:
-    module-path: marionette
-  revive:
-    rules:
-      - name: exported
-        arguments:
-          # Naming of existing exported types is revised in block 0034; until
-          # then only require documentation, not stutter-free names.
-          - "disableStutteringCheck"
-
-issues:
-  exclude-use-default: false
+formatters:
+  enable:
+    - gofumpt
+  settings:
+    gofumpt:
+      module-path: marionette

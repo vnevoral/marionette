@@ -143,12 +143,8 @@ func TestRunRequiresAPairedDevice(t *testing.T) {
 	}
 	baseURL := "http://" + addr.String()
 
-	if response, err := http.Get(baseURL + "/api/cards"); err != nil || response.StatusCode != http.StatusUnauthorized {
-		t.Fatalf("GET /api/cards without a device = %v, %v", response, err)
-	}
-	if response, err := http.Get(baseURL + "/api/health"); err != nil || response.StatusCode != http.StatusOK {
-		t.Fatalf("GET /api/health = %v, %v", response, err)
-	}
+	expectStatus(t, http.DefaultClient, baseURL+"/api/cards", http.StatusUnauthorized)
+	expectStatus(t, http.DefaultClient, baseURL+"/api/health", http.StatusOK)
 	match := regexp.MustCompile(`code=([0-9A-Z]{4}-[0-9A-Z]{4})`).FindStringSubmatch(logs.String())
 	if match == nil {
 		t.Fatalf("no pairing code in the start-up log: %s", logs.String())
@@ -162,9 +158,7 @@ func TestRunRequiresAPairedDevice(t *testing.T) {
 		t.Fatalf("pairing = %v, %v", pairing, err)
 	}
 	_ = pairing.Body.Close()
-	if response, err := client.Get(baseURL + "/api/cards"); err != nil || response.StatusCode != http.StatusOK {
-		t.Fatalf("GET /api/cards as a paired device = %v, %v", response, err)
-	}
+	expectStatus(t, client, baseURL+"/api/cards", http.StatusOK)
 
 	cancel()
 	select {
@@ -206,4 +200,19 @@ func (b *safeBuffer) String() string {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 	return b.buffer.String()
+}
+
+// expectStatus fetches url and closes the body, so no connection of the
+// client stays busy when the test shuts the server down.
+func expectStatus(t *testing.T, client *http.Client, url string, want int) {
+	t.Helper()
+	response, err := client.Get(url)
+	if err != nil {
+		t.Fatalf("GET %s error = %v", url, err)
+	}
+	_, _ = io.Copy(io.Discard, response.Body)
+	_ = response.Body.Close()
+	if response.StatusCode != want {
+		t.Fatalf("GET %s status = %d, want %d", url, response.StatusCode, want)
+	}
 }

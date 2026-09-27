@@ -44,7 +44,7 @@ In practice:
 
 The easiest way is the dev container (VS Code: "Reopen in Container"). It
 provides Go, Node 22, golangci-lint and the Playwright browser. Without it,
-install Go 1.23 or newer and Node 22 (`web/.nvmrc`).
+install Go 1.27 or newer and Node 22 (`web/.nvmrc`).
 
 ```bash
 make ui-install   # once, installs npm dependencies
