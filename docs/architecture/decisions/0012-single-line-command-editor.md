@@ -83,3 +83,14 @@ shell ze stringu) jsou správné a mají zůstat.
   pole Command line.
 - UX specifikace §7.2 se mění: „Arguments … are repeatable rows“ platí
   nadále jen pro proměnné prostředí.
+
+## Doplnění (2026-09-27, blok 0053)
+
+Konec řádku je chybou jen **mimo uvozovky**; uvnitř `'…'` a `"…"` je
+součástí argumentu (tak to parser dělal od začátku, bod 3 to jen neuváděl).
+Akce uložená přes API nebo v souboru může mít víceřádkový argument (např.
+dvouřádkový skript pro `sh -c`). Jednořádkové textové pole by konec řádku
+při zobrazení tiše odstranilo a první úprava by skript změnila, proto se
+takový příkazový řádek edituje ve víceřádkovém poli, které konec řádku
+zachová. Pole zůstane víceřádkové až do opuštění editoru, aby se při
+smazání konce řádku nevyměnilo a neztratilo fokus.

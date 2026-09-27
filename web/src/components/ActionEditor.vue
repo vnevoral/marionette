@@ -1,8 +1,9 @@
 <script setup lang="ts">
-import { computed, useId } from "vue";
+import { computed, ref, useId, watch } from "vue";
 import Button from "primevue/button";
 import InputNumber from "primevue/inputnumber";
 import InputText from "primevue/inputtext";
+import Textarea from "primevue/textarea";
 import Select from "primevue/select";
 import type { Action } from "@/api";
 import { newRowId, type ActionFieldErrors, type EnvironmentRow } from "@/views/cardEditModel";
@@ -38,6 +39,18 @@ const parsed = computed(() => parseCommandLine(commandLine.value));
 // A save error wins; otherwise a parse error shows while typing.
 const commandError = computed(
 	() => props.errors?.command || (parsed.value.ok ? "" : parsed.value.message),
+);
+// A stored argument may contain a line break (a two-line `sh -c` script
+// written through the API). A text input would silently drop it, so such a
+// line is edited in a text area that keeps it (ADR-0012). The area stays
+// once shown, so removing the break does not swap the field and lose focus.
+const multiLine = ref(false);
+watch(
+	commandLine,
+	(line) => {
+		if (/[\r\n]/.test(line)) multiLine.value = true;
+	},
+	{ immediate: true },
 );
 const preview = computed(() =>
 	parsed.value.ok && parsed.value.command ? parsed.value : undefined,
@@ -88,9 +101,12 @@ function removeEnvironment(id: string) {
 		<div class="form-grid grid">
 			<div class="col-12 field">
 				<label :for="`${ids}-command`" class="field-label">Command line</label>
-				<InputText
+				<component
+					:is="multiLine ? Textarea : InputText"
 					:id="`${ids}-command`"
 					class="command-line"
+					:auto-resize="multiLine || undefined"
+					:rows="multiLine ? 2 : undefined"
 					:model-value="commandLine"
 					placeholder="/usr/bin/ping -c 1 -W 2 192.168.1.10"
 					spellcheck="false"

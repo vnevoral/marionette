@@ -447,6 +447,46 @@ describe("CardDetailView", () => {
 			wrapper.unmount();
 		});
 
+		it("does not take an old run for the new one when the runs failed to load", async () => {
+			vi.mocked(getRuns)
+				.mockRejectedValueOnce(new Error("offline"))
+				.mockResolvedValueOnce([oldRun])
+				.mockResolvedValue([newRun, oldRun]);
+			const { wrapper } = await mountDetail("lamp");
+			expect(wrapper.text()).toContain("Run history is unavailable");
+			await buttonByLabel(wrapper, "Run action").trigger("click");
+			await flushPromises();
+			await advance(2000);
+			expect(wrapper.findAll(".run-row")).toHaveLength(1);
+			await advance(2000);
+			expect(wrapper.findAll(".run-row")).toHaveLength(2);
+			// Without a baseline the list stays fresh for the whole budget
+			// (5 s timeout + 30 s margin), then the reads stop.
+			await advance(40_000);
+			const reads = vi.mocked(getRuns).mock.calls.length;
+			expect(reads).toBe(1 + 17);
+			await advance(10_000);
+			expect(getRuns).toHaveBeenCalledTimes(reads);
+			wrapper.unmount();
+		});
+
+		it("does not take an old run for the new one while the runs are still loading", async () => {
+			let answerFirstRead!: (runs: Run[]) => void;
+			vi.mocked(getRuns)
+				.mockImplementationOnce(() => new Promise((resolve) => (answerFirstRead = resolve)))
+				.mockResolvedValueOnce([oldRun])
+				.mockResolvedValue([newRun, oldRun]);
+			const { wrapper } = await mountDetail("lamp");
+			await buttonByLabel(wrapper, "Run action").trigger("click");
+			await flushPromises();
+			answerFirstRead([oldRun]);
+			await advance(2000);
+			expect(wrapper.findAll(".run-row")).toHaveLength(1);
+			await advance(2000);
+			expect(wrapper.findAll(".run-row")).toHaveLength(2);
+			wrapper.unmount();
+		});
+
 		it("ends the wait when the page is left", async () => {
 			vi.mocked(getRuns).mockResolvedValue([oldRun]);
 			const { wrapper } = await mountDetail("lamp");

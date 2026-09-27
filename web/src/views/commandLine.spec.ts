@@ -91,7 +91,12 @@ describe("parseCommandLine", () => {
 		expect(failure("echo abc\\")).toMatchObject({ index: 8 });
 	});
 
-	it("refuses a line break", () => {
+	it("keeps a line break inside quotes", () => {
+		expect(parsed("sh -c 'echo a\necho b'")).toEqual(["sh", "-c", "echo a\necho b"]);
+		expect(parsed('sh -c "x\ny"')).toEqual(["sh", "-c", "x\ny"]);
+	});
+
+	it("refuses a line break outside quotes", () => {
 		expect(failure("echo a\necho b").message).toBe("The command must be a single line.");
 		expect(failure("echo a\r").index).toBe(6);
 	});
@@ -123,6 +128,7 @@ describe("formatCommandLine", () => {
 		["echo", ["hello e2e"]],
 		["ls", ["/mnt/My Disk", "it's", 'say "hi"', "back\\slash", "$HOME", "a|b", "", "~", "*"]],
 		["/bin/sh", ["-c", "ping -c 1 host | grep ttl && echo 'up'"]],
+		["/bin/sh", ["-c", "echo a\necho b\r\n"]],
 		["printf", ["%s\t%s", "tab\there", "(x)", "`y`", ";", "&", "<>"]],
 		["", ["only args"]],
 		["cmd with space", []],

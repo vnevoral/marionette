@@ -233,7 +233,9 @@ needs a shell (unquoted `|`, `&`, `;`, `<`, `>`, `(`, `)`, `` ` ``, `$`), an
 unclosed quote, or a trailing backslash is explained beside the field and
 cannot be saved. Quotes and backslashes follow
 [ADR-0012](../architecture/decisions/0012-single-line-command-editor.md); a
-stored action is shown as one line with quotes added where needed.
+stored action is shown as one line with quotes added where needed; an
+action with a multi-line argument (written through the API) is shown in a
+text area that keeps the line break.
 Environment variables are repeatable rows, not an opaque JSON editor.
 
 ### 7.3 Validation and unsaved changes

@@ -83,6 +83,12 @@ describe("commandLineOf", () => {
 		const saved = actionFrom(stored, commandLineOf(stored), []);
 		expect([saved.command, saved.args]).toEqual([stored.command, stored.args]);
 		expect(commandLineOf(undefined)).toBe("");
+
+		// A multi-line script written through the API survives an unchanged save.
+		const script = { ...emptyAction(), command: "sh", args: ["-c", "echo a\necho b"] };
+		const resaved = actionFrom(script, commandLineOf(script), []);
+		expect([resaved.command, resaved.args]).toEqual(["sh", ["-c", "echo a\necho b"]]);
+		expect(checked({ primaryLine: commandLineOf(script) }).firstError).toBe("");
 	});
 });
 

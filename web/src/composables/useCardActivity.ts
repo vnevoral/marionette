@@ -5,11 +5,18 @@ import { FEEDBACK } from "@/ui/vocabulary";
 
 export type RunWaitResult = "found" | "timeout" | "aborted";
 
+/**
+ * What was known about the runs before an action: the newest run's start
+ * (undefined for a card without runs), or null when the list was still
+ * loading or its last read failed, so no run can be told apart as new.
+ */
+export type RunBaseline = { startedAt: string | undefined } | null;
+
 /** True when `run` started after the newest run known before the action. */
-function isNewerRun(run: Run | undefined, previousStartedAt: string | undefined): boolean {
-	if (!run) return false;
-	if (!previousStartedAt) return true;
-	return Date.parse(run.startedAt) > Date.parse(previousStartedAt);
+function isNewerRun(run: Run | undefined, baseline: RunBaseline): boolean {
+	if (!run || !baseline) return false;
+	if (!baseline.startedAt) return true;
+	return Date.parse(run.startedAt) > Date.parse(baseline.startedAt);
 }
 
 // Recent runs and status history of one card. reset() starts a new generation
@@ -22,10 +29,13 @@ export function useCardActivity(cardID: Ref<string>) {
 	const errors = ref<{ runs?: string; history?: string }>({});
 	let generation = 0;
 	let runWait: AbortController | undefined;
+	// The runs list reflects the server: its last read for this card succeeded.
+	let runsCurrent = false;
 
 	function reset() {
 		generation++;
 		stopWaitingForRun();
+		runsCurrent = false;
 		runs.value = [];
 		history.value = [];
 		runsLoading.value = true;
@@ -39,10 +49,13 @@ export function useCardActivity(cardID: Ref<string>) {
 			const loaded = await getRuns(cardID.value);
 			if (current !== generation) return false;
 			runs.value = loaded ?? [];
+			runsCurrent = true;
 			delete errors.value.runs;
 			return true;
 		} catch {
-			if (current === generation) errors.value.runs = FEEDBACK.runsUnavailable;
+			if (current !== generation) return false;
+			errors.value.runs = FEEDBACK.runsUnavailable;
+			runsCurrent = false;
 			return false;
 		} finally {
 			if (current === generation) runsLoading.value = false;
@@ -68,6 +81,11 @@ export function useCardActivity(cardID: Ref<string>) {
 		return Promise.allSettled([loadRuns(current), loadHistory(current)]);
 	}
 
+	/** The baseline for waitForNewRun, taken before the action is sent. */
+	function runBaseline(): RunBaseline {
+		return runsCurrent ? { startedAt: runs.value[0]?.startedAt } : null;
+	}
+
 	function stopWaitingForRun() {
 		runWait?.abort();
 		runWait = undefined;
@@ -78,10 +96,12 @@ export function useCardActivity(cardID: Ref<string>) {
 	 * card's fast polling interval (2 s without one) until a run newer than the
 	 * newest one known before the action appears, or the action's timeout plus
 	 * the queue margin passes. Comparing server timestamps keeps a skewed
-	 * browser clock out of it. A new wait, reset() or unmounting ends the
-	 * previous one; a failed read is shown and the wait goes on.
+	 * browser clock out of it. Without a baseline (the list was loading or
+	 * failed, see runBaseline) no run can be recognised, so the list is kept
+	 * fresh for the whole budget instead. A new wait, reset() or unmounting
+	 * ends the previous one; a failed read is shown and the wait goes on.
 	 */
-	function waitForNewRun(card: ActionCard, previousStartedAt: string | undefined) {
+	function waitForNewRun(card: ActionCard, baseline: RunBaseline) {
 		stopWaitingForRun();
 		const controller = new AbortController();
 		runWait = controller;
@@ -104,7 +124,7 @@ export function useCardActivity(cardID: Ref<string>) {
 			const poll = async () => {
 				const fresh = await loadRuns(current);
 				if (settled) return;
-				if (fresh && isNewerRun(runs.value[0], previousStartedAt)) return finish("found");
+				if (fresh && isNewerRun(runs.value[0], baseline)) return finish("found");
 				timer = setTimeout(poll, intervalMs);
 			};
 			const deadline = setTimeout(() => finish("timeout"), runWaitBudgetMs(card));
@@ -124,6 +144,7 @@ export function useCardActivity(cardID: Ref<string>) {
 		reset,
 		load,
 		loadHistory,
+		runBaseline,
 		waitForNewRun,
 	};
 }

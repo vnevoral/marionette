@@ -215,6 +215,10 @@ uloží do `docs/plans/blocks/NNNN-nazev.md`. Blok se implementuje promptem
   3. [0052 — Přejmenování spárovaného zařízení](blocks/0052-device-rename.md)
      — **Hotovo** (2026-09-27); FR-57, `PATCH /api/devices/{id}`, tlačítko **Rename**
      na stránce Devices.
+  4. [0053 — Opravy z code review 3](blocks/0053-review-fixes-3.md)
+     — **Hotovo** (2026-09-27); víceřádkový argument se edituje v poli,
+     které konec řádku zachová; čekání na běh bez výchozího bodu nebere
+     starý běh za nový.
 
   Otevřené otázky revize jsou rozhodnuté v
   [requirements.md, sekce 13](../requirements/requirements.md#13-rozhodnutí-revize-projektu-2026-09-26)

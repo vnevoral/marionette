@@ -74,6 +74,23 @@ describe("ActionEditor", () => {
 		expect(wrapper.find(".preview-command").text()).toBe("ping");
 	});
 
+	it("keeps a line break of a stored argument in a text area", async () => {
+		const wrapper = mountEditor({ commandLine: "sh -c 'echo a\necho b'" });
+		expect(wrapper.find("input.command-line").exists()).toBe(false);
+		const area = wrapper.find<HTMLTextAreaElement>("textarea.command-line");
+		expect(area.element.value).toBe("sh -c 'echo a\necho b'");
+		expect(wrapper.findAll(".preview-arg").map((item) => item.text())).toEqual([
+			"-c",
+			"echo a\necho b",
+		]);
+		expect(wrapper.find(".field-error").exists()).toBe(false);
+
+		// Removing the break keeps the text area, so the field keeps focus.
+		await area.setValue("sh -c 'echo a'");
+		expect(lastEmitted<string>(wrapper, "update:commandLine")).toBe("sh -c 'echo a'");
+		expect(wrapper.find("textarea.command-line").exists()).toBe(true);
+	});
+
 	it("shows no preview for an empty line", () => {
 		const wrapper = mountEditor({ commandLine: "  " });
 		expect(wrapper.find(".command-preview li").exists()).toBe(false);
