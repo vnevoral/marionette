@@ -108,7 +108,8 @@ See [Definition of Done](../../devops/definition-of-done.md) plus:
     `sha256sum -c` → OK, archive content unchanged, the binary carries
     `v1.0.0`, the tree stayed clean after the build. Verification of
     `/api/health` on the Pi will be done by the owner after creating the
-    real `v1.0.0` tag.
+    real `v1.0.0` tag. Done: the tagged releases up to `v1.2.1` were
+    installed on the Pi and report their tag (owner, 2026-09-27).
 - **Deviations from the plan**:
   - the version is determined by `git tag --points-at HEAD` filtered by
     the regular expression `^v[0-9]+\.[0-9]+\.[0-9]+$` instead of

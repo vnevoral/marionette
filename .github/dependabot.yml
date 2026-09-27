@@ -19,6 +19,10 @@ updates:
         update-types: ["version-update:semver-major"]
       - dependency-name: vite
         update-types: ["version-update:semver-major"]
+      # TypeScript 7 is not supported by typescript-eslint and vue-tsc yet;
+      # adopt a new major only after a compatibility check (ci-cd.md).
+      - dependency-name: typescript
+        update-types: ["version-update:semver-major"]
   - package-ecosystem: github-actions
     directory: /
     schedule:

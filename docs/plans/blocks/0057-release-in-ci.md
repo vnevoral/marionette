@@ -91,6 +91,17 @@ See [Definition of Done](../../devops/definition-of-done.md) plus:
   is ignored). The negative scenarios (tag `v1.2.3-rc1`, failing test)
   cannot be verified without pushing a tag. They will be verified in a
   fork when the owner needs them.
+- **Verification on the real repository (owner, 2026-09-27)**:
+  - tag `v1.2.0`: the e2e job of the called CI failed (pairing screen at
+    320 px with a fallback font) and **no Release was created** — the
+    "failing test" negative case verified in practice; fixed by block 0059;
+  - tag `v1.2.1`: CI passed and the workflow published the Release with the
+    archive and `.sha256` without any manual step;
+  - on the reference Raspberry Pi the owner installed `v1.2.1` as an upgrade
+    according to the README (data and paired devices kept), tested the
+    rollback to the previous release, and runs `v1.2.1` in production.
+  - The `v1.2.3-rc1` negative case remains verified only by
+    `deploy/release_version_test.sh`.
 - **Deviations from the plan**: instead of separate `make verify` and
   `make e2e` steps, the release workflow calls the whole `ci.yml` (new
   trigger `workflow_call`), so the release goes through exactly the same

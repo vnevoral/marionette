@@ -12,11 +12,14 @@ one or more concrete implementation blocks (see the
 
 ## Current state
 
-As of 2026-09-27 all phases below are **Done**, the last closed block is
+As of 2026-09-27 all phases below are **Done** (blocks 0060 and 0061 are
+proposed maintenance work), the last closed block is
 [0059](blocks/0059-pairing-screen-width-fix.md) and the current release is
 **v1.2.1** (tags `v1.0.0`, `v1.1.0`, `v1.2.0`, `v1.2.1`; `v1.2.0` has no
 GitHub Release because its CI run failed, fixed by block 0059). The
-requirements are at v0.11. New work starts as a new requirement and block
+requirements are at v0.11. `v1.2.1` runs on the reference Raspberry Pi;
+the upgrade and rollback procedure from the README was verified there by
+the owner on 2026-09-27. New work starts as a new requirement and block
 per the development workflow.
 
 ## Phase overview
@@ -249,13 +252,22 @@ per the development workflow.
      footer.
   8. [0057 — Release from CI after pushing a tag](blocks/0057-release-in-ci.md)
      — **Done** (2026-09-27); FR-06, `release.yml` workflow, GitHub Release
-     with the archive and `.sha256`.
+     with the archive and `.sha256`; verified with `v1.2.0` (failed CI, no
+     Release) and `v1.2.1` (Release, upgrade and rollback on the Pi).
   9. [0058 — SSE event after a primary action run is recorded](blocks/0058-run-recorded-event.md)
      — **Done** (2026-09-27); FR-42a, ADR-0008 addendum, `run.recorded`
      instead of repeated queries for runs.
   10. [0059 — Pairing screen at 320 px with a fallback font](blocks/0059-pairing-screen-width-fix.md)
      — **Done** (2026-09-27); fix for the E2E failure in the first release
      from CI (`v1.2.0`), FR-29.
+
+  **After the repository was published (2026-09-27):**
+  1. [0060 — Toolchain update: supported Go and golangci-lint v2](blocks/0060-toolchain-go-and-golangci-lint-v2.md)
+     — **Proposed**; Go 1.23 is out of support, golangci-lint-action v9
+     (Dependabot PR #3) requires golangci-lint v2.
+  2. [0061 — SSE subscription before the connected comment, reliable timing tests](blocks/0061-sse-subscribe-order-and-timing-tests.md)
+     — **Proposed**; an event right after `: connected` can be lost; fixes
+     two intermittently failing Go tests.
 
   The open questions from the review are decided in
   [requirements.md, section 13](../requirements/requirements.md#13-decisions--project-review-2026-09-26)
