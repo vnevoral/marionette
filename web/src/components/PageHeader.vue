@@ -60,9 +60,18 @@ defineProps<{
 	align-items: center;
 	gap: var(--space-3);
 }
+/* A button label never breaks into two lines (block 0063). */
+.page-header-actions > :deep(*) {
+	white-space: nowrap;
+}
 @media (max-width: 48rem) {
+	/* The actions get their own full-width row and share it equally. */
+	.page-header-row {
+		flex-direction: column;
+		align-items: stretch;
+	}
 	.page-header-actions > :deep(*) {
-		flex: 1;
+		flex: 1 1 0;
 		justify-content: center;
 	}
 }

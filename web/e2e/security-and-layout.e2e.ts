@@ -81,6 +81,39 @@ test.describe("at 320 px", () => {
 		}
 	});
 
+	test("header buttons share the full width and keep their labels on one line", async ({
+		page,
+		request,
+	}) => {
+		await createCard(request, { id: "narrow", name: "A card with a fairly long name" });
+		for (const width of [320, 412]) {
+			await page.setViewportSize({ width, height: 800 });
+			for (const path of ["/", "/cards/narrow"]) {
+				await page.goto(path);
+				await expect(page.locator(".loading-state")).toHaveCount(0);
+				const row = await page.locator(".page-header-row").boundingBox();
+				const actions = page.locator(".page-header-actions");
+				const box = await actions.boundingBox();
+				expect(box!.width, `${path} at ${width} px`).toBeCloseTo(row!.width, 0);
+				const buttons = await actions.locator(":scope > *").all();
+				expect(buttons.length).toBe(2);
+				const widths = [];
+				for (const button of buttons) {
+					widths.push((await button.boundingBox())!.width);
+					const lines = await button.locator(".p-button-label").evaluate((label) => {
+						const range = document.createRange();
+						range.selectNodeContents(label);
+						return new Set(Array.from(range.getClientRects()).map((rect) => Math.round(rect.top)))
+							.size;
+					});
+					expect(lines, `${path} at ${width} px`).toBe(1);
+				}
+				// Side by side they are equally wide; stacked they are full width.
+				expect(widths[0]).toBeCloseTo(widths[1], 0);
+			}
+		}
+	});
+
 	test("the save notice fits the screen", async ({ page, request }) => {
 		await createCard(request, { id: "narrow", name: "A card with a fairly long name" });
 		await page.goto("/cards/narrow/edit");

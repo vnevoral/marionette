@@ -200,6 +200,9 @@ management views.
 - Desktop: three columns, up to four on very wide screens.
 - Tablet: two columns.
 - 320–767 px: one column, full-width action controls, no overlap.
+- Page header actions (for example **Refresh** and **New card**, **Edit card**
+  and **Delete card**): button labels never wrap; up to 768 px the actions
+  take their own row below the title and share its full width equally.
 - Card ordering is stable across refreshes.
 
 ## 6. Card detail

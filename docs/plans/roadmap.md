@@ -13,7 +13,7 @@ one or more concrete implementation blocks (see the
 ## Current state
 
 As of 2026-09-27 all phases below are **Done**, the last closed block is
-[0062](blocks/0062-card-color-on-status-panel.md) and the current release is
+[0063](blocks/0063-page-header-actions-on-mobile.md) and the current release is
 **v1.2.3** (tags `v1.0.0`, `v1.1.0`, `v1.2.0`, `v1.2.1`, `v1.2.2`, `v1.2.3`;
 `v1.2.0` has no GitHub Release because its CI run failed, fixed by block
 0059). `v1.2.2` contains blocks 0060 and 0061 (Go 1.27, golangci-lint v2,
@@ -279,6 +279,9 @@ per the development workflow.
      — **Done** (2026-09-27); FR-10a, the detail stripe moves from
      the icon tile to the Current status panel, same as the dashboard;
      released as `v1.2.3`.
+  4. [0063 — Page header actions on mobile](blocks/0063-page-header-actions-on-mobile.md)
+     — **Done** (2026-09-29); FR-29, header buttons fill the row
+     equally on narrow screens and their labels do not wrap.
 
   The open questions from the review are decided in
   [requirements.md, section 13](../requirements/requirements.md#13-decisions--project-review-2026-09-26)
