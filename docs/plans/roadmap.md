@@ -19,9 +19,9 @@ GitHub Release because its CI run failed, fixed by block 0059). `v1.2.2`
 contains blocks 0060 and 0061 (Go 1.27, golangci-lint v2, SSE subscription
 order), `v1.2.3` block 0062 (card color on the Current status panel) and
 `v1.2.4` block 0063 (page header actions on mobile). The requirements are
-at v0.11. `v1.2.4` runs on the reference Raspberry Pi, deployed by the
-owner on 2026-09-29 (`v1.2.3` was verified there on 2026-09-27; the upgrade
-and rollback procedure from the README was verified with `v1.2.1`). New work starts as a new requirement and block
+at v0.11. `v1.2.4` runs on the reference Raspberry Pi; the owner deployed it
+and verified it there on 2026-09-29 (the upgrade and rollback procedure from
+the README was verified with `v1.2.1`). New work starts as a new requirement and block
 per the development workflow.
 
 ## Phase overview
