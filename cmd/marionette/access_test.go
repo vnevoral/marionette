@@ -142,16 +142,21 @@ func TestRunRequiresAPairedDevice(t *testing.T) {
 		t.Fatal("server did not start listening")
 	}
 	baseURL := "http://" + addr.String()
+	// A transport of its own, so the test can close the connections it left
+	// open before the shutdown (see below).
+	transport := &http.Transport{}
+	defer transport.CloseIdleConnections()
+	anonymous := &http.Client{Transport: transport}
 
-	expectStatus(t, http.DefaultClient, baseURL+"/api/cards", http.StatusUnauthorized)
-	expectStatus(t, http.DefaultClient, baseURL+"/api/health", http.StatusOK)
+	expectStatus(t, anonymous, baseURL+"/api/cards", http.StatusUnauthorized)
+	expectStatus(t, anonymous, baseURL+"/api/health", http.StatusOK)
 	match := regexp.MustCompile(`code=([0-9A-Z]{4}-[0-9A-Z]{4})`).FindStringSubmatch(logs.String())
 	if match == nil {
 		t.Fatalf("no pairing code in the start-up log: %s", logs.String())
 	}
 
 	jar, _ := cookiejar.New(nil)
-	client := &http.Client{Jar: jar}
+	client := &http.Client{Jar: jar, Transport: transport}
 	pairing, err := client.Post(baseURL+"/api/pairing", "application/json",
 		strings.NewReader(`{"code":"`+match[1]+`","name":"Integration test"}`))
 	if err != nil || pairing.StatusCode != http.StatusCreated {
@@ -160,6 +165,10 @@ func TestRunRequiresAPairedDevice(t *testing.T) {
 	_ = pairing.Body.Close()
 	expectStatus(t, client, baseURL+"/api/cards", http.StatusOK)
 
+	// The transport may have dialed a spare connection that never sent a
+	// request. http.Server.Shutdown waits up to 5 s for such a connection,
+	// longer than the 2 s shutdown timeout, so close it first.
+	transport.CloseIdleConnections()
 	cancel()
 	select {
 	case err := <-finished:

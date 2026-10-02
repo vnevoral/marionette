@@ -12,8 +12,8 @@ one or more concrete implementation blocks (see the
 
 ## Current state
 
-As of 2026-09-29 all phases below are **Done**, the last closed block is
-[0063](blocks/0063-page-header-actions-on-mobile.md) and the current release is
+As of 2026-10-02 all phases below are **Done**, the last closed block is
+[0064](blocks/0064-flaky-paired-device-shutdown-test.md) and the current release is
 **v1.2.4** (tags `v1.0.0`, `v1.1.0`, `v1.2.0` to `v1.2.4`; `v1.2.0` has no
 GitHub Release because its CI run failed, fixed by block 0059). `v1.2.2`
 contains blocks 0060 and 0061 (Go 1.27, golangci-lint v2, SSE subscription
@@ -283,6 +283,9 @@ per the development workflow.
      — **Done** (2026-09-29); FR-29, header buttons fill the row
      equally on narrow screens and their labels do not wrap; released as
      `v1.2.4`.
+  5. [0064 — Flaky shutdown in the paired-device integration test](blocks/0064-flaky-paired-device-shutdown-test.md)
+     — **Done** (2026-10-02); the test closes a spare idle client
+     connection that `http.Server.Shutdown` would wait 5 s for.
 
   The open questions from the review are decided in
   [requirements.md, section 13](../requirements/requirements.md#13-decisions--project-review-2026-09-26)
