@@ -26,6 +26,9 @@ web/*.tsbuildinfo
 web/vite.config.js
 web/vite.config.d.ts
 
+# Personal Claude Code settings
+/.claude/settings.local.json
+
 # Editor / OS
 .DS_Store
 *.log

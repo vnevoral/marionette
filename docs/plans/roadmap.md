@@ -14,14 +14,17 @@ one or more concrete implementation blocks (see the
 
 As of 2026-10-12 all phases below are **Done**, the last closed block is
 [0065](blocks/0065-host-pairing-command.md) and the current release is
-**v1.2.4** (tags `v1.0.0`, `v1.1.0`, `v1.2.0` to `v1.2.4`; `v1.2.0` has no
-GitHub Release because its CI run failed, fixed by block 0059). `v1.2.2`
+**v1.3.1** (tags `v1.0.0`, `v1.1.0`, `v1.2.0` to `v1.2.4`, `v1.3.0`,
+`v1.3.1`; `v1.2.0` has no GitHub Release because its CI run failed, fixed
+by block 0059; `v1.3.0` has none because `npm audit` failed on a new
+advisory for `source-map-js`, fixed in the lockfile for `v1.3.1`). `v1.2.2`
 contains blocks 0060 and 0061 (Go 1.27, golangci-lint v2, SSE subscription
-order), `v1.2.3` block 0062 (card color on the Current status panel) and
-`v1.2.4` block 0063 (page header actions on mobile). The requirements are
-at v0.12. `v1.2.4` runs on the reference Raspberry Pi; the owner deployed it
-and verified it there on 2026-09-29 (the upgrade and rollback procedure from
-the README was verified with `v1.2.1`). New work starts as a new requirement and block
+order), `v1.2.3` block 0062 (card color on the Current status panel),
+`v1.2.4` block 0063 (page header actions on mobile) and `v1.3.1` blocks
+0064 and 0065 (`marionette pair`). The requirements are at v0.12.
+`v1.3.1` runs on the reference Raspberry Pi; the owner deployed it and
+verified `sudo marionette pair` there on 2026-10-12 (the upgrade and
+rollback procedure from the README was verified with `v1.2.1`). New work starts as a new requirement and block
 per the development workflow.
 
 ## Phase overview
@@ -289,7 +292,8 @@ per the development workflow.
   6. [0065 — Pairing code from the host (`marionette pair`)](blocks/0065-host-pairing-command.md)
      — **Done** (2026-10-12); FR-58,
      [ADR-0013](../architecture/decisions/0013-host-pairing-command.md),
-     `sudo marionette pair` over a local control socket.
+     `sudo marionette pair` over a local control socket; released as
+     `v1.3.1` and verified on the Pi.
 
   The open questions from the review are decided in
   [requirements.md, section 13](../requirements/requirements.md#13-decisions--project-review-2026-09-26)

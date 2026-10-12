@@ -130,8 +130,10 @@ See [Definition of Done](../../devops/definition-of-done.md) plus:
   `install_test.sh` (runtime directory `0700`, host command in the hints);
   Vitest and E2E for the pairing screen text. A manual smoke test with the
   built binary printed a code, showed the socket as `srw-------` and
-  removed it on shutdown. The check on the reference Raspberry Pi follows
-  with the release.
+  removed it on shutdown. Released as `v1.3.1` (the `v1.3.0` release run
+  failed on a new `npm audit` advisory, fixed in the lockfile); the owner
+  deployed it on the reference Raspberry Pi and verified
+  `sudo marionette pair` there on 2026-10-12.
 - **Deviations from the plan**: none.
 - **Documentation updated**: requirements v0.12 (FR-58, FR-53, FR-56),
   ADR-0013 (Accepted), ADR-0011 pointer, architecture overview, README,
