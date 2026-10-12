@@ -57,17 +57,21 @@ describe("PairView", () => {
 		vi.unstubAllGlobals();
 	});
 
-	it("shows the service log command only while no device is paired", async () => {
+	it("names the host command always and the service log only while no device is paired", async () => {
+		const commands = (wrapper: Awaited<ReturnType<typeof mountPair>>["wrapper"]) =>
+			wrapper.findAll(".pair-command").map((command) => command.text());
+
 		vi.mocked(getSession).mockResolvedValue({ status: "unpaired", bootstrap: true });
 		const first = await mountPair("/pair");
-		expect(first.wrapper.find(".pair-command").text()).toBe(
+		expect(commands(first.wrapper)).toEqual([
+			"sudo marionette pair",
 			'journalctl -u marionette | grep "pairing code"',
-		);
+		]);
 		first.wrapper.unmount();
 
 		vi.mocked(getSession).mockResolvedValue({ status: "unpaired", bootstrap: false });
 		const later = await mountPair("/pair");
-		expect(later.wrapper.find(".pair-command").exists()).toBe(false);
+		expect(commands(later.wrapper)).toEqual(["sudo marionette pair"]);
 		expect(later.wrapper.text()).toContain("Devices → Pair a new device");
 		later.wrapper.unmount();
 	});

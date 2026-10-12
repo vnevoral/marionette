@@ -81,9 +81,14 @@ onMounted(() => {
 			<h2 id="pair-form-title" class="sr-only">{{ ACCESS.pairTitle }}</h2>
 			<div v-if="bootstrap" class="pair-hint">
 				<p>{{ ACCESS.bootstrapHint }}</p>
+				<code class="pair-command">{{ ACCESS.hostCommand }}</code>
+				<p>{{ ACCESS.bootstrapLogHint }}</p>
 				<code class="pair-command">{{ ACCESS.bootstrapCommand }}</code>
 			</div>
-			<p v-else class="pair-hint pair-hint-muted">{{ ACCESS.otherDeviceHint }}</p>
+			<div v-else class="pair-hint pair-hint-muted">
+				<p>{{ ACCESS.otherDeviceHint }}</p>
+				<code class="pair-command">{{ ACCESS.hostCommand }}</code>
+			</div>
 
 			<form class="pair-form" novalidate @submit.prevent="pair">
 				<label class="pair-field"

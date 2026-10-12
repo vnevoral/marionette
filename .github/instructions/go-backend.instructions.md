@@ -17,6 +17,11 @@ applyTo: "cmd/**/*.go,internal/**/*.go"
 - Domain logic (config store, action evaluation) is separated from the
   HTTP layer (`internal/server`) and testable without the network/real
   process execution.
+- The control socket (`internal/control`, ADR-0013) is a separate local
+  interface for host commands such as `marionette pair`: keep it to the
+  routes the ADR lists, never mount its handler on the TCP listener and
+  never log the pairing codes it issues (NFR-13). A new host command needs
+  a requirement and an ADR addendum first.
 - After every change: `go build ./...`, `go vet ./...`, `go test ./...`;
   before closing, `make verify`.
 - New functionality must have a corresponding FR/NFR in

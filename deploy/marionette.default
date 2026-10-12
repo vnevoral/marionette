@@ -8,7 +8,8 @@ MARIONETTE_ADDR=:8080
 # mutating API requests. Empty accepts any host.
 #MARIONETTE_ALLOWED_HOSTS=pi.local:8080,192.168.1.10:8080
 # Access control: only paired devices can use the UI and API (on|off).
-# With no device paired yet, the pairing code is in `journalctl -u marionette`.
+# Get a pairing code for a new device with `sudo marionette pair`; with no
+# device paired yet, the code is also in `journalctl -u marionette`.
 #MARIONETTE_AUTH=on
 # Days a device may stay unused before it must pair again (1-400).
 #MARIONETTE_DEVICE_EXPIRY_DAYS=60
@@ -17,6 +18,9 @@ MARIONETTE_ADDR=:8080
 #MARIONETTE_COOKIE_SECURE=auto
 # Paired devices file; defaults to devices.json next to MARIONETTE_CONFIG.
 #MARIONETTE_DEVICES=/var/lib/marionette/devices.json
+# Control socket of `marionette pair`. The command does not read this file:
+# after changing the path run `sudo MARIONETTE_CONTROL_SOCKET=<path> marionette pair`.
+#MARIONETTE_CONTROL_SOCKET=/run/marionette/control.sock
 # Log format (text|json) and minimum level (debug|info|warn|error).
 #MARIONETTE_LOG_FORMAT=text
 #MARIONETTE_LOG_LEVEL=info

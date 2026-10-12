@@ -190,7 +190,8 @@ func TestShutdownSavesHistoryBeforeQueueDrain(t *testing.T) {
 	recorded := &recordedSteps{}
 	dirty := true
 	steps := shutdownSteps{
-		stopHTTP: func(context.Context) error { recorded.add("http"); return nil },
+		stopControl: func(context.Context) error { recorded.add("control"); return nil },
+		stopHTTP:    func(context.Context) error { recorded.add("http"); return nil },
 		saveHistory: func() error {
 			recorded.add("save")
 			dirty = false
@@ -213,7 +214,7 @@ func TestShutdownSavesHistoryBeforeQueueDrain(t *testing.T) {
 	if err := shutdown(ctx, steps, slog.New(slog.NewTextHandler(io.Discard, nil))); err != nil {
 		t.Fatalf("shutdown() error = %v", err)
 	}
-	want := []string{"http", "save", "actions", "scheduler", "save", "devices"}
+	want := []string{"control", "http", "save", "actions", "scheduler", "save", "devices"}
 	if strings.Join(recorded.calls, ",") != strings.Join(want, ",") {
 		t.Fatalf("shutdown order = %v, want %v", recorded.calls, want)
 	}

@@ -292,9 +292,10 @@ that.
   - Fields: **Pairing code** (typed in any case, grouped as `XXXX-XXXX`,
     filled in from `?code=`) and **Device name** (suggested from the browser
     and system, e.g. "Chrome on Android"; required, up to 64 characters).
-  - While no device is paired at all, the screen shows the command that
-    reads the code from the service log; otherwise it points to **Devices →
-    Pair a new device** on a paired device.
+  - While no device is paired at all, the screen shows the host command
+    `sudo marionette pair` and the command that reads the code from the
+    service log; otherwise it points to **Devices → Pair a new device** on a
+    paired device and to `sudo marionette pair` on the host (FR-58).
   - A wrong, used or expired code shows one message: **The pairing code is
     invalid or has expired.** Success shows the toast **Device paired**.
 - **Devices** (`/devices`): the paired browsers, most recently used first,

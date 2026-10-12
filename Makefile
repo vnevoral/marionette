@@ -3,6 +3,8 @@ APP_NAME := marionette
 DIST_DIR := internal/webui/dist
 DEV_CONFIG := ./marionette.json
 DEV_FIXTURE := deploy/dev-fixture.json
+# Control socket of the dev backend, used by `make pair`
+DEV_CONTROL_SOCKET := ./marionette.sock
 VERSION ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo dev)
 LDFLAGS := -X main.version=$(VERSION)
 # Release version from the tag on HEAD; expanded only by release-arm64, which
@@ -10,7 +12,7 @@ LDFLAGS := -X main.version=$(VERSION)
 override RELEASE_VERSION = $(shell bash deploy/release_version.sh 2>/dev/null)
 override RELEASE_ARCHIVE = $(APP_NAME)-$(RELEASE_VERSION)-linux-arm64.tar.gz
 
-.PHONY: ui-install ui-build ui-dev ui-lint ui-test deploy-test release-test e2e dev-config backend-run backend-dev build build-arm64 release-arm64 test lint verify clean
+.PHONY: ui-install ui-build ui-dev ui-lint ui-test deploy-test release-test e2e dev-config backend-run backend-dev pair build build-arm64 release-arm64 test lint verify clean
 
 ## Install UI dependencies
 ui-install:
@@ -38,11 +40,15 @@ dev-config:
 
 ## Run the Go backend using the currently embedded UI build
 backend-run: dev-config
-	MARIONETTE_CONFIG=$(DEV_CONFIG) go run -ldflags "$(LDFLAGS)" ./cmd/marionette
+	MARIONETTE_CONFIG=$(DEV_CONFIG) MARIONETTE_CONTROL_SOCKET=$(DEV_CONTROL_SOCKET) go run -ldflags "$(LDFLAGS)" ./cmd/marionette
 
 ## Run the Go backend with hot reload (air)
 backend-dev: dev-config
 	air
+
+## Print a pairing code from the running dev backend (marionette pair)
+pair:
+	MARIONETTE_CONTROL_SOCKET=$(DEV_CONTROL_SOCKET) go run ./cmd/marionette pair
 
 ## Build the UI, then produce a single Go binary for the current host platform
 build: ui-build

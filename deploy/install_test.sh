@@ -42,6 +42,13 @@ read_write_paths=$(unit_value ReadWritePaths)
 [[ -d "$root$working_directory" ]] || fail "data directory $working_directory missing"
 [[ "$working_directory" == "$read_write_paths" ]] || fail "WorkingDirectory $working_directory is not the writable path $read_write_paths"
 [[ -f "$root/etc/systemd/system/marionette.service" ]] || fail "unit file not installed"
+# The control socket of `marionette pair` (ADR-0013) lives in a runtime
+# directory that only root and the service user can enter, at the path the
+# service uses by default.
+[[ "$(unit_value RuntimeDirectory)" == marionette ]] || fail "unit has no RuntimeDirectory=marionette"
+[[ "$(unit_value RuntimeDirectoryMode)" == 0700 ]] || fail "runtime directory is not 0700"
+grep -qF '"/run/marionette/control.sock"' "$script_dir/../internal/control/control.go" ||
+	fail "default control socket is not under /run/marionette"
 
 config="$root$working_directory/marionette.json"
 config_path=$(sed -n 's/^MARIONETTE_CONFIG=//p' "$root$environment_file")
@@ -64,6 +71,7 @@ hint='journalctl -u marionette | grep "pairing code"'
 output=$(DESTDIR="$work/hint" "$script_dir/install.sh" "$binary")
 grep -qF "$hint" <<<"$output" || fail "no pairing hint without paired devices"
 grep -qF "http://<host>:8080/" <<<"$output" || fail "pairing hint does not name the port"
+grep -qF "sudo marionette pair" <<<"$output" || fail "pairing hint does not name the host command"
 
 # The hint follows MARIONETTE_ADDR and disappears once devices.json exists,
 # or when access control is off.
@@ -72,10 +80,12 @@ grep -qF "http://<host>:9090/" <<<"$output" || fail "pairing hint ignores MARION
 touch "$root$working_directory/devices.json"
 output=$(DESTDIR="$root" "$script_dir/install.sh" "$binary")
 if grep -qF "$hint" <<<"$output"; then fail "pairing hint shown with paired devices"; fi
+grep -qF "sudo marionette pair" <<<"$output" || fail "no host command hint with paired devices"
 rm "$root$working_directory/devices.json"
 echo 'MARIONETTE_AUTH=off' >>"$root$environment_file"
 output=$(DESTDIR="$root" "$script_dir/install.sh" "$binary")
 if grep -qF "$hint" <<<"$output"; then fail "pairing hint shown with access control off"; fi
+if grep -qF "marionette pair" <<<"$output"; then fail "host command hint shown with access control off"; fi
 
 # The ping hint (block 0046) appears when the kernel forbids unprivileged
 # ICMP and stays silent when it is allowed or the setting cannot be read.

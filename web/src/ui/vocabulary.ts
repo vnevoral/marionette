@@ -123,14 +123,16 @@ export const LOADING = {
 	devices: "Loading devices...",
 } as const;
 
-/** Wording of the pairing screen and the Devices page (FR-50..FR-55). */
+/** Wording of the pairing screen and the Devices page (FR-50..FR-58). */
 export const ACCESS = {
 	pairTitle: "Pair this device",
 	pairLede:
 		"Enter a pairing code once. After that this browser opens Marionette without asking again.",
-	bootstrapHint: "No device is paired yet. The pairing code is in the service log on the host:",
+	bootstrapHint: "No device is paired yet. Get a pairing code on the host:",
+	hostCommand: "sudo marionette pair",
+	bootstrapLogHint: "or read the code written at startup from the service log:",
 	bootstrapCommand: 'journalctl -u marionette | grep "pairing code"',
-	otherDeviceHint: "Get a code on a paired device: Devices → Pair a new device.",
+	otherDeviceHint: "Get a code on a paired device: Devices → Pair a new device, or on the host:",
 	codeLabel: "Pairing code",
 	nameLabel: "Device name",
 	pairAction: "Pair device",

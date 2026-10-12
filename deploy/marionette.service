@@ -18,6 +18,10 @@ PrivateTmp=true
 ProtectSystem=strict
 ProtectHome=read-only
 ReadWritePaths=/var/lib/marionette
+# /run/marionette holds the control socket of `marionette pair` (ADR-0013);
+# only root and the service user can enter it.
+RuntimeDirectory=marionette
+RuntimeDirectoryMode=0700
 
 [Install]
 WantedBy=multi-user.target

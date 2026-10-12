@@ -39,8 +39,10 @@ When assessing a problem, keep in mind what Marionette is designed for:
   device token travels unencrypted; for other networks put a TLS reverse
   proxy in front and set `MARIONETTE_COOKIE_SECURE=always`.
 - **Only paired devices** can use the API (except the health, session and
-  pairing endpoints). A device pairs with a one-time code shown in the
-  service log; tokens are stored on the host only as hashes.
+  pairing endpoints). A device pairs with a one-time code from a paired
+  device, from `sudo marionette pair` on the host (a local socket only root
+  and the service user can open) or, for the first device, from the service
+  log; tokens are stored on the host only as hashes.
 - **Mutating requests are protected against cross-site requests** (JSON
   content type, `Origin` and `Sec-Fetch-Site` checks, optional host
   allowlist).

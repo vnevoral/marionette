@@ -26,6 +26,7 @@ import (
 	"marionette/internal/status"
 
 	"marionette/internal/access"
+	"marionette/internal/control"
 )
 
 // version is the release identifier reported by GET /api/health. It is set at
@@ -69,13 +70,20 @@ type environment struct {
 	DeviceExpiry time.Duration
 	// CookieSecure decides the Secure attribute of the device cookie.
 	CookieSecure server.CookieSecurity
+	// ControlSocket is the path of the local control socket used by
+	// `marionette pair` (FR-58, ADR-0013); empty (tests) runs without one.
+	ControlSocket string
+	// ControlSocketSet is true when MARIONETTE_CONTROL_SOCKET chose the path:
+	// a socket that cannot be created then stops the start-up instead of
+	// only being logged.
+	ControlSocketSet bool
 }
 
 // loadEnvironment reads MARIONETTE_CONFIG, MARIONETTE_ADDR,
 // MARIONETTE_SHUTDOWN_TIMEOUT, MARIONETTE_ALLOWED_HOSTS, MARIONETTE_LOG_FORMAT,
 // MARIONETTE_LOG_LEVEL, MARIONETTE_AUTH, MARIONETTE_DEVICES,
-// MARIONETTE_DEVICE_EXPIRY_DAYS and MARIONETTE_COOKIE_SECURE with their
-// defaults.
+// MARIONETTE_DEVICE_EXPIRY_DAYS, MARIONETTE_COOKIE_SECURE and
+// MARIONETTE_CONTROL_SOCKET with their defaults.
 func loadEnvironment(getenv func(string) string) (environment, error) {
 	env := environment{
 		ConfigPath:      getenv("MARIONETTE_CONFIG"),
@@ -148,7 +156,41 @@ func loadEnvironment(getenv func(string) string) (environment, error) {
 	default:
 		return environment{}, fmt.Errorf("MARIONETTE_COOKIE_SECURE %q: must be auto, always or never", raw)
 	}
+	env.ControlSocket, env.ControlSocketSet = controlSocketPath(getenv)
 	return env, nil
+}
+
+// controlSocketPath returns MARIONETTE_CONTROL_SOCKET or the default path,
+// and whether the variable was set. The service and `marionette pair` use
+// the same rule.
+func controlSocketPath(getenv func(string) string) (string, bool) {
+	if path := strings.TrimSpace(getenv("MARIONETTE_CONTROL_SOCKET")); path != "" {
+		return path, true
+	}
+	return control.DefaultSocketPath, false
+}
+
+// openControl creates the control socket. Without the directory of the
+// default path (the service was not started by the systemd unit, e.g. in
+// development) it only warns: the HTTP service matters more than the host
+// command. A path chosen explicitly must work.
+func openControl(env environment, registry *access.Registry, logger *slog.Logger) (*control.Server, error) {
+	if env.ControlSocket == "" {
+		return nil, nil
+	}
+	if !env.ControlSocketSet {
+		if _, err := os.Stat(filepath.Dir(env.ControlSocket)); errors.Is(err, os.ErrNotExist) {
+			logger.Warn("control socket directory does not exist; `marionette pair` is unavailable",
+				"path", env.ControlSocket, "hint", "set MARIONETTE_CONTROL_SOCKET or use the systemd unit")
+			return nil, nil
+		}
+	}
+	server, err := control.Listen(env.ControlSocket, registry, logger)
+	if err != nil {
+		return nil, err
+	}
+	logger.Info("control socket listening", "path", server.Path())
+	return server, nil
 }
 
 // openAccess opens the paired devices when access control is on and tells
@@ -184,6 +226,9 @@ func newLogger(writer io.Writer, env environment) *slog.Logger {
 }
 
 func main() {
+	if len(os.Args) > 1 {
+		os.Exit(runCommand(os.Args[1:], os.Getenv, os.Stdout, os.Stderr))
+	}
 	env, err := loadEnvironment(os.Getenv)
 	if err != nil {
 		slog.New(slog.NewTextHandler(os.Stderr, nil)).Error("invalid environment", "error", err)
@@ -280,10 +325,22 @@ func (app application) run(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("listen on %s: %w", app.env.Addr, err)
 	}
-	serveErr := make(chan error, 1)
+	controlServer, err := openControl(app.env, devices, app.logger)
+	if err != nil {
+		_ = listener.Close()
+		return fmt.Errorf("open control socket: %w", err)
+	}
+	serveErr := make(chan error, 2)
 	go func() {
-		serveErr <- srv.Serve(listener)
+		serveErr <- fmt.Errorf("HTTP server: %w", srv.Serve(listener))
 	}()
+	if controlServer != nil {
+		go func() {
+			if err := controlServer.Serve(); err != nil {
+				serveErr <- fmt.Errorf("control socket: %w", err)
+			}
+		}()
+	}
 	app.logger.Info("marionette listening", "addr", listener.Addr().String(), "version", version)
 	if app.onListening != nil {
 		app.onListening(listener.Addr())
@@ -291,7 +348,10 @@ func (app application) run(ctx context.Context) error {
 
 	select {
 	case err := <-serveErr:
-		return fmt.Errorf("HTTP server: %w", err)
+		if controlServer != nil {
+			_ = controlServer.Shutdown(context.Background())
+		}
+		return err
 	case <-ctx.Done():
 	}
 
@@ -310,6 +370,9 @@ func (app application) run(ctx context.Context) error {
 		stopScheduler: scheduler.Stop,
 		historyDirty:  store.Dirty,
 	}
+	if controlServer != nil {
+		steps.stopControl = controlServer.Shutdown
+	}
 	if !readOnly {
 		steps.saveHistory = func() error { return store.SaveFileWithHistory(app.env.ConfigPath) }
 	}
@@ -322,7 +385,9 @@ func (app application) run(ctx context.Context) error {
 // shutdownSteps are the dependencies of the shutdown sequence, expressed as
 // functions so the ordering can be tested without a running server.
 type shutdownSteps struct {
-	stopHTTP func(context.Context) error
+	// stopControl closes the control socket; nil when there is none.
+	stopControl func(context.Context) error
+	stopHTTP    func(context.Context) error
 	// saveHistory is nil when the store is read-only (unreadable config
 	// file): the file must not be overwritten in that case.
 	saveHistory   func() error
@@ -354,6 +419,9 @@ func shutdown(ctx context.Context, steps shutdownSteps, logger *slog.Logger) err
 		logger.Info("shutdown step done", "step", name, "duration", duration)
 	}
 
+	if steps.stopControl != nil {
+		step("stop control socket", func() error { return steps.stopControl(ctx) })
+	}
 	step("stop HTTP server", func() error { return steps.stopHTTP(ctx) })
 
 	if steps.saveHistory == nil {

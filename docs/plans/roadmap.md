@@ -12,14 +12,14 @@ one or more concrete implementation blocks (see the
 
 ## Current state
 
-As of 2026-10-02 all phases below are **Done**, the last closed block is
-[0064](blocks/0064-flaky-paired-device-shutdown-test.md) and the current release is
+As of 2026-10-12 all phases below are **Done**, the last closed block is
+[0065](blocks/0065-host-pairing-command.md) and the current release is
 **v1.2.4** (tags `v1.0.0`, `v1.1.0`, `v1.2.0` to `v1.2.4`; `v1.2.0` has no
 GitHub Release because its CI run failed, fixed by block 0059). `v1.2.2`
 contains blocks 0060 and 0061 (Go 1.27, golangci-lint v2, SSE subscription
 order), `v1.2.3` block 0062 (card color on the Current status panel) and
 `v1.2.4` block 0063 (page header actions on mobile). The requirements are
-at v0.11. `v1.2.4` runs on the reference Raspberry Pi; the owner deployed it
+at v0.12. `v1.2.4` runs on the reference Raspberry Pi; the owner deployed it
 and verified it there on 2026-09-29 (the upgrade and rollback procedure from
 the README was verified with `v1.2.1`). New work starts as a new requirement and block
 per the development workflow.
@@ -43,7 +43,7 @@ per the development workflow.
 ## Planning notes
 
 - Phase 1 is closed: `docs/requirements/requirements.md` was at v0.5 at
-  that point (now v0.11; open questions resolved, see section 7 of the document) and
+  that point (now v0.12; open questions resolved, see section 7 of the document) and
   [ADR-0004](../architecture/decisions/0004-action-card-domain-model.md) is
   accepted, including run history, output rules, polling and the
   concurrency limit.
@@ -286,6 +286,10 @@ per the development workflow.
   5. [0064 — Flaky shutdown in the paired-device integration test](blocks/0064-flaky-paired-device-shutdown-test.md)
      — **Done** (2026-10-02); the test closes a spare idle client
      connection that `http.Server.Shutdown` would wait 5 s for.
+  6. [0065 — Pairing code from the host (`marionette pair`)](blocks/0065-host-pairing-command.md)
+     — **Done** (2026-10-12); FR-58,
+     [ADR-0013](../architecture/decisions/0013-host-pairing-command.md),
+     `sudo marionette pair` over a local control socket.
 
   The open questions from the review are decided in
   [requirements.md, section 13](../requirements/requirements.md#13-decisions--project-review-2026-09-26)

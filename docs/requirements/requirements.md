@@ -1,4 +1,4 @@
-# Marionette Requirements (SRS) — v0.11
+# Marionette Requirements (SRS) — v0.12
 
 > Status: **refined** (phase 1 and UX specification, 2026-09-25; extended with
 > an SSE stream for live status changes, 2026-09-25; extended with two polling
@@ -10,7 +10,8 @@
 > [Decisions — review 2026-09-26](#13-decisions--project-review-2026-09-26);
 > added FR-05, FR-21a and FR-22a after validation on a Raspberry Pi, 2026-09-26;
 > FR-57 device renaming, 2026-09-27; FR-10a card color, 2026-09-27;
-> FR-06, FR-41a and FR-42a, 2026-09-27).
+> FR-06, FR-41a and FR-42a, 2026-09-27; FR-58 pairing code from the host,
+> 2026-10-12).
 > The open questions from v0.1 were decided
 > with the project owner, see [Phase 1 decisions](#7-phase-1-decisions-2026-09-25),
 > [Decisions — polling and termination](#9-decisions--polling-and-termination-2026-09-25)
@@ -289,6 +290,7 @@ network, reachable from outside via VPN.
   pairing code at startup and writes it to the log
   (`journalctl -u marionette`); the pairing screen points the operator to
   the log. Once a paired device exists, the code is not written to the log.
+  The operator can also run `sudo marionette pair` on the host (FR-58).
 - **FR-54 Additional devices**: A paired device can generate a code for
   another device in the UI (**Devices** → **Pair a new device**); the code
   and a link that pre-fills it are shown.
@@ -297,9 +299,11 @@ network, reachable from outside via VPN.
   device. Removal takes effect immediately for REST; an open SSE stream of a
   removed device ends at the latest at the next heartbeat (15 s). Removing
   one's own device is a logout.
-- **FR-56 Access recovery**: When all devices are lost, the operator deletes
-  the devices file on the host and restarts the service; a new code is then
-  generated at startup according to FR-53. The procedure is in the README.
+- **FR-56 Access recovery**: When all devices are lost, the operator gets a
+  new code with `sudo marionette pair` on the host (FR-58). To revoke every
+  device at once, the operator deletes the devices file on the host and
+  restarts the service; a new code is then generated at startup according
+  to FR-53. The procedure is in the README.
 - **FR-57 Device renaming** _(added 2026-09-27)_: The device name is entered
   during pairing (FR-52) and a paired device can later change it on the
   **Devices** page, for any paired device including its own (just like
@@ -308,6 +312,16 @@ network, reachable from outside via VPN.
   rejects an invalid name with `422` and a field error. The change is saved
   immediately to the devices file and does not affect the token, validity or
   last-used time. Names do not have to be unique.
+- **FR-58 Pairing code from the host** _(added 2026-10-12, ADR-0013)_: An
+  operator with administrator access to the host (SSH and `sudo`) can get a
+  pairing code for a new device without the web UI by running
+  `sudo marionette pair`. The command asks the running service for a code
+  over a local socket that only root and the service user can open, and
+  prints the code and its expiry. The code follows FR-51 (and therefore
+  invalidates a code shown in the UI), works whether or not devices are
+  paired and does not change any device. The code is not written to the
+  service log; the log records only that a code was issued from the host.
+  With access control off the command reports that no pairing is needed.
 
 ## 4. Non-functional requirements
 
@@ -454,7 +468,7 @@ phase 8).
 | Future of PrimeFlex            | Removed after phase 8 and replaced with an own utility layer with the same classes; Tailwind rejected, PrimeVue stays on v4 (MIT) because of the v5 license ([ADR-0010](../architecture/decisions/0010-own-layout-utilities-replace-primeflex.md), block 0035). |
 | Cross-site API protection      | NFR-12 accepted; implementation in block 0026.                                                                                                              |
 | Repository license             | MIT (block 0031 adds `LICENSE`).                                                                                                                            |
-| Authentication (NFR-01)        | Access only from paired devices: a one-time code (the first one in the service log), then a device token in a cookie without further verification; validity 60 days of non-use, configurable; no tokens for scripts (FR-50..56, NFR-13, [ADR-0011](../architecture/decisions/0011-device-pairing-access.md), blocks 0043–0044). |
+| Authentication (NFR-01)        | Access only from paired devices: a one-time code (the first one in the service log, any time from `sudo marionette pair` on the host), then a device token in a cookie without further verification; validity 60 days of non-use, configurable; no tokens for scripts (FR-50..58, NFR-13, [ADR-0011](../architecture/decisions/0011-device-pairing-access.md), [ADR-0013](../architecture/decisions/0013-host-pairing-command.md), blocks 0043–0044, 0065). |
 
 ## 12. Traceability
 

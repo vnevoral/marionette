@@ -61,9 +61,10 @@ default_value() {
 	printf '%s' "$value"
 }
 
-# print_pairing_hint tells the operator how to pair the first device
-# (FR-53): with access control on and no devices file yet, the UI is locked
-# until the code from the service log is entered.
+# print_pairing_hint tells the operator how to pair a device: with access
+# control on and no devices file yet, the UI is locked until the code from
+# the service log (FR-53) or from `marionette pair` (FR-58) is entered; with
+# paired devices it only names the host command for further devices.
 print_pairing_hint() {
 	local config devices addr
 	[[ $(default_value MARIONETTE_AUTH) == off ]] && return 0
@@ -72,12 +73,22 @@ print_pairing_hint() {
 	if [[ -z "$devices" ]]; then
 		devices="$(dirname -- "${config:-$data_dir/marionette.json}")/devices.json"
 	fi
-	[[ -e $(rooted_path "$devices") ]] && return 0
+	if [[ -e $(rooted_path "$devices") ]]; then
+		echo
+		echo "To pair another device from this host, run:"
+		echo
+		echo "  sudo marionette pair"
+		return 0
+	fi
 	addr=$(default_value MARIONETTE_ADDR)
 	addr=${addr:-:8080}
 	echo
 	echo "No device is paired yet. Open http://<host>:${addr##*:}/ in a browser"
-	echo "and enter the pairing code from the service log:"
+	echo "and enter a pairing code. Get one on this host with:"
+	echo
+	echo "  sudo marionette pair"
+	echo
+	echo "or read the code written at startup from the service log:"
 	echo
 	echo '  journalctl -u marionette | grep "pairing code"'
 }

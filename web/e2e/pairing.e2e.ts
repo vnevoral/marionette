@@ -35,8 +35,10 @@ test("an unpaired browser gets only the pairing screen and no data", async ({
 	const page = await context.newPage();
 	await page.goto("/devices");
 	await expect(page).toHaveURL(/\/pair\?next=(%2F|\/)devices$/);
-	// A device is paired already, so the log hint is replaced by the Devices hint.
+	// A device is paired already, so the log hint is replaced by the Devices
+	// hint and the host command (FR-58).
 	await expect(page.getByText("Devices → Pair a new device")).toBeVisible();
+	await expect(page.getByText("sudo marionette pair")).toBeVisible();
 	await expect(page.getByText("journalctl")).toHaveCount(0);
 	for (const path of ["/api/cards", "/api/devices", "/api/events"]) {
 		expect((await context.request.get(path)).status(), path).toBe(401);

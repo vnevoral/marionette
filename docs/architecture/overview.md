@@ -5,8 +5,11 @@
 ```mermaid
 flowchart LR
     Operator["Operator / Administrator\n(paired browser)"] -->|HTTP/HTTPS: REST + SSE| Marionette
+    Admin["Administrator\n(SSH + sudo on the host)"] -->|marionette pair| ControlSocket
     subgraph Host["Host (Raspberry Pi / Ubuntu)"]
         Marionette["Marionette\n(single Go process, systemd service)"]
+        ControlSocket[["control.sock\n(/run/marionette, 0600)"]]
+        ControlSocket --> Marionette
         ConfigFile[("marionette.json\n(cards, settings, history)")]
         DevicesFile[("devices.json\n(paired devices)")]
         Marionette -->|reads/writes| ConfigFile
@@ -17,7 +20,7 @@ flowchart LR
 
 ## Components
 
-State as of release v1.2.1 (2026-09-27): all components are implemented;
+State as of block 0065 (2026-10-12): all components are implemented;
 the Status column names the phase or block that introduced or last
 reshaped each one.
 
@@ -27,6 +30,8 @@ reshaped each one.
 | Embedded UI            | `internal/webui`  | `go:embed` `web/dist`                                           | Implemented                                 |
 | SPA (Vue 3 + PrimeVue) | `web/src`         | Dashboard, card detail, card editor, pairing and Devices screens, version footer; shared SSE stream with REST fallback (`composables/`), status vocabulary and formatting (`ui/`), shared components (`components/`), PrimeVue preset (`theme/`) | Implemented — phases 6, 8, 9 (0029–0059)    |
 | Device access          | `internal/access` | Paired devices, pairing codes, device tokens, `devices.json` persistence (ADR-0011) | Implemented — 0043, 0052                    |
+| Control socket         | `internal/control` | Local Unix socket for `marionette pair` (one route, pairing code), and its client (ADR-0013) | Implemented — 0065                          |
+| Entrypoint and CLI     | `cmd/marionette`  | Service composition, lifecycle and shutdown; `marionette pair` / `help` subcommands | Implemented — 0034, 0065                    |
 | Config store           | `internal/config` | In-memory cards, Settings, JSON persistence and history (see [Protecting the configuration file](#protecting-the-configuration-file)) | Implemented — phase 2                       |
 | Execution engine       | `internal/execengine` | Safe execution of actions on the host (process group, timeout, minimal environment), output capture, concurrency limit | Implemented — phase 3, hardened 0024/0034   |
 | Status/health engine   | `internal/status` | Card status evaluation, transition history, optional polling    | Implemented — phase 4                       |
@@ -90,7 +95,7 @@ issued (other origins are intentionally not allowed).
 
 ## Access from paired devices
 
-The `internal/access` package (block 0043, FR-50..FR-56, NFR-13, ADR-0011)
+The `internal/access` package (block 0043, FR-50..FR-58, NFR-13, ADR-0011)
 keeps paired devices in `devices.json` (by default next to
 `MARIONETTE_CONFIG`, permissions `0600`, written via
 `fsutil.WriteFileAtomic`) and at most one pairing code in memory. The
@@ -126,13 +131,22 @@ keeps paired devices in `devices.json` (by default next to
   the log at startup and again on `GET /api/session` if none is valid — so
   the pairing screen can always find the current code in
   `journalctl -u marionette`.
+- **Code from the host** (FR-58, ADR-0013, block 0065): `marionette pair`
+  calls `POST /pairing-code` over the control socket
+  (`MARIONETTE_CONTROL_SOCKET`, default `/run/marionette/control.sock`;
+  the unit creates `/run/marionette` with mode `0700`, the socket is
+  `0600`). The socket is served by its own `http.Server` in
+  `internal/control`, never by the public router; the code goes only to
+  the command's output, the log records just that a code was issued. With
+  `MARIONETTE_AUTH=off` the socket answers `409`. The socket closes first
+  in the shutdown sequence ("stop control socket").
 - **Removal** takes effect for REST immediately; the SSE stream of a
   removed device ends at the next heartbeat (15 s).
 - **Failure**: a corrupted `devices.json` is quarantined
   (`.corrupt-<time>`) and the service starts with no devices (a new code in
   the log); an unreadable file stops startup (access is never silently
-  opened). Recovering lost access: delete `devices.json` and restart the
-  service.
+  opened). Recovering lost access: `sudo marionette pair`; revoking every
+  device: delete `devices.json` and restart the service.
 - `MARIONETTE_AUTH=off` disables authentication (development); startup logs
   it as a warning.
 

@@ -5,7 +5,7 @@ tmp_dir = "tmp"
 pre_cmd = ["make dev-config"]
 cmd = "go build -o ./tmp/marionette ./cmd/marionette"
 bin = "tmp/marionette"
-full_bin = "MARIONETTE_ADDR=:8080 MARIONETTE_CONFIG=./marionette.json ./tmp/marionette"
+full_bin = "MARIONETTE_ADDR=:8080 MARIONETTE_CONFIG=./marionette.json MARIONETTE_CONTROL_SOCKET=./marionette.sock ./tmp/marionette"
 include_ext = ["go"]
 exclude_dir = ["tmp", "bin", "web", "internal/webui/dist"]
 delay = 200

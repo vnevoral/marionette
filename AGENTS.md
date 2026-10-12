@@ -31,12 +31,15 @@ only then change the code.
 ## Architecture at a glance
 
 - `cmd/marionette` — entrypoint: service composition, `slog`, lifecycle and
-  graceful shutdown
+  graceful shutdown; without arguments it runs the service, `marionette
+  pair` is the host command that prints a pairing code (FR-58)
 - `internal/server` — pure HTTP layer: routes, request validation,
   cross-site protection, SSE writing, SPA fallback (no goroutines outside
   handlers)
 - `internal/access` — paired devices, pairing codes and device tokens
   (`devices.json`, ADR-0011)
+- `internal/control` — local control socket for `marionette pair` and its
+  client (ADR-0013); never mounted on the TCP listener
 - `internal/config` — domain model of cards, in-memory store, JSON persistence
 - `internal/execengine` — safe execution of actions (process group, timeout,
   minimal environment) and the concurrency limit
@@ -57,6 +60,7 @@ dependencies (no Node.js on the target, no separate web server).
 make ui-install     # once: npm install for web/
 make ui-dev          # Vite dev server :5173 (proxy /api -> :8080)
 make backend-dev     # Go backend with hot-reload (air) on :8080
+make pair            # pairing code from the running dev backend (./marionette.sock)
 make build           # build UI + embed + Go binary for the current platform
 make build-arm64     # cross-compile for Raspberry Pi (linux/arm64)
 make release-arm64   # release archive + .sha256; needs a clean tree and a vX.Y.Z tag on HEAD

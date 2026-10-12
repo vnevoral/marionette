@@ -67,6 +67,7 @@ Open the folder in the dev container (VS Code: "Reopen in Container"), then:
 make ui-install   # once, installs npm dependencies
 make ui-dev       # Vite dev server on :5173, proxies /api to :8080
 make backend-dev  # Go backend with hot reload (air) on :8080
+make pair         # pairing code from the running dev backend (marionette pair)
 make verify       # build UI + lint + tests; run before every commit
 make e2e          # browser tests against the built binary (Playwright, Chromium)
 ```
@@ -77,9 +78,10 @@ dev-config`). Go 1.27 or newer (`go.mod`) and Node 22 (`web/.nvmrc`) are
 required; the dev container provides both.
 
 Access control is on in development too: the first start prints a pairing
-code in the backend output; enter it on the pairing screen once (the paired
-device is kept in `./devices.json`). Set `MARIONETTE_AUTH=off` to skip
-pairing while developing.
+code in the backend output, and `make pair` prints a new one at any time
+(the dev backend listens on `./marionette.sock`). Enter it on the pairing
+screen once (the paired device is kept in `./devices.json`). Set
+`MARIONETTE_AUTH=off` to skip pairing while developing.
 
 ## Production build
 
@@ -156,6 +158,7 @@ the fix (see [Ping status check reports Problem](#ping-status-check-reports-prob
 | `MARIONETTE_DEVICES`          | next to the config  | Path of the paired devices file (`devices.json` in the directory of `MARIONETTE_CONFIG`).                 |
 | `MARIONETTE_DEVICE_EXPIRY_DAYS` | `60`              | A device unused for this many days must pair again (1–400). Devices in use are renewed automatically.     |
 | `MARIONETTE_COOKIE_SECURE`    | `auto`              | `Secure` attribute of the device cookie: `auto` (when the connection uses TLS), `always` (behind a TLS proxy) or `never`. |
+| `MARIONETTE_CONTROL_SOCKET`   | `/run/marionette/control.sock` | Local socket of `marionette pair`. Without the default directory (no systemd unit) the service runs without it; an explicit path must work. The command reads the same variable, not `/etc/default/marionette`. |
 
 Cards are normally managed in the UI. The configuration file is plain
 JSON; [deploy/marionette.example.json](deploy/marionette.example.json) is an
@@ -192,23 +195,33 @@ Only paired devices (browsers) can use Marionette. A device pairs once with a
 one-time code and is never asked again; there is no password.
 
 1. **First device.** After installation, open Marionette in a browser. It
-   shows the pairing screen. Read the code from the service log on the host
-   and enter it with a name for the device:
+   shows the pairing screen. Get a code on the host and enter it with a name
+   for the device:
+
+   ```bash
+   sudo marionette pair
+   ```
+
+   The code is valid for 10 minutes and works once. While no device is
+   paired, the service also writes a code to its log at startup (and again
+   when the pairing screen is opened and no code is valid):
 
    ```bash
    journalctl -u marionette | grep "pairing code"
    ```
 
-   The code is valid for 10 minutes; opening the pairing screen again writes
-   a fresh one while no device is paired.
 2. **More devices.** On a paired device open **Devices** → **Pair a new
    device** and enter the shown code (or open the link) on the new device.
-   Any device can be renamed later on the Devices page (pencil icon), for
+   Without a paired device at hand, run `sudo marionette pair` on the host
+   over SSH; the other devices stay paired. Only one code is valid at a
+   time, so a new code replaces the one shown on the Devices page. Any
+   device can be renamed later on the Devices page (pencil icon), for
    example to tell two "Chrome on Linux" apart.
 3. **Removing a device** on the Devices page ends its access at once.
    A device that is not used for `MARIONETTE_DEVICE_EXPIRY_DAYS` (60 by
    default) expires; a device in use is renewed automatically.
-4. **Lost every device?** On the host:
+4. **Lost every device?** Run `sudo marionette pair` on the host and pair
+   again. To revoke every paired device at once instead, on the host:
 
    ```bash
    sudo rm /var/lib/marionette/devices.json
