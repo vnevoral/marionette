@@ -45,8 +45,5 @@ jobs:
           TAG: ${{ github.ref_name }}
         run: |
           archive="bin/marionette-${TAG}-linux-arm64.tar.gz"
-          # --latest: the newest published release is always the one that
-          # releases/latest and `gh release download` without a tag return
-          # (FR-06, block 0067).
           gh release create "$TAG" "$archive" "$archive.sha256" \
-            --verify-tag --latest --title "Marionette $TAG" --generate-notes
+            --verify-tag --title "Marionette $TAG" --generate-notes

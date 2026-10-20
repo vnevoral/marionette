@@ -298,9 +298,9 @@ per the development workflow.
      — **Done** (2026-10-20); Go 1.27.3 in the dev container,
      golangci-lint v2.15.0, npm updates within the ranges (supersedes
      Dependabot PRs #13–#17).
-  8. [0067 — Every release is the Latest release](blocks/0067-latest-release.md)
-     — **Done** (2026-10-20); FR-06, `gh release create --latest`, README
-     installs the latest release without typing its version.
+  8. [0067 — Installing the latest release](blocks/0067-latest-release.md)
+     — **Done** (2026-10-20); FR-06, the README installs GitHub's Latest
+     release without typing its version.
 
   The open questions from the review are decided in
   [requirements.md, section 13](../requirements/requirements.md#13-decisions--project-review-2026-09-26)

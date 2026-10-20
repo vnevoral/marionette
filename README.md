@@ -106,9 +106,9 @@ full CI and then publishes a
 ARM64 archive and its `.sha256` file.
 
 Download both on the target Linux host. The commands below use the shell
-variable `v` for the release tag. Every new release is marked as the
-[latest release](https://github.com/vnevoral/marionette/releases/latest);
-to install it, let GitHub tell you its tag:
+variable `v` for the release tag. To install the
+[latest release](https://github.com/vnevoral/marionette/releases/latest),
+let GitHub tell you its tag:
 
 ```bash
 v=$(curl -fsS https://api.github.com/repos/vnevoral/marionette/releases/latest \

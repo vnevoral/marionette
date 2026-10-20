@@ -11,7 +11,7 @@
 > added FR-05, FR-21a and FR-22a after validation on a Raspberry Pi, 2026-09-26;
 > FR-57 device renaming, 2026-09-27; FR-10a card color, 2026-09-27;
 > FR-06, FR-41a and FR-42a, 2026-09-27; FR-58 pairing code from the host,
-> 2026-10-12; FR-06 Latest release, 2026-10-20).
+> 2026-10-12; FR-06 installing the latest release, 2026-10-20).
 > The open questions from v0.1 were decided
 > with the project owner, see [Phase 1 decisions](#7-phase-1-decisions-2026-09-25),
 > [Decisions — polling and termination](#9-decisions--polling-and-termination-2026-09-25)
@@ -65,11 +65,9 @@ distributed as a single executable file.
   (version from the git tag `vMAJOR.MINOR.PATCH`, a `.sha256` file) is built
   and published by CI automatically after the tag is pushed, as a GitHub
   Release. Tags are still created only by the project owner. The release is
-  not published if the tests do not pass. Each published release is marked
-  as the **Latest** GitHub Release _(added 2026-10-20)_, so
-  `releases/latest`, the GitHub API and `gh release download` without a
-  tag always lead to the most recently published version, and the README
-  shows how to install it without typing the version number.
+  not published if the tests do not pass. The README shows how to install
+  the latest release (GitHub's **Latest** release, which GitHub marks
+  automatically) without typing the version number _(added 2026-10-20)_.
 
 ### 3.2 Action cards and actions
 
