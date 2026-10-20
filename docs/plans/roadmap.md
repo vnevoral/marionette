@@ -12,8 +12,8 @@ one or more concrete implementation blocks (see the
 
 ## Current state
 
-As of 2026-10-12 all phases below are **Done**, the last closed block is
-[0065](blocks/0065-host-pairing-command.md) and the current release is
+As of 2026-10-20 all phases below are **Done**, the last closed block is
+[0066](blocks/0066-dependency-update-2026-10.md) and the current release is
 **v1.3.1** (tags `v1.0.0`, `v1.1.0`, `v1.2.0` to `v1.2.4`, `v1.3.0`,
 `v1.3.1`; `v1.2.0` has no GitHub Release because its CI run failed, fixed
 by block 0059; `v1.3.0` has none because `npm audit` failed on a new
@@ -294,6 +294,10 @@ per the development workflow.
      [ADR-0013](../architecture/decisions/0013-host-pairing-command.md),
      `sudo marionette pair` over a local control socket; released as
      `v1.3.1` and verified on the Pi.
+  7. [0066 — Dependency and toolchain update (October 2026)](blocks/0066-dependency-update-2026-10.md)
+     — **Done** (2026-10-20); Go 1.27.3 in the dev container,
+     golangci-lint v2.15.0, npm updates within the ranges (supersedes
+     Dependabot PRs #13–#17).
 
   The open questions from the review are decided in
   [requirements.md, section 13](../requirements/requirements.md#13-decisions--project-review-2026-09-26)

@@ -317,10 +317,12 @@ func TestRunShutsDownQuicklyWithOpenSSEClientAndSavesHistory(t *testing.T) {
 	if line, err := eventReader.ReadString('\n'); err != nil || line != ": connected\n" {
 		t.Fatalf("first SSE line = %q, %v", line, err)
 	}
-	streamClosed := make(chan error, 1)
+	// Closed once the server ends the stream; how it ends (EOF or a reset)
+	// does not matter here.
+	streamClosed := make(chan struct{})
 	go func() {
-		_, err := io.ReadAll(eventReader)
-		streamClosed <- err
+		_, _ = io.ReadAll(eventReader)
+		close(streamClosed)
 	}()
 
 	response, err := http.Post(baseURL+"/api/cards/long/actions/primary", "application/json", nil)

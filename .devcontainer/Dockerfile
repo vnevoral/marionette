@@ -14,9 +14,9 @@ RUN rm -f /etc/apt/sources.list.d/yarn.list \
 # Go toolchain pinned to the version in go.mod. The devcontainers/go image
 # does not ship newer Go releases, so the image's Go is replaced by the
 # official archive, verified against the checksum published on go.dev.
-ARG GO_VERSION=1.27.1
-ARG GO_SHA256_AMD64=63d339f0da5ab53635a56f2490a7984dfe12dfcff22ad749f63edaf590168445
-ARG GO_SHA256_ARM64=3450b45a3f9ee8568792736a5c5e70a1f2e9b36c35a8f74958c03e51d7d92bec
+ARG GO_VERSION=1.27.3
+ARG GO_SHA256_AMD64=65efbc80fdc1fa2cd2631cad5b481777a68e8725f34e89f50fc6ac714e379b40
+ARG GO_SHA256_ARM64=a06e99309dbcbdca1a8ccd2282c3ee146e55930886e26b4f1193269587165f49
 RUN arch="$(dpkg --print-architecture)" \
 	&& case "$arch" in \
 		amd64) sum="$GO_SHA256_AMD64" ;; \
@@ -33,5 +33,5 @@ RUN arch="$(dpkg --print-architecture)" \
 USER vscode
 RUN go install github.com/air-verse/air@v1.67.4 \
 	&& go install mvdan.cc/gofumpt@v0.12.0 \
-	&& curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/v2.14.0/install.sh \
-		| sh -s -- -b "$(go env GOPATH)/bin" v2.14.0
+	&& curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/v2.15.0/install.sh \
+		| sh -s -- -b "$(go env GOPATH)/bin" v2.15.0
