@@ -68,9 +68,11 @@ version from `git describe`.
      (e.g. `v1.2.3-rc1`, which the workflow filter lets through), so no
      release is created;
    - `gh release create` publishes a GitHub Release for the tag with the
-     archive `marionette-vX.Y.Z-linux-arm64.tar.gz` and its `.sha256`. The
-     notes are generated from the commits. Only this job has the
-     `contents: write` permission.
+     archive `marionette-vX.Y.Z-linux-arm64.tar.gz` and its `.sha256` and
+     marks it as **Latest** (`--latest`, FR-06), so `releases/latest` and
+     `gh release download` without a tag always return the release just
+     published. The notes are generated from the commits. Only this job has
+     the `contents: write` permission.
 3. On the target host, the archive and the `.sha256` are downloaded from
    GitHub Releases (README, "Installation on Linux with systemd"); the
    reference verification runs on a Raspberry Pi ARM64 with Ubuntu 24.x. In

@@ -13,7 +13,7 @@ one or more concrete implementation blocks (see the
 ## Current state
 
 As of 2026-10-20 all phases below are **Done**, the last closed block is
-[0066](blocks/0066-dependency-update-2026-10.md) and the current release is
+[0067](blocks/0067-latest-release.md) and the current release is
 **v1.3.1** (tags `v1.0.0`, `v1.1.0`, `v1.2.0` to `v1.2.4`, `v1.3.0`,
 `v1.3.1`; `v1.2.0` has no GitHub Release because its CI run failed, fixed
 by block 0059; `v1.3.0` has none because `npm audit` failed on a new
@@ -21,7 +21,7 @@ advisory for `source-map-js`, fixed in the lockfile for `v1.3.1`). `v1.2.2`
 contains blocks 0060 and 0061 (Go 1.27, golangci-lint v2, SSE subscription
 order), `v1.2.3` block 0062 (card color on the Current status panel),
 `v1.2.4` block 0063 (page header actions on mobile) and `v1.3.1` blocks
-0064 and 0065 (`marionette pair`). The requirements are at v0.12.
+0064 and 0065 (`marionette pair`). The requirements are at v0.13.
 `v1.3.1` runs on the reference Raspberry Pi; the owner deployed it and
 verified `sudo marionette pair` there on 2026-10-12 (the upgrade and
 rollback procedure from the README was verified with `v1.2.1`). New work starts as a new requirement and block
@@ -46,7 +46,7 @@ per the development workflow.
 ## Planning notes
 
 - Phase 1 is closed: `docs/requirements/requirements.md` was at v0.5 at
-  that point (now v0.12; open questions resolved, see section 7 of the document) and
+  that point (now v0.13; open questions resolved, see section 7 of the document) and
   [ADR-0004](../architecture/decisions/0004-action-card-domain-model.md) is
   accepted, including run history, output rules, polling and the
   concurrency limit.
@@ -298,6 +298,9 @@ per the development workflow.
      — **Done** (2026-10-20); Go 1.27.3 in the dev container,
      golangci-lint v2.15.0, npm updates within the ranges (supersedes
      Dependabot PRs #13–#17).
+  8. [0067 — Every release is the Latest release](blocks/0067-latest-release.md)
+     — **Done** (2026-10-20); FR-06, `gh release create --latest`, README
+     installs the latest release without typing its version.
 
   The open questions from the review are decided in
   [requirements.md, section 13](../requirements/requirements.md#13-decisions--project-review-2026-09-26)

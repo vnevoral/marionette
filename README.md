@@ -106,19 +106,29 @@ full CI and then publishes a
 ARM64 archive and its `.sha256` file.
 
 Download both on the target Linux host. The commands below use the shell
-variable `v` for the release tag; set it to the version you install (the
-[latest release](https://github.com/vnevoral/marionette/releases/latest)
-unless you have a reason to pick another):
+variable `v` for the release tag. Every new release is marked as the
+[latest release](https://github.com/vnevoral/marionette/releases/latest);
+to install it, let GitHub tell you its tag:
 
 ```bash
-v=vX.Y.Z   # the release to install
+v=$(curl -fsS https://api.github.com/repos/vnevoral/marionette/releases/latest \
+  | sed -n 's/.*"tag_name": *"\([^"]*\)".*/\1/p')
+echo "$v"  # e.g. v1.3.1
+```
+
+To install another release instead, set it yourself, e.g. `v=v1.2.4`. Then
+download the archive and its checksum:
+
+```bash
 base=https://github.com/vnevoral/marionette/releases/download/$v
 curl -LO "$base/marionette-$v-linux-arm64.tar.gz"
 curl -LO "$base/marionette-$v-linux-arm64.tar.gz.sha256"
 ```
 
 With the GitHub CLI, `gh release download "$v" -R vnevoral/marionette -p
-"marionette-$v-linux-arm64.tar.gz*"` does the same.
+"marionette-$v-linux-arm64.tar.gz*"` does the same; without the tag,
+`gh release download -R vnevoral/marionette -p "marionette-*-linux-arm64.tar.gz*"`
+downloads the latest release (set `v` to its tag for the steps below).
 
 Without GitHub, build the same archive on a build host from a clean, tagged
 commit and copy both files over; without a matching tag on `HEAD`, or with
