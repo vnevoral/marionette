@@ -13,7 +13,7 @@ one or more concrete implementation blocks (see the
 ## Current state
 
 As of 2026-10-20 all phases below are **Done**, the last closed block is
-[0080](blocks/0080-dev-data-directory.md) and the current release is
+[0081](blocks/0081-dependency-update-typescript-6.md) and the current release is
 **v2.0.0** (tags `v1.0.0`, `v1.1.0`, `v1.2.0` to `v1.2.4`, `v1.3.0`,
 `v1.3.1`, `v2.0.0`; `v1.2.0` has no GitHub Release because its CI run
 failed, fixed by block 0059; `v1.3.0` has none because `npm audit` failed on a new
@@ -27,8 +27,9 @@ notes; published 2026-10-20, the first release with notes in
 `docs/releases/`). The requirements are at v0.14.
 `v1.3.1` runs on the reference Raspberry Pi: the owner deployed it and
 verified `sudo marionette pair` there on 2026-10-12 (the upgrade and
-rollback procedure from the README was verified with `v1.2.1`). `v2.0.0`
-is not deployed there yet. New work starts as a new requirement and block
+rollback procedure from the README was verified with `v1.2.1`). The owner
+upgraded it to `v2.0.0` on 2026-10-20: the upgrade keeps the existing
+configuration and only the card icons had to be chosen again. New work starts as a new requirement and block
 per the development workflow and reaches `main` through a pull request
 (block 0068).
 
@@ -43,17 +44,18 @@ the move to pull requests (block 0068), one release run per tag
 (block 0071), `primeicons` on MIT 7.x (block 0072), the replacement of
 PrimeVue by Reka UI, own components and Lucide (ADR-0014, blocks
 0073–0076), hand-written release notes (block 0077), the Dependabot
-cooldown (block 0078), the repository cleanup (block 0079) and the dev
-data directory (block 0080), all
+cooldown (block 0078), the repository cleanup (block 0079), the dev
+data directory (block 0080) and TypeScript 6 (block 0081, ADR-0015), all
 2026-10-20. The UI bundle is about 340 kB (113 kB gzip) since PrimeVue is
 gone, below the Vite warning, so the bundle-size item is dropped.
 
-1. **TypeScript 7.** Major version; needs a changelog check and an ADR
-   (`docs/devops/ci-cd.md`).
-2. **happy-dom 21.** Major version of a test dependency.
+1. **TypeScript 7.** Waits until `typescript-eslint` and `vue-tsc`
+   support it (ADR-0015).
+2. **happy-dom 21.** Major version of a test dependency; qualifies under
+   the two-week rule from 2026-10-26.
 3. **Rollback on the Pi.** The README rollback procedure was last verified
    with `v1.2.1`; the unit and the control socket changed since (block
-   0065). Repeat it with the upgrade to `v2.0.0`.
+   0065). The upgrade to `v2.0.0` is verified; repeat the rollback.
 
 Deferred features, only on a concrete need: API tokens for scripts and
 passkeys once there is TLS (ADR-0011), UI localization (ADR-0007).
@@ -378,6 +380,10 @@ passkeys once there is TLS (ADR-0011), UI localization (ADR-0007).
      **Done** (2026-10-20); the dev configuration, paired devices and
      control socket live in the git-ignored `.dev/` instead of the
      repository root.
+  22. [0081 — Dependency update and TypeScript 6](blocks/0081-dependency-update-typescript-6.md)
+     — **Done** (2026-10-20); TypeScript 6.0.3 with the deprecated
+     `baseUrl` removed (ADR-0015); every other dependency is on its newest
+     version that is at least two weeks old.
 
   The open questions from the review are decided in
   [requirements.md, section 13](../requirements/requirements.md#13-decisions--project-review-2026-09-26)
