@@ -69,3 +69,8 @@ self-hosted tool. This decision supplements ADR-0003.
 > Added 2026-10-20 (block 0071): `@primevue/themes` was replaced by
 > `@primeuix/themes` 2.x; Dependabot ignores the major versions of
 > `primevue` and `@primeuix/themes`.
+
+> Added 2026-10-20 (block 0076): PrimeVue, `@primeuix/themes` and
+> `primeicons` were removed under
+> [ADR-0014](0014-replace-primevue-with-reka-ui.md); their Dependabot
+> ignores went with them. The layout utilities decided here stay.

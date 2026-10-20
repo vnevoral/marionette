@@ -1,6 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { flushPromises, mount, RouterLinkStub } from "@vue/test-utils";
-import PrimeVue from "primevue/config";
 import {
 	enqueuePrimary,
 	enqueueStatus,
@@ -74,7 +73,7 @@ const plain: ActionCard = {
 
 function mountHome() {
 	return mount(HomeView, {
-		global: { plugins: [PrimeVue], stubs: { RouterLink: RouterLinkStub } },
+		global: { stubs: { RouterLink: RouterLinkStub } },
 	});
 }
 

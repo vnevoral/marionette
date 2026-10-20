@@ -76,8 +76,8 @@ end-to-end flows); see
   commit messages.
 - **Go:** `gofumpt` formatting, errors are returned, no `panic` outside the
   embedded UI initialization, no new dependencies without a reason.
-- **Vue/TypeScript:** `<script setup lang="ts">`, PrimeVue components
-  instead of custom UI elements, tab indentation, Prettier and ESLint.
+- **Vue/TypeScript:** `<script setup lang="ts">`, the shared components in
+  `web/src/ui/` instead of ad-hoc UI elements, tab indentation, Prettier and ESLint.
 - **Security:** actions run commands on the host. Never pass user input
   through a shell or run it without validation; see the security
   requirements (NFR-01, NFR-12, NFR-13) in the requirements document.

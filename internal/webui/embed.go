@@ -1,4 +1,4 @@
-// Package webui embeds the compiled Vue/PrimeVue SPA (web/dist) into the Go binary.
+// Package webui embeds the compiled Vue SPA (web/dist) into the Go binary.
 package webui
 
 import (

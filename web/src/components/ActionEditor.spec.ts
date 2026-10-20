@@ -1,6 +1,5 @@
 import { describe, expect, it } from "vitest";
 import { mount } from "@vue/test-utils";
-import PrimeVue from "primevue/config";
 import type { Action } from "@/api";
 import ActionEditor from "@/components/ActionEditor.vue";
 import type { EnvironmentRow } from "@/views/cardEditModel";
@@ -30,7 +29,6 @@ function mountEditor(overrides: Partial<EditorProps> = {}) {
 			"onUpdate:environment": (value: EnvironmentRow[]) =>
 				void wrapper.setProps({ environment: value }),
 		},
-		global: { plugins: [PrimeVue] },
 	});
 	return wrapper;
 }

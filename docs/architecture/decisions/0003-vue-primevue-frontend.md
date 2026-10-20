@@ -67,4 +67,6 @@ after reviewing the changelog/migration and updating this ADR.
 > Added 2026-10-20: [ADR-0014](0014-replace-primevue-with-reka-ui.md)
 > replaces PrimeVue, its themes and `primeicons` with Reka UI, the project's
 > own styled components and Lucide icons. Vue 3, Vite and `vue-router` stay
-> as decided here.
+> as decided here. Block 0076 (2026-10-20) removed the last PrimeVue,
+> `@primeuix/*` and `primeicons` packages; the PrimeVue parts of this ADR
+> are superseded.

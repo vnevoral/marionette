@@ -141,14 +141,13 @@ step 3.
 - govulncheck: pinned in `ci.yml` and the `vulncheck` target of the
   `Makefile` (`golang.org/x/vuln/cmd/govulncheck@vX.Y.Z`, run with
   `go run`); raise it together with golangci-lint.
-- npm (`web/`): keep PrimeVue on the stable major branch (`v4-stable`
-  dist-tag), see
-  [ADR-0003](../architecture/decisions/0003-vue-primevue-frontend.md).
-  Before accepting a new major version of any key dependency (Vite, Vue,
-  PrimeVue, TypeScript), check the changelog and write/update an ADR if it
-  brings breaking changes.
+- npm (`web/`): Dependabot ignores major versions of Vue, Vite,
+  TypeScript, `reka-ui` and `@lucide/vue`. Before accepting a new major
+  version of any of them, check the changelog and the licence and
+  write/update an ADR if it brings breaking changes (ADR-0003, ADR-0014).
 - Layout utilities are the project's own `web/src/styles/layout.css`
   (14 classes, see
   [ADR-0010](../architecture/decisions/0010-own-layout-utilities-replace-primeflex.md));
-  PrimeFlex was removed in block 0035. PrimeVue stays on v4 (MIT); version 5
-  has a commercial license and requires a new ADR.
+  PrimeFlex was removed in block 0035 and PrimeVue, `@primeuix/*` and
+  `primeicons` in block 0076
+  ([ADR-0014](../architecture/decisions/0014-replace-primevue-with-reka-ui.md)).

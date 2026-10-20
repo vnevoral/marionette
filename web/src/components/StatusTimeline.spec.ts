@@ -1,6 +1,5 @@
 import { describe, expect, it } from "vitest";
 import { mount } from "@vue/test-utils";
-import PrimeVue from "primevue/config";
 import type { StatusChange } from "@/api";
 import StatusTimeline from "@/components/StatusTimeline.vue";
 
@@ -20,7 +19,6 @@ function mountTimeline(
 ) {
 	return mount(StatusTimeline, {
 		props: { changes: [], loading: false, now, ...props },
-		global: { plugins: [PrimeVue] },
 	});
 }
 

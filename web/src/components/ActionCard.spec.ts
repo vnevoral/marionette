@@ -1,6 +1,5 @@
 import { describe, expect, it } from "vitest";
 import { mount, RouterLinkStub } from "@vue/test-utils";
-import PrimeVue from "primevue/config";
 import type { ActionCard as Card, StatusSnapshot } from "@/api";
 import ActionCard from "@/components/ActionCard.vue";
 import type { PendingRequest, RequestResult } from "@/types";
@@ -26,7 +25,7 @@ function mountCard(props: {
 }) {
 	return mount(ActionCard, {
 		props: { card, ...props },
-		global: { plugins: [PrimeVue], stubs: { RouterLink: RouterLinkStub } },
+		global: { stubs: { RouterLink: RouterLinkStub } },
 	});
 }
 

@@ -2,7 +2,6 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { h } from "vue";
 import { flushPromises, mount, type VueWrapper } from "@vue/test-utils";
 import { createMemoryHistory, createRouter, RouterView, type Router } from "vue-router";
-import PrimeVue from "primevue/config";
 import MSelect from "@/ui/MSelect.vue";
 import { ApiError, createCard, getCard, updateCard, type ActionCard } from "@/api";
 import CardEditView from "@/views/CardEditView.vue";
@@ -57,7 +56,7 @@ async function mountEdit(path: string) {
 	// Rendered through RouterView so onBeforeRouteLeave is attached to the route.
 	const wrapper = mount(
 		{ render: () => h(RouterView) },
-		{ global: { plugins: [router, PrimeVue], provide: { ...confirm.provide, ...toast.provide } } },
+		{ global: { plugins: [router], provide: { ...confirm.provide, ...toast.provide } } },
 	);
 	await flushPromises();
 	return { wrapper, router, confirm, toast };

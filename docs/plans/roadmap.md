@@ -13,7 +13,7 @@ one or more concrete implementation blocks (see the
 ## Current state
 
 As of 2026-10-20 all phases below are **Done**, the last closed block is
-[0075](blocks/0075-ui-feedback.md) and the current release is
+[0076](blocks/0076-remove-primevue.md) and the current release is
 **v1.3.1** (tags `v1.0.0`, `v1.1.0`, `v1.2.0` to `v1.2.4`, `v1.3.0`,
 `v1.3.1`; `v1.2.0` has no GitHub Release because its CI run failed, fixed
 by block 0059; `v1.3.0` has none because `npm audit` failed on a new
@@ -49,20 +49,18 @@ the move to pull requests (block 0068), one release run per tag
    (blocks 0071, 0072). The owner asked on 2026-10-20 to replace PrimeVue:
    [ADR-0014](../architecture/decisions/0014-replace-primevue-with-reka-ui.md)
    (**Accepted**) replaces it with Reka UI, own styled components and
-   Lucide icons in four blocks, with a visual refresh. Blocks 0073 (icons,
-   buttons, surfaces, tokens), 0074 (form controls) and 0075 (toast and
-   confirmation dialog) are done, so no PrimeVue component is rendered any
-   more; next is 0076 (removal of the PrimeVue packages). Until then,
-   watch PrimeVue 4 for releases and security fixes. The icon change is
-   incompatible for API clients, so the next release is **v2.0.0**.
+   Lucide icons in four blocks, with a visual refresh. **Done**: blocks
+   0073 (icons, buttons, surfaces, tokens), 0074 (form controls), 0075
+   (toast and confirmation dialog) and 0076 (packages removed). The icon
+   change is incompatible for API clients, so the next release is
+   **v2.0.0**, with hand-written release notes (block 0077).
 5. **Rollback on the Pi.** The README rollback procedure was last verified
    with `v1.2.1`; the unit and the control socket changed since (block
    0065). Repeat it with the next upgrade.
 
 Deferred features, only on a concrete need: API tokens for scripts and
 passkeys once there is TLS (ADR-0011), UI localization (ADR-0007). PrimeVue
-5 is not planned (commercial license, ADR-0003/ADR-0010); backlog item 4
-plans its replacement.
+was replaced by Reka UI and own components (ADR-0014, backlog item 4).
 
 ## Phase overview
 
@@ -366,6 +364,10 @@ plans its replacement.
      — **Done** (2026-10-20); ADR-0014 part 3: own feedback service with
      `MToastHost` (Reka UI `Toast`) and `MConfirmHost` (Reka UI
      `AlertDialog`).
+  17. [0076 — Remove PrimeVue](blocks/0076-remove-primevue.md) — **Done**
+     (2026-10-20); ADR-0014 part 4: `primevue`, `@primeuix/themes`,
+     `primeicons` and the preset removed, documentation and the README
+     screenshot updated.
 
   The open questions from the review are decided in
   [requirements.md, section 13](../requirements/requirements.md#13-decisions--project-review-2026-09-26)
