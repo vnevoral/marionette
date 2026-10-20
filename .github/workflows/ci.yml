@@ -19,6 +19,9 @@ jobs:
       - uses: actions/setup-go@v7
         with:
           go-version-file: go.mod
+          # The latest patch release, not the one cached on the runner, so
+          # builds get standard library security fixes (block 0066).
+          check-latest: true
       - uses: golangci/golangci-lint-action@v9
         with:
           version: v2.15.0
@@ -54,6 +57,9 @@ jobs:
       - uses: actions/setup-go@v7
         with:
           go-version-file: go.mod
+          # The latest patch release, not the one cached on the runner, so
+          # builds get standard library security fixes (block 0066).
+          check-latest: true
       - uses: actions/setup-node@v7
         with:
           node-version-file: web/.nvmrc

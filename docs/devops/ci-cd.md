@@ -100,7 +100,8 @@ step 3.
 
 - Go: `go.mod` sets the version (currently Go 1.27, also stated in the
   README); CI and the release build use the latest patch release of it
-  (`setup-go` with `go-version-file`). The dev container pins the same
+  (`setup-go` with `go-version-file` and `check-latest: true`; without it
+  the runner's cached patch release is used). The dev container pins the same
   version with its checksum (`.devcontainer/Dockerfile`, `GO_VERSION`).
   Stay on a Go release that still receives security fixes (the two newest
   major releases); raise it cautiously and test the build on arm64

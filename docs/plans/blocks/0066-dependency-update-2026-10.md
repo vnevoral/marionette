@@ -29,7 +29,9 @@ open Dependabot pull requests #13–#17, without changing behavior.
 - **In scope**:
   - dev container: Go 1.27.3 (checksums from go.dev), golangci-lint
     v2.15.0 (gofumpt stays v0.12.0, the version bundled in v2.15.0);
-  - CI: golangci-lint v2.15.0;
+  - CI: golangci-lint v2.15.0; `setup-go` with `check-latest: true` in
+    `ci.yml` and `release.yml` (found after the first push: without it CI
+    used the runner's cached Go 1.27.2, not 1.27.3);
   - `web/`: `npm update` within the ranges and the ranges raised to the
     installed versions (vue 3.5.44, vue-router 5.4.0, vite 8.3.4, vitest
     5.0.5, eslint 10.13.0, Playwright 1.64.1, ...);
@@ -58,4 +60,4 @@ open Dependabot pull requests #13–#17, without changing behavior.
   `govulncheck ./...` and `npm audit` report nothing. The Vite chunk size
   warning (index chunk about 610 kB) predates the update.
 - **Deviations from the plan**: none.
-- **Documentation updated**: roadmap.
+- **Documentation updated**: roadmap, `docs/devops/ci-cd.md`.
