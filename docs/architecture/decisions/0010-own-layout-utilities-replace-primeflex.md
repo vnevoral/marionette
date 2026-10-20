@@ -65,3 +65,7 @@ self-hosted tool. This decision supplements ADR-0003.
   licensing assessment.
 - ADR-0009 is superseded by this ADR; `docs/devops/ci-cd.md`, requirements
   section 13 and the UX specification refer to this ADR.
+
+> Added 2026-10-20 (block 0071): `@primevue/themes` was replaced by
+> `@primeuix/themes` 2.x; Dependabot ignores the major versions of
+> `primevue` and `@primeuix/themes`.

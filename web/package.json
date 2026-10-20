@@ -20,7 +20,7 @@
 		"format:check": "prettier --check ."
 	},
 	"dependencies": {
-		"@primevue/themes": "^4.5.4",
+		"@primeuix/themes": "^2.0.3",
 		"primeicons": "^8.0.2",
 		"primevue": "^4.5.5",
 		"vue": "^3.5.44",

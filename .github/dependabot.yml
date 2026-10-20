@@ -10,10 +10,11 @@ updates:
       interval: weekly
     ignore:
       # Major upgrades of core UI dependencies require an ADR (ADR-0003,
-      # ADR-0010: PrimeVue 5 changed its licence, the project stays on v4).
+      # ADR-0010: PrimeVue 5 changed its licence, the project stays on v4;
+      # @primeuix/themes 3.x belongs to PrimeVue 5).
       - dependency-name: primevue
         update-types: ["version-update:semver-major"]
-      - dependency-name: "@primevue/themes"
+      - dependency-name: "@primeuix/themes"
         update-types: ["version-update:semver-major"]
       - dependency-name: vue
         update-types: ["version-update:semver-major"]
