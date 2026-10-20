@@ -31,7 +31,10 @@ open Dependabot pull requests #13–#17, without changing behavior.
     v2.15.0 (gofumpt stays v0.12.0, the version bundled in v2.15.0);
   - CI: golangci-lint v2.15.0; `setup-go` with `check-latest: true` in
     `ci.yml` and `release.yml` (found after the first push: without it CI
-    used the runner's cached Go 1.27.2, not 1.27.3);
+    used the runner's cached Go 1.27.2, not 1.27.3). On 2026-10-20 the
+    `actions/go-versions` manifest that `setup-go` reads ends at 1.27.2,
+    so CI still builds with 1.27.2 (no known vulnerabilities) and picks
+    up 1.27.3 once it is published;
   - `web/`: `npm update` within the ranges and the ranges raised to the
     installed versions (vue 3.5.44, vue-router 5.4.0, vite 8.3.4, vitest
     5.0.5, eslint 10.13.0, Playwright 1.64.1, ...);
