@@ -14,17 +14,21 @@ one or more concrete implementation blocks (see the
 
 As of 2026-10-20 all phases below are **Done**, the last closed block is
 [0077](blocks/0077-release-notes.md) and the current release is
-**v1.3.1** (tags `v1.0.0`, `v1.1.0`, `v1.2.0` to `v1.2.4`, `v1.3.0`,
-`v1.3.1`; `v1.2.0` has no GitHub Release because its CI run failed, fixed
-by block 0059; `v1.3.0` has none because `npm audit` failed on a new
+**v2.0.0** (tags `v1.0.0`, `v1.1.0`, `v1.2.0` to `v1.2.4`, `v1.3.0`,
+`v1.3.1`, `v2.0.0`; `v1.2.0` has no GitHub Release because its CI run
+failed, fixed by block 0059; `v1.3.0` has none because `npm audit` failed on a new
 advisory for `source-map-js`, fixed in the lockfile for `v1.3.1`). `v1.2.2`
 contains blocks 0060 and 0061 (Go 1.27, golangci-lint v2, SSE subscription
 order), `v1.2.3` block 0062 (card color on the Current status panel),
-`v1.2.4` block 0063 (page header actions on mobile) and `v1.3.1` blocks
-0064 and 0065 (`marionette pair`). The requirements are at v0.14.
-`v1.3.1` runs on the reference Raspberry Pi; the owner deployed it and
+`v1.2.4` block 0063 (page header actions on mobile), `v1.3.1` blocks
+0064 and 0065 (`marionette pair`) and `v2.0.0` blocks 0068 to 0077 (the
+new UI on Reka UI and Lucide, card icons as names, hand-written release
+notes; published 2026-10-20, the first release with notes in
+`docs/releases/`). The requirements are at v0.14.
+`v1.3.1` runs on the reference Raspberry Pi: the owner deployed it and
 verified `sudo marionette pair` there on 2026-10-12 (the upgrade and
-rollback procedure from the README was verified with `v1.2.1`). New work starts as a new requirement and block
+rollback procedure from the README was verified with `v1.2.1`). `v2.0.0`
+is not deployed there yet. New work starts as a new requirement and block
 per the development workflow and reaches `main` through a pull request
 (block 0068).
 
@@ -53,10 +57,11 @@ the move to pull requests (block 0068), one release run per tag
    0073 (icons, buttons, surfaces, tokens), 0074 (form controls), 0075
    (toast and confirmation dialog) and 0076 (packages removed). The icon
    change is incompatible for API clients, so the next release is
-   **v2.0.0**, with hand-written release notes (block 0077).
+   **v2.0.0**, with hand-written release notes (block 0077); released
+   2026-10-20.
 5. **Rollback on the Pi.** The README rollback procedure was last verified
    with `v1.2.1`; the unit and the control socket changed since (block
-   0065). Repeat it with the next upgrade.
+   0065). Repeat it with the upgrade to `v2.0.0`.
 
 Deferred features, only on a concrete need: API tokens for scripts and
 passkeys once there is TLS (ADR-0011), UI localization (ADR-0007). PrimeVue
