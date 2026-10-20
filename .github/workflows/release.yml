@@ -12,6 +12,13 @@ on:
 permissions:
   contents: read
 
+# GitHub has started two runs for one tag push (v1.2.4); runs for the same
+# tag publish one after another and deploy/publish_release.sh skips a
+# release that is already published (block 0069).
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
 jobs:
   ci:
     uses: ./.github/workflows/ci.yml
@@ -43,7 +50,4 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           TAG: ${{ github.ref_name }}
-        run: |
-          archive="bin/marionette-${TAG}-linux-arm64.tar.gz"
-          gh release create "$TAG" "$archive" "$archive.sha256" \
-            --verify-tag --title "Marionette $TAG" --generate-notes
+        run: bash deploy/publish_release.sh "$TAG"

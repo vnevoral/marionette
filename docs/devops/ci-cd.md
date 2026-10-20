@@ -8,7 +8,8 @@ On every push and pull request:
    devcontainer, configuration `.golangci.yml`), `go build ./...`,
    `go vet ./...`, `go test -race -count=1 ./...` on linux/amd64, `bash -n`
    and a staged test of the install script (`deploy/install_test.sh`) and a
-   test of the release version rule (`deploy/release_version_test.sh`).
+   test of the release version rule (`deploy/release_version_test.sh`) and
+   of release publishing (`deploy/publish_release_test.sh`).
 2. **web** — `npm ci`, `npm audit --omit=dev --audit-level=high`,
    `npm run lint` (`--max-warnings 0`), `npm run format:check`,
    `npm run build` (includes type-check via `vue-tsc`) in `web/`. The Node
@@ -87,8 +88,12 @@ version from `git describe`.
      tags. `deploy/release_version.sh` rejects a tag of a different form
      (e.g. `v1.2.3-rc1`, which the workflow filter lets through), so no
      release is created;
-   - `gh release create` publishes a GitHub Release for the tag with the
-     archive `marionette-vX.Y.Z-linux-arm64.tar.gz` and its `.sha256`.
+   - `deploy/publish_release.sh` publishes a GitHub Release for the tag
+     with the archive `marionette-vX.Y.Z-linux-arm64.tar.gz` and its
+     `.sha256` (`gh release create`). Runs for the same tag are queued in
+     one `concurrency` group, and a run that finds the release already
+     published with both assets succeeds without changing it; a draft or a
+     release missing an asset fails the run (block 0069).
      GitHub marks the newest release as **Latest** automatically; the
      README installs that release (FR-06). The notes are generated from the
      commits. Only this job has the `contents: write` permission.

@@ -78,9 +78,12 @@ deploy-test:
 	bash deploy/install_test.sh
 
 ## Test of the release version rule (tag vMAJOR.MINOR.PATCH on a clean HEAD)
+## and of publishing a GitHub Release once per tag
 release-test:
 	bash -n deploy/release_version.sh
 	bash deploy/release_version_test.sh
+	bash -n deploy/publish_release.sh
+	bash deploy/publish_release_test.sh
 
 ## End-to-end tests: real binary with the embedded SPA in headless Chromium
 ## (Playwright). Needs `npx playwright install chromium` once; not part of
