@@ -13,7 +13,7 @@ one or more concrete implementation blocks (see the
 ## Current state
 
 As of 2026-10-20 all phases below are **Done**, the last closed block is
-[0068](blocks/0068-pull-request-workflow.md) and the current release is
+[0069](blocks/0069-one-release-run-per-tag.md) and the current release is
 **v1.3.1** (tags `v1.0.0`, `v1.1.0`, `v1.2.0` to `v1.2.4`, `v1.3.0`,
 `v1.3.1`; `v1.2.0` has no GitHub Release because its CI run failed, fixed
 by block 0059; `v1.3.0` has none because `npm audit` failed on a new
@@ -33,33 +33,38 @@ per the development workflow and reaches `main` through a pull request
 Known follow-up work, recorded on 2026-10-20 after block 0067. The owner
 approved the items as proposed on 2026-10-20; each item becomes a block
 (and an ADR where noted) before it is implemented. Ordered by priority.
-Done since: the dev container rebuild (`go version` reports go1.27.3) and
-the move to pull requests (block 0068), both 2026-10-20.
+Done since: the dev container rebuild (`go version` reports go1.27.3),
+the move to pull requests (block 0068) and one release run per tag
+(block 0069), all 2026-10-20.
 
-1. **Duplicate release runs for one tag.** GitHub started two Release runs
-   for the `v1.2.4` tag push; the second failed with "a release with the
-   same tag name already exists" (the release itself was fine). Proposal:
-   a `concurrency` group per tag in `release.yml` and skipping an existing
-   release instead of failing.
-2. **`govulncheck` in CI.** The outdated Go in the dev container was found
+1. **`govulncheck` in CI.** The outdated Go in the dev container was found
    by chance (block 0066). A `govulncheck ./...` step in `ci.yml` would
    check Go the way `npm audit` checks the web part.
-3. **`@primevue/themes` → `@primeuix/themes`.** The package is deprecated
+2. **`@primevue/themes` → `@primeuix/themes`.** The package is deprecated
    and only wraps `@primeuix/themes`; `web/src/theme/preset.ts` imports
    `definePreset` and Aura from it. An import and dependency change,
    PrimeVue stays on v4.
-4. **TypeScript 7.** Major version; needs a changelog check and an ADR
+3. **TypeScript 7.** Major version; needs a changelog check and an ADR
    (`docs/devops/ci-cd.md`).
-5. **happy-dom 21.** Major version of a test dependency.
-6. **Bundle size.** The main JS chunk is about 610 kB (150 kB gzip) and
+4. **happy-dom 21.** Major version of a test dependency.
+5. **Bundle size.** The main JS chunk is about 610 kB (150 kB gzip) and
    Vite warns above 500 kB; code splitting would reduce it. Low priority.
+6. **PrimeVue 4 support.** PrimeVue 5 is no longer MIT: the free PrimeUI
+   Community License is per developer, needs a license key that must not
+   be published, and directs open-source projects to the MIT versions
+   (PrimeVue 4 and earlier). The project stays on the `v4-stable`
+   dist-tag. Added 2026-10-20 at the owner's request: watch whether v4
+   still gets releases, security fixes above all; when it stops, an ADR
+   compares PrimeVue 5 under the Community License with an MIT component
+   library and the effort of a replacement.
 7. **Rollback on the Pi.** The README rollback procedure was last verified
    with `v1.2.1`; the unit and the control socket changed since (block
    0065). Repeat it with the next upgrade.
 
 Deferred features, only on a concrete need: API tokens for scripts and
 passkeys once there is TLS (ADR-0011), UI localization (ADR-0007). PrimeVue
-5 is not planned (commercial license, ADR-0003/ADR-0010).
+5 is not planned (commercial license, ADR-0003/ADR-0010); backlog item 6
+watches v4 support.
 
 ## Phase overview
 
@@ -338,6 +343,10 @@ passkeys once there is TLS (ADR-0011), UI localization (ADR-0007). PrimeVue
   9. [0068 — Changes reach `main` through pull requests](blocks/0068-pull-request-workflow.md)
      — **Done** (2026-10-20); the "Protect main" ruleset requires a pull
      request, the admin bypass applies only within one, squash merge only.
+  10. [0069 — One release run per tag](blocks/0069-one-release-run-per-tag.md)
+     — **Done** (2026-10-20); FR-06, `concurrency` per tag in
+     `release.yml`, `deploy/publish_release.sh` skips a release that is
+     already published with both assets.
 
   The open questions from the review are decided in
   [requirements.md, section 13](../requirements/requirements.md#13-decisions--project-review-2026-09-26)
