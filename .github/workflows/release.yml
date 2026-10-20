@@ -20,7 +20,19 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  # A tag without docs/releases/<tag>.md fails here, before CI and the build
+  # (block 0077).
+  notes:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - name: Check the release notes
+        env:
+          TAG: ${{ github.ref_name }}
+        run: bash deploy/publish_release.sh --check-notes "$TAG"
+
   ci:
+    needs: notes
     uses: ./.github/workflows/ci.yml
 
   release:

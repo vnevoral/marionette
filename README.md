@@ -102,7 +102,8 @@ Releases are versioned `vMAJOR.MINOR.PATCH` by git tags (rules in
 [docs/devops/ci-cd.md](docs/devops/ci-cd.md)). Pushing such a tag runs the
 full CI and then publishes a
 [GitHub Release](https://github.com/vnevoral/marionette/releases) with the
-ARM64 archive and its `.sha256` file.
+ARM64 archive, its `.sha256` file and the release notes from
+[docs/releases/](docs/releases/).
 
 ### Installing the latest release
 
