@@ -25,6 +25,13 @@
   preserves the configuration and the defaults, and a file that is not ELF
   is rejected. Behavior with real systemd (start, restart, reboot,
   hardening) is verified manually on the reference host (block 0023).
+- `make release-test` (part of `make test` and of the CI job `backend`)
+  runs `deploy/release_version_test.sh`, the release version rule (only a
+  clean tree whose `HEAD` carries a `vX.Y.Z` tag yields a version), and
+  `deploy/publish_release_test.sh` with a fake `gh`: a new tag is published
+  once with its notes file, an existing release is skipped, and missing
+  notes, a draft, a missing asset or a `gh` error fail without creating
+  anything.
 
 ## Frontend (Vue)
 

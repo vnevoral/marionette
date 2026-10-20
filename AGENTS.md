@@ -47,7 +47,9 @@ only then change the code.
 - `internal/actions` — background action queue (bounded, deduplication, drain)
 - `internal/events` — event broker for SSE (status changes, recorded runs)
 - `internal/fsutil` — atomic file writes shared by the config and device stores
-- `internal/webui` — `go:embed` of the built `web/dist` into the binary
+- `internal/webui` — `go:embed` of the built `internal/webui/dist` into the
+  binary; the build output is not versioned and a binary built without
+  `make ui-build` serves a placeholder page
 - `web` — Vue 3 SPA with own components on Reka UI and Lucide icons, built via Vite into
   `internal/webui/dist`
 
@@ -66,7 +68,7 @@ make build-arm64     # cross-compile for Raspberry Pi (linux/arm64)
 make release-arm64   # release archive + .sha256; needs a clean tree and a vX.Y.Z tag on HEAD
 make e2e             # Playwright tests against the built binary (not part of verify)
 make vulncheck       # govulncheck over the Go code (online, not part of verify)
-make test            # go test -race ./... + npm test (Vitest)
+make test            # go test -race ./... + npm test (Vitest) + deploy and release script tests
 make lint            # golangci-lint + eslint + vue-tsc + prettier --check
 make verify          # the single validation command: build UI + lint + test + go build/vet
 ```
@@ -97,7 +99,7 @@ Done refer to it). During fast iteration you can use the partial
   of the embedded FS.
 - Vue/TS: `<script setup lang="ts">`, the shared components in `web/src/ui/`
   (on Reka UI, ADR-0014) instead of ad-hoc UI elements, tab indentation
-  (see `.prettierrc.json`), ESLint flat config.
+  (see `web/.prettierrc.json`), ESLint flat config.
 - Dependencies: add or update to a version released at least two weeks
   earlier (security fixes excepted); see "Dependency versioning" in
   [docs/devops/ci-cd.md](docs/devops/ci-cd.md).

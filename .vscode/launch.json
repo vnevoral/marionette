@@ -10,11 +10,12 @@
 			"preLaunchTask": "Marionette: prepare backend",
 			"env": {
 				"MARIONETTE_ADDR": ":8080",
-				"MARIONETTE_CONFIG": "${workspaceFolder}/marionette.json"
+				"MARIONETTE_CONFIG": "${workspaceFolder}/marionette.json",
+				"MARIONETTE_CONTROL_SOCKET": "${workspaceFolder}/marionette.sock"
 			},
 			"serverReadyAction": {
 				"action": "openExternally",
-				"pattern": "marionette listening on :([0-9]+)",
+				"pattern": "marionette listening.* addr=\\S*:([0-9]+)",
 				"uriFormat": "http://localhost:%s"
 			}
 		},

@@ -18,8 +18,6 @@ const toast = useToast();
 
 const TONE_ICONS: Record<ToastTone, string> = {
 	success: "circle-check",
-	info: "circle-alert",
-	error: "circle-x",
 };
 </script>
 
@@ -93,14 +91,6 @@ const TONE_ICONS: Record<ToastTone, string> = {
 .m-toast-success .m-toast-icon,
 .m-toast-success .m-toast-summary {
 	color: var(--color-success-strong);
-}
-.m-toast-info .m-toast-icon,
-.m-toast-info .m-toast-summary {
-	color: var(--color-info-strong);
-}
-.m-toast-error .m-toast-icon,
-.m-toast-error .m-toast-summary {
-	color: var(--color-danger-strong);
 }
 .m-toast-text {
 	flex: 1;

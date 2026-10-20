@@ -14,7 +14,7 @@ applyTo: "web/src/**"
   ARIA, styled with the tokens from `tokens.css`. Icons are Lucide names
   registered in `ui/icons.ts` — see
   [ADR-0014](../../docs/architecture/decisions/0014-replace-primevue-with-reka-ui.md).
-- Tab indentation, double quotes (see `.prettierrc.json`); after a change
+- Tab indentation, double quotes (see `web/.prettierrc.json`); after a change
   run `npm run format` and `npm run lint` from `web/`.
 - Do not add a new major version of Vue/Vite/Reka UI/Lucide without a new ADR
   that evaluates the breaking changes.

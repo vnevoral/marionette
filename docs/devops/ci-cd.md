@@ -14,7 +14,7 @@ On every push and pull request:
    of release publishing (`deploy/publish_release_test.sh`).
 2. **web** — `npm ci`, `npm audit --omit=dev --audit-level=high`,
    `npm run lint` (`--max-warnings 0`), `npm run format:check`,
-   `npm run build` (includes type-check via `vue-tsc`) in `web/`. The Node
+   `npm test` (Vitest), `npm run build` (includes type-check via `vue-tsc`) in `web/`. The Node
    version is set by the `web/.nvmrc` file (identical to the devcontainer
    and `engines`).
 3. **e2e** — `npm ci`, `npx playwright install --with-deps chromium`,
@@ -57,7 +57,7 @@ versions released at least 14 days earlier (`cooldown`, see "Dependency
 versioning"), and major versions of key UI dependencies are excluded
 (ADR-0003, ADR-0014).
 
-## Release process (verified on Raspberry Pi 2026-09-26, phase 7)
+## Release process
 
 ### Release versioning (block 0051)
 

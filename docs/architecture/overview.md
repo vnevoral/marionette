@@ -20,15 +20,15 @@ flowchart LR
 
 ## Components
 
-State as of block 0065 (2026-10-12): all components are implemented;
+State as of block 0079 (2026-10-20): all components are implemented;
 the Status column names the phase or block that introduced or last
 reshaped each one.
 
 | Component              | Location          | Responsibility                                                  | Status                                      |
 | ---------------------- | ----------------- | --------------------------------------------------------------- | ------------------------------------------- |
 | HTTP server / routing  | `internal/server` | API routes, SPA fallback with cache headers                     | Implemented — phase 5, 0028                 |
-| Embedded UI            | `internal/webui`  | `go:embed` `web/dist`                                           | Implemented                                 |
-| SPA (Vue 3, Reka UI)   | `web/src`         | Dashboard, card detail, card editor, pairing and Devices screens, version footer; shared SSE stream with REST fallback (`composables/`), status vocabulary, formatting, base components and icons (`ui/`, ADR-0014), shared patterns (`components/`) | Implemented — phases 6, 8, 9 (0029–0059)    |
+| Embedded UI            | `internal/webui`  | `go:embed` `internal/webui/dist`, a placeholder page without a UI build | Implemented — 0079                          |
+| SPA (Vue 3, Reka UI)   | `web/src`         | Dashboard, card detail, card editor, pairing and Devices screens, version footer; shared SSE stream with REST fallback (`composables/`), status vocabulary, formatting, base components and icons (`ui/`, ADR-0014), shared patterns (`components/`) | Implemented — phases 6, 8, 9 (0029–0059), 0073–0076 |
 | Device access          | `internal/access` | Paired devices, pairing codes, device tokens, `devices.json` persistence (ADR-0011) | Implemented — 0043, 0052                    |
 | Control socket         | `internal/control` | Local Unix socket for `marionette pair` (one route, pairing code), and its client (ADR-0013) | Implemented — 0065                          |
 | Entrypoint and CLI     | `cmd/marionette`  | Service composition, lifecycle and shutdown; `marionette pair` / `help` subcommands | Implemented — 0034, 0065                    |
@@ -203,7 +203,7 @@ block 0027) runs a fixed sequence with an overall limit of
 `TimeoutStopSec`); each step is logged with its duration:
 
 1. **Stop HTTP** — `http.Server.Shutdown` closes the listener and, via
-   `RegisterOnShutdown`, closes the `StatusEventBroker`, so all SSE streams
+   `RegisterOnShutdown`, closes the `events.Broker`, so all SSE streams
    (`/api/events`) end immediately and shutdown does not wait for them.
    In-flight regular requests complete.
 2. **Save history (first pass)** — the configuration, run history and
@@ -222,7 +222,7 @@ block 0027) runs a fixed sequence with an overall limit of
 A second signal during shutdown terminates the process immediately (the
 default signal handling is restored once shutdown begins).
 
-The action queue (`BackgroundActions`) is bounded to
+The action queue (`actions.Queue`) is bounded to
 `4 × MaxConcurrentActions` (FR-18): a full queue returns `503` with a
 `Retry-After` header (estimated from the queue length per worker, min.
 1 s); a request for a card and action kind that is already waiting in the
