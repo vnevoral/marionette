@@ -43,14 +43,14 @@ the move to pull requests (block 0068), one release run per tag
 2. **happy-dom 21.** Major version of a test dependency.
 3. **Bundle size.** The main JS chunk is about 610 kB (150 kB gzip) and
    Vite warns above 500 kB; code splitting would reduce it. Low priority.
-4. **PrimeVue 4 support.** PrimeVue 5 is no longer MIT: the free PrimeUI
-   Community License is per developer, needs a license key that must not
-   be published, and directs open-source projects to the MIT versions
-   (PrimeVue 4 and earlier). The project stays on the `v4-stable`
-   dist-tag. Added 2026-10-20 at the owner's request: watch whether v4
-   still gets releases, security fixes above all; when it stops, an ADR
-   compares PrimeVue 5 under the Community License with an MIT component
-   library and the effort of a replacement.
+4. **Replace PrimeVue.** PrimeVue 5, `@primeuix/themes` 3.x and
+   `primeicons` 8.x are under the PrimeUI License (per-developer Community
+   License with a key); the project stays on the MIT lines meanwhile
+   (blocks 0071, 0072). The owner asked on 2026-10-20 to replace PrimeVue:
+   [ADR-0014](../architecture/decisions/0014-replace-primevue-with-reka-ui.md)
+   (**Proposed**) proposes Reka UI, own styled components and Lucide
+   icons in four blocks. Until it is done, watch PrimeVue 4 for releases
+   and security fixes.
 5. **Rollback on the Pi.** The README rollback procedure was last verified
    with `v1.2.1`; the unit and the control socket changed since (block
    0065). Repeat it with the next upgrade.
@@ -58,7 +58,7 @@ the move to pull requests (block 0068), one release run per tag
 Deferred features, only on a concrete need: API tokens for scripts and
 passkeys once there is TLS (ADR-0011), UI localization (ADR-0007). PrimeVue
 5 is not planned (commercial license, ADR-0003/ADR-0010); backlog item 4
-watches v4 support.
+plans its replacement.
 
 ## Phase overview
 
