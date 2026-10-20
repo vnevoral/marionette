@@ -52,3 +52,9 @@ after reviewing the changelog/migration and updating this ADR.
 > utility layer ([ADR-0010](0010-own-layout-utilities-replace-primeflex.md));
 > the sentence about PrimeFlex in the Decision and Consequences above is
 > thereby superseded.
+
+> Added 2026-10-20 (block 0071): the Aura theme and `definePreset` come
+> from `@primeuix/themes` 2.x (MIT), the package PrimeVue 4 itself depends
+> on, instead of the deprecated `@primevue/themes` wrapper. `@primeuix/themes`
+> 3.x belongs to PrimeVue 5 and its licence; Dependabot ignores its major
+> versions.

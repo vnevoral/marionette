@@ -1,5 +1,5 @@
-import { definePreset } from "@primevue/themes";
-import Aura from "@primevue/themes/aura";
+import { definePreset } from "@primeuix/themes";
+import Aura from "@primeuix/themes/aura";
 
 // Marionette's PrimeVue preset (ADR-0009, UX spec §8.2): the sage/green
 // palette from tokens.css expressed as Aura semantic tokens, so components
@@ -114,7 +114,7 @@ const MarionettePreset = definePreset(Aura, {
 	},
 	components: {
 		button: {
-			label: { fontWeight: "500" },
+			root: { label: { fontWeight: "500" } },
 		},
 		// Aura draws a success toast in {green.600} on {green.50} (3.2:1, below
 		// WCAG AA for 16 px text and off-palette); use the accent tokens
