@@ -13,7 +13,7 @@ one or more concrete implementation blocks (see the
 ## Current state
 
 As of 2026-10-20 all phases below are **Done**, the last closed block is
-[0071](blocks/0071-primeuix-themes.md) and the current release is
+[0072](blocks/0072-primeicons-mit.md) and the current release is
 **v1.3.1** (tags `v1.0.0`, `v1.1.0`, `v1.2.0` to `v1.2.4`, `v1.3.0`,
 `v1.3.1`; `v1.2.0` has no GitHub Release because its CI run failed, fixed
 by block 0059; `v1.3.0` has none because `npm audit` failed on a new
@@ -35,8 +35,8 @@ approved the items as proposed on 2026-10-20; each item becomes a block
 (and an ADR where noted) before it is implemented. Ordered by priority.
 Done since: the dev container rebuild (`go version` reports go1.27.3),
 the move to pull requests (block 0068), one release run per tag
-(block 0069), `govulncheck` in CI (block 0070) and `@primeuix/themes`
-(block 0071), all 2026-10-20.
+(block 0069), `govulncheck` in CI (block 0070), `@primeuix/themes`
+(block 0071) and `primeicons` on MIT 7.x (block 0072), all 2026-10-20.
 
 1. **TypeScript 7.** Major version; needs a changelog check and an ADR
    (`docs/devops/ci-cd.md`).
@@ -347,6 +347,9 @@ watches v4 support.
   12. [0071 — `@primevue/themes` → `@primeuix/themes`](blocks/0071-primeuix-themes.md)
      — **Done** (2026-10-20); the preset imports `@primeuix/themes` 2.x
      (MIT), Dependabot ignores its 3.x line (PrimeVue 5).
+  13. [0072 — `primeicons` on the MIT 7.x line](blocks/0072-primeicons-mit.md)
+     — **Done** (2026-10-20); `primeicons` 8.x is under the PrimeUI License,
+     7.0.0 is MIT and has every icon the UI uses.
 
   The open questions from the review are decided in
   [requirements.md, section 13](../requirements/requirements.md#13-decisions--project-review-2026-09-26)
