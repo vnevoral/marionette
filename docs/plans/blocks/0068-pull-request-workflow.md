@@ -4,7 +4,7 @@
 - **Requirements**: NFR-05, NFR-06 (testability, maintainability); no
   product requirement changes
 - **ADRs**: none (repository process, not architecture)
-- **Status**: Approved
+- **Status**: Done
 - **Dependencies**: none; roadmap backlog item 1 (decided 2026-10-20)
 
 ## Goal
@@ -87,6 +87,21 @@ See [Definition of Done](../../devops/definition-of-done.md) plus:
 
 ## Closure
 
-- **Status after implementation**:
-- **Verification**:
-- **Documentation updated**:
+- **Status after implementation**: Done (2026-10-20)
+- **Verification**: the ruleset update returned the rules `deletion`,
+  `non_fast_forward`, `required_status_checks` and `pull_request` (0
+  approvals, squash only) with the admin bypass `pull_request`;
+  `gh api repos/vnevoral/marionette/rules/branches/main` lists the same
+  four rules. A throwaway commit pushed straight to `main` was refused
+  ("Changes must be made through a pull request") and reset locally.
+  The repository allows only squash merge with the pull request title as
+  the subject and deletes merged branches. The pull request for this block
+  passed `backend`, `web` and `e2e` and was squash-merged. `make verify`
+  passed.
+- **Deviations from the plan**: the squash commit body is the branch's
+  commit messages (`COMMIT_MESSAGES`), not the pull request body or blank:
+  the body would copy the template checklist into history, a blank body
+  would drop the `Co-Authored-By` trailers.
+- **Documentation updated**: `AGENTS.md`, `CONTRIBUTING.md`,
+  `docs/devops/development-workflow.md`, `docs/devops/ci-cd.md`
+  (new section "Pull requests and `main`", release step 1), roadmap.

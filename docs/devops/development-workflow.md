@@ -30,6 +30,11 @@ Every new feature or change goes through these steps:
    documentation, the ADR/requirements in case of a deviation, and list the
    checks performed.
 
+Every change, planning documents included, reaches `main` through a pull
+request with passing CI checks; nobody pushes to `main` directly, the
+maintainer included (block 0068, see [ci-cd.md](ci-cd.md#pull-requests-and-main)).
+A block's implementation and its closure are usually one pull request.
+
 The planning steps (`/new-requirement`, `/new-adr`, `/plan-block`) do not
 change source code or start implementation. The implementation step
 (`/implement-block`) must not start without an approved block.
