@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref } from "vue";
 import { useRouter } from "vue-router";
-import { useConfirm } from "primevue/useconfirm";
 import { createPairingCode, listDevices, removeDevice, type Device, type PairingCode } from "@/api";
 import DetailPanel from "@/components/DetailPanel.vue";
 import DeviceRow from "@/components/DeviceRow.vue";
@@ -13,6 +12,7 @@ import RequestState from "@/components/RequestState.vue";
 import { useNotify } from "@/composables/useNotify";
 import { markUnpaired, setSession, useSession } from "@/composables/useSession";
 import { useTransientMessage } from "@/composables/useTransientMessage";
+import { useConfirm } from "@/ui/feedback";
 import MButton from "@/ui/MButton.vue";
 import MSpinner from "@/ui/MSpinner.vue";
 import { ACCESS, ACTIONS, FEEDBACK, LOADING } from "@/ui/vocabulary";
@@ -92,12 +92,9 @@ function confirmRemove(device: Device) {
 	confirm.require({
 		header: ACCESS.removeDevice,
 		message: ACCESS.removeMessage(device.name, device.current),
-		icon: "pi pi-exclamation-triangle",
 		acceptLabel: ACCESS.removeDevice,
 		rejectLabel: ACTIONS.cancel,
-		acceptProps: { severity: "danger" },
-		rejectProps: { severity: "secondary", outlined: true },
-		defaultFocus: "reject",
+		danger: true,
 		accept: () => void remove(device),
 	});
 }

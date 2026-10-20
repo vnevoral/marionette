@@ -69,9 +69,8 @@
 	--font-weight-semibold: 600;
 }
 
-/* The remaining PrimeVue components (toast, confirmation dialog) take their
-   colours from src/theme/preset.ts until ADR-0014 removes them; this file
-   holds the app's own tokens, resets and shared layout classes. */
+/* The app's own tokens, resets and shared layout classes; the components in
+   src/ui/ draw with them (ADR-0014). */
 
 * {
 	box-sizing: border-box;

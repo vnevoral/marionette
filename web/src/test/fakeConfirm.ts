@@ -1,18 +1,14 @@
-import type { ConfirmationOptions } from "primevue/confirmationoptions";
-import * as useConfirmModule from "primevue/useconfirm";
 import { vi } from "vitest";
+import { ConfirmKey, type ConfirmOptions } from "@/ui/feedback";
 
-// PrimeVue exports the injection key at runtime but not in its typings.
-const { PrimeVueConfirmSymbol } = useConfirmModule as unknown as { PrimeVueConfirmSymbol: symbol };
-
-// Stand-in for PrimeVue's ConfirmationService: records the last require()
-// call so a test can trigger accept/reject without mounting ConfirmDialog.
+// Stand-in for the confirm service: records the last require() call so a
+// test can trigger accept/reject without mounting MConfirmHost.
 export function fakeConfirm() {
-	const require = vi.fn<(options: ConfirmationOptions) => void>();
+	const require = vi.fn<(options: ConfirmOptions) => void>();
 	return {
-		provide: { [PrimeVueConfirmSymbol]: { require, close: vi.fn() } },
+		provide: { [ConfirmKey as symbol]: { require } },
 		require,
-		last(): ConfirmationOptions {
+		last(): ConfirmOptions {
 			const options = require.mock.calls.at(-1)?.[0];
 			if (!options) throw new Error("confirm.require was not called");
 			return options;

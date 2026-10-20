@@ -149,7 +149,8 @@ Feedback channels:
   detail, validation and server errors, load errors, a failed delete. Several
   cards can report at once without covering each other.
 - **Toast** (top right; full width minus the 16 px gutter on phones; about
-  4 s) only for the outcome of an operation that ends by leaving or
+  4 s, paused while hovered or focused, closable, swipe right to dismiss
+  on touch) only for the outcome of an operation that ends by leaving or
   replacing the page, so the notice survives the navigation: **Card saved**
   and **Card deleted**. Toasts are success notices only; an error never
   appears only in a toast.
@@ -382,9 +383,7 @@ Card colours (FR-10a) are the tokens `--card-color-black`, `-blue`,
 name, `web/src/ui/cardColors.ts` lists the options. Red and green are left
 out because they mean **Problem** and **Healthy**.
 
-Views use semantic tokens rather than local hex values. The PrimeVue
-components that remain until ADR-0014 is complete (toast, confirmation
-dialog) take the same palette from `web/src/theme/preset.ts`.
+Views use semantic tokens rather than local hex values.
 The app ships one light scheme; the OS dark mode is not followed.
 
 ### 8.3 Typography and density
@@ -405,18 +404,22 @@ secondary, ghost, danger and danger-ghost; a router link with `to`),
 `MIcon` (Lucide icons by name from `ui/icons.ts`; an unknown name shows the
 ghost icon), `MSpinner`, `MTag`, `MMessage` and `MCard`, and the form
 controls `MInput`, `MTextarea`, `MNumberInput`, `MSelect` and `MSwitch`
-(block 0074; select and switch on Reka UI). Shared patterns
+(block 0074; select and switch on Reka UI). Page-level feedback is the
+service in `ui/feedback.ts` (`useToast`, `useConfirm`) rendered once in
+`App.vue` by `MToastHost` (Reka UI `Toast`) and `MConfirmHost` (Reka UI
+`AlertDialog`; one question at a time, the focus starts on the cancel
+button, a destructive question has a danger accept button; block 0075).
+Shared patterns
 built from them live in `web/src/components` and are used by every view
 (block 0033):
 
 - `AppShell`, `PageHeader`, `ConnectionStatus`;
 - `StatusBadge`, `RequestState`, `InlineError`, `EmptyState`; page-level
-  notices go through the shared PrimeVue `Toast` in `App.vue` and the
-  `useNotify` composable (§4 feedback channels);
+  notices go through `MToastHost` and the `useNotify` composable (§4 feedback channels);
 - `ActionCard`, `ActionControls`;
 - `ActionEditor`, `FormSection`, `CardIdentityFields`, `PollingFields`;
-  the unsaved-changes dialog is the shared `ConfirmDialog` driven
-  by the `useUnsavedChangesGuard` composable;
+  the unsaved-changes question is the shared `MConfirmHost` driven by the
+  `useUnsavedChangesGuard` composable;
 - `RunTable`, `StatusTimeline`, `StatusSummary`, `DetailPanel`,
   `DetailErrorState`.
 

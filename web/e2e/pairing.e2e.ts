@@ -1,4 +1,5 @@
 import { expect, test, type Browser, type Page } from "@playwright/test";
+import { toast } from "./helpers";
 
 // Pairing and device management with access control on (FR-50..FR-55,
 // FR-57). The
@@ -68,7 +69,7 @@ test("pairs another browser with a code from Devices, then removes it", async ({
 	const context = await freshBrowser(browser, baseURL!);
 	const second = await context.newPage();
 	await pairWithCode(second, code, "Second browser");
-	await expect(second.getByRole("alert").filter({ hasText: "Device paired" })).toBeVisible();
+	await expect(toast(second, "Device paired")).toBeVisible();
 
 	// The Devices page notices the new device without a reload.
 	await expect(page.getByText('"Second browser" is now paired.')).toBeVisible({ timeout: 10_000 });
@@ -108,9 +109,7 @@ test("a pairing link fills the code in", async ({ page, browser, baseURL }) => {
 	await expect(dialog).toContainText("This is the device you are using");
 	await dialog.getByRole("button", { name: "Remove device" }).click();
 	await expect(other).toHaveURL(/\/pair/);
-	await expect(
-		other.getByRole("alert").filter({ hasText: "This device was removed" }),
-	).toBeVisible();
+	await expect(toast(other, "This device was removed")).toBeVisible();
 	expect((await context.request.get("/api/cards")).status()).toBe(401);
 	await context.close();
 });

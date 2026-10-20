@@ -1,8 +1,7 @@
 import { createApp } from "vue";
 import PrimeVue from "primevue/config";
-import ConfirmationService from "primevue/confirmationservice";
-import ToastService from "primevue/toastservice";
 import MarionettePreset from "@/theme/preset";
+import { createFeedback } from "@/ui/feedback";
 import App from "./App.vue";
 import router from "./router";
 
@@ -13,8 +12,7 @@ import "./styles/tokens.css";
 const app = createApp(App);
 
 app.use(router);
-app.use(ConfirmationService);
-app.use(ToastService);
+app.use(createFeedback());
 app.use(PrimeVue, {
 	theme: {
 		preset: MarionettePreset,

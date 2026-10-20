@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
-import { useConfirm } from "primevue/useconfirm";
 import { ApiError, deleteCard, getCard, type ActionCard } from "@/api";
 import ActionControls from "@/components/ActionControls.vue";
 import ActionNote from "@/components/ActionNote.vue";
@@ -21,6 +20,7 @@ import { useNotify } from "@/composables/useNotify";
 import { useTransientMessage, useTransientResult } from "@/composables/useTransientMessage";
 import { singleParam } from "@/router/params";
 import type { ActionKind, PendingRequest } from "@/types";
+import { useConfirm } from "@/ui/feedback";
 import MButton from "@/ui/MButton.vue";
 import MSpinner from "@/ui/MSpinner.vue";
 import {
@@ -135,12 +135,9 @@ function removeCard() {
 	confirm.require({
 		header: ACTIONS.deleteCard,
 		message: `Delete "${current.name}"? Its runs and status history are removed as well.`,
-		icon: "pi pi-exclamation-triangle",
 		acceptLabel: ACTIONS.deleteCard,
 		rejectLabel: ACTIONS.cancel,
-		acceptProps: { severity: "danger" },
-		rejectProps: { severity: "secondary", outlined: true },
-		defaultFocus: "reject",
+		danger: true,
 		accept: () => void performDelete(current),
 	});
 }

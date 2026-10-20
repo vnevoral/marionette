@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { createCard, deleteAllCards, expectNoHorizontalScroll } from "./helpers";
+import { createCard, deleteAllCards, expectNoHorizontalScroll, toast } from "./helpers";
 
 test.beforeEach(async ({ request }) => {
 	await deleteAllCards(request);
@@ -119,10 +119,10 @@ test.describe("at 320 px", () => {
 		await page.goto("/cards/narrow/edit");
 		await page.getByLabel("Description", { exact: true }).fill("Saved on a phone");
 		await page.getByRole("button", { name: "Save card" }).click();
-		const notice = page.getByRole("alert").filter({ hasText: "Card saved" });
+		const notice = toast(page, "Card saved");
 		await expect(notice).toBeVisible();
-		// Palette colours from the preset, not Aura's bright green (AA contrast).
-		await expect(notice.locator(".p-toast-summary")).toHaveCSS("color", "rgb(57, 114, 84)");
+		// The palette's strong success colour on white (AA contrast).
+		await expect(notice.locator(".m-toast-summary")).toHaveCSS("color", "rgb(37, 104, 71)");
 		const box = await notice.boundingBox();
 		expect(box!.x).toBeGreaterThanOrEqual(0);
 		expect(box!.x + box!.width).toBeLessThanOrEqual(320);
