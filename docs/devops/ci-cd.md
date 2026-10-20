@@ -52,8 +52,10 @@ disabled): the commit subject is the pull request title, the body the
 branch's commit messages, and the branch is deleted after the merge.
 
 Dependabot (`.github/dependabot.yml`)
-opens weekly PRs for Go modules, npm and GitHub Actions; major versions of
-key UI dependencies are excluded (ADR-0003, ADR-0010).
+opens weekly PRs for Go modules, npm and GitHub Actions. It proposes only
+versions released at least 14 days earlier (`cooldown`, see "Dependency
+versioning"), and major versions of key UI dependencies are excluded
+(ADR-0003, ADR-0014).
 
 ## Release process (verified on Raspberry Pi 2026-09-26, phase 7)
 
@@ -135,6 +137,13 @@ step 4.
 
 ## Dependency versioning
 
+- Age rule: a new dependency version (Go module, npm package, GitHub
+  Action, tool) is taken only when it was released at least two weeks
+  earlier, so regressions and compromised releases have time to surface.
+  Dependabot enforces it with `cooldown: default-days: 14`; manual updates
+  follow it too (check `npm view <package> time`). Security fixes are the
+  exception: Dependabot security updates ignore the cooldown, and a fix
+  for a known vulnerability may be taken at once (block 0078).
 - Go: `go.mod` sets the version (currently Go 1.27, also stated in the
   README); CI and the release build use the latest patch release of it
   (`setup-go` with `go-version-file` and `check-latest: true`; without it
