@@ -27,6 +27,44 @@ verified `sudo marionette pair` there on 2026-10-12 (the upgrade and
 rollback procedure from the README was verified with `v1.2.1`). New work starts as a new requirement and block
 per the development workflow.
 
+## Backlog
+
+Known follow-up work, recorded on 2026-10-20 after block 0067. Nothing is
+approved yet; each item becomes a block (and an ADR where noted) before it
+is implemented. Ordered by priority.
+
+1. **Rebuild the dev container.** `.devcontainer/Dockerfile` pins Go 1.27.3
+   and golangci-lint v2.15.0 (block 0066), but a container built earlier
+   still runs Go 1.27.1, which has known standard library vulnerabilities,
+   so a local `make verify` does not match CI. Action for the owner
+   (VS Code: "Dev Containers: Rebuild Container"); afterwards
+   `go version` reports go1.27.3.
+2. **Duplicate release runs for one tag.** GitHub started two Release runs
+   for the `v1.2.4` tag push; the second failed with "a release with the
+   same tag name already exists" (the release itself was fine). Proposal:
+   a `concurrency` group per tag in `release.yml` and skipping an existing
+   release instead of failing.
+3. **`govulncheck` in CI.** The outdated Go in the dev container was found
+   by chance (block 0066). A `govulncheck ./...` step in `ci.yml` would
+   check Go the way `npm audit` checks the web part.
+4. **`@primevue/themes` → `@primeuix/themes`.** The package is deprecated;
+   likely only an import change, PrimeVue stays on v4.
+5. **TypeScript 7.** Major version; needs a changelog check and an ADR
+   (`docs/devops/ci-cd.md`).
+6. **happy-dom 21.** Major version of a test dependency.
+7. **Bundle size.** The main JS chunk is about 610 kB (150 kB gzip) and
+   Vite warns above 500 kB; code splitting would reduce it. Low priority.
+8. **Direct pushes to `main`.** They bypass the ruleset that requires the
+   three CI checks. Either move to pull requests or align the ruleset with
+   the way the owner works.
+9. **Rollback on the Pi.** The README rollback procedure was last verified
+   with `v1.2.1`; the unit and the control socket changed since (block
+   0065). Repeat it with the next upgrade.
+
+Deferred features, only on a concrete need: API tokens for scripts and
+passkeys once there is TLS (ADR-0011), UI localization (ADR-0007). PrimeVue
+5 is not planned (commercial license, ADR-0003/ADR-0010).
+
 ## Phase overview
 
 | Phase | Name                                                                                          | Status                                             | Requirements                   |
