@@ -1,4 +1,4 @@
-import { useToast } from "primevue/usetoast";
+import { useToast } from "@/ui/feedback";
 import { messageVisibleMs } from "@/composables/useTransientMessage";
 
 /**
@@ -11,7 +11,7 @@ export function useNotify() {
 	const toast = useToast();
 	return {
 		success(summary: string, detail?: string) {
-			toast.add({ severity: "success", summary, detail, life: messageVisibleMs });
+			toast.add({ tone: "success", summary, detail, life: messageVisibleMs });
 		},
 	};
 }

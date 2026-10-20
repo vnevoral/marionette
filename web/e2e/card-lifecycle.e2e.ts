@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { actionEditor, createCard, currentStatusBadge, deleteAllCards } from "./helpers";
+import { actionEditor, createCard, currentStatusBadge, deleteAllCards, toast } from "./helpers";
 
 test.beforeEach(async ({ request }) => {
 	await deleteAllCards(request);
@@ -21,7 +21,7 @@ test("creates, runs, checks and deletes a card through the UI", async ({ page })
 	await page.getByLabel("Configure status action").check();
 	await actionEditor(page, "Status action").getByLabel("Command line").fill("true");
 	await page.getByRole("button", { name: "Save card" }).click();
-	await expect(page.getByRole("alert").filter({ hasText: "Card saved" })).toBeVisible();
+	await expect(toast(page, "Card saved")).toBeVisible();
 	await expect(page.getByRole("heading", { name: "Edit card", level: 1 })).toBeVisible();
 
 	await page.getByRole("link", { name: "Back to card detail" }).click();
@@ -47,9 +47,7 @@ test("creates, runs, checks and deletes a card through the UI", async ({ page })
 	await expect(dialog).toContainText('Delete "Printer"?');
 	await dialog.getByRole("button", { name: "Delete card" }).click();
 	await expect(page).toHaveURL("/");
-	await expect(page.getByRole("alert").filter({ hasText: "Card deleted" })).toContainText(
-		'"Printer"',
-	);
+	await expect(toast(page, "Card deleted")).toContainText('"Printer"');
 	await expect(page.getByRole("heading", { name: "No action cards yet" })).toBeVisible();
 });
 
@@ -63,7 +61,7 @@ test("colours a card with a stripe that keeps the card height", async ({ page, r
 	await page.getByRole("combobox", { name: "Color" }).click();
 	await page.getByRole("option", { name: "Teal" }).click();
 	await page.getByRole("button", { name: "Save card" }).click();
-	await expect(page.getByRole("alert").filter({ hasText: "Card saved" })).toBeVisible();
+	await expect(toast(page, "Card saved")).toBeVisible();
 
 	await page.goto("/");
 	await page.reload();
@@ -184,11 +182,11 @@ test("edits a stored action as one command line", async ({ page, request }) => {
 	await line.fill("echo hi | grep hi");
 	await expect(primary.locator(".field-error")).toContainText('"|" needs a shell');
 	await page.getByRole("button", { name: "Save card" }).click();
-	await expect(page.getByRole("alert").filter({ hasText: "Card saved" })).toHaveCount(0);
+	await expect(toast(page, "Card saved")).toHaveCount(0);
 
 	await line.fill("echo 'hello again' done");
 	await page.getByRole("button", { name: "Save card" }).click();
-	await expect(page.getByRole("alert").filter({ hasText: "Card saved" })).toBeVisible();
+	await expect(toast(page, "Card saved")).toBeVisible();
 	const stored = (await (await request.get("/api/cards/quoted")).json()) as {
 		primary: { command: string; args: string[] };
 	};

@@ -66,3 +66,11 @@ export async function expectNoHorizontalScroll(page: Page) {
 	);
 	expect(overflow, "page scrolls horizontally").toBeLessThanOrEqual(0);
 }
+
+// A page-level notice (MToastHost) inside the notifications region.
+export function toast(page: Page, text: string) {
+	return page
+		.getByRole("region", { name: /^Notifications/ })
+		.locator(".m-toast")
+		.filter({ hasText: text });
+}

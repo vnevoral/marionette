@@ -156,7 +156,7 @@ describe("CardEditView", () => {
 		// The notice is a toast so it survives the move to the edit route.
 		expect(toast.summaries()).toEqual(["Card saved"]);
 		expect(toast.add.mock.calls[0][0]).toMatchObject({
-			severity: "success",
+			tone: "success",
 			detail: "Lamp",
 			life: 4000,
 		});

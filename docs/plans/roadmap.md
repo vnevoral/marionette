@@ -13,7 +13,7 @@ one or more concrete implementation blocks (see the
 ## Current state
 
 As of 2026-10-20 all phases below are **Done**, the last closed block is
-[0074](blocks/0074-ui-form-controls.md) and the current release is
+[0075](blocks/0075-ui-feedback.md) and the current release is
 **v1.3.1** (tags `v1.0.0`, `v1.1.0`, `v1.2.0` to `v1.2.4`, `v1.3.0`,
 `v1.3.1`; `v1.2.0` has no GitHub Release because its CI run failed, fixed
 by block 0059; `v1.3.0` has none because `npm audit` failed on a new
@@ -50,10 +50,11 @@ the move to pull requests (block 0068), one release run per tag
    [ADR-0014](../architecture/decisions/0014-replace-primevue-with-reka-ui.md)
    (**Accepted**) replaces it with Reka UI, own styled components and
    Lucide icons in four blocks, with a visual refresh. Blocks 0073 (icons,
-   buttons, surfaces, tokens) and 0074 (form controls) are done; next are
-   0075 (toast and confirmation dialog) and 0076 (removal of PrimeVue). Until
-   then, watch PrimeVue 4 for releases and security fixes. The icon change
-   is incompatible for API clients, so the next release is **v2.0.0**.
+   buttons, surfaces, tokens), 0074 (form controls) and 0075 (toast and
+   confirmation dialog) are done, so no PrimeVue component is rendered any
+   more; next is 0076 (removal of the PrimeVue packages). Until then,
+   watch PrimeVue 4 for releases and security fixes. The icon change is
+   incompatible for API clients, so the next release is **v2.0.0**.
 5. **Rollback on the Pi.** The README rollback procedure was last verified
    with `v1.2.1`; the unit and the control socket changed since (block
    0065). Repeat it with the next upgrade.
@@ -361,6 +362,10 @@ plans its replacement.
   15. [0074 — UI form controls on Reka UI](blocks/0074-ui-form-controls.md)
      — **Done** (2026-10-20); ADR-0014 part 2: own `MInput`, `MTextarea`,
      `MNumberInput`, `MSelect` and `MSwitch` (select and switch on Reka UI).
+  16. [0075 — Toast and confirmation dialog on Reka UI](blocks/0075-ui-feedback.md)
+     — **Done** (2026-10-20); ADR-0014 part 3: own feedback service with
+     `MToastHost` (Reka UI `Toast`) and `MConfirmHost` (Reka UI
+     `AlertDialog`).
 
   The open questions from the review are decided in
   [requirements.md, section 13](../requirements/requirements.md#13-decisions--project-review-2026-09-26)
