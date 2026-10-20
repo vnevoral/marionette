@@ -191,7 +191,7 @@ useUnsavedChangesGuard(isDirty, () => saving.value);
 </script>
 
 <template>
-	<main class="page">
+	<main class="page editor-page">
 		<PageHeader
 			:eyebrow="isNew() ? 'New action card' : 'Edit action card'"
 			:title="isNew() ? 'New card' : 'Edit card'"
@@ -220,7 +220,7 @@ useUnsavedChangesGuard(isDirty, () => saving.value);
 			<span>{{ LOADING.card }}</span>
 		</div>
 
-		<MCard v-else class="editor-card">
+		<MCard v-else>
 			<div class="editor-body">
 				<CardIdentityFields
 					v-model:name="form.name"
@@ -284,8 +284,9 @@ useUnsavedChangesGuard(isDirty, () => saving.value);
 .edit-feedback:empty {
 	display: none;
 }
-.editor-card {
-	max-width: 960px;
+/* The header and the form share one centred column of the form's width. */
+.editor-page {
+	max-width: calc(960px + 2 * var(--page-padding-x));
 }
 .editor-body {
 	padding: var(--space-6);

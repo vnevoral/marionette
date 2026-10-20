@@ -79,5 +79,6 @@ See [Definition of Done](../../devops/definition-of-done.md).
   request after the visual check, **Cancel** and **Save card** moved from
   the sticky `SaveBar` (which floated mid-page and left a gap under the
   form) to the page header actions, like Card Detail; `SaveBar` is
-  removed and the e2e header-button check covers the edit page.
+  removed and the e2e header-button check covers the edit page. The edit
+  page (header and form) is one centred column of the form's width.
 - **Documentation updated**: UX spec §7.2, §8.4, roadmap.
