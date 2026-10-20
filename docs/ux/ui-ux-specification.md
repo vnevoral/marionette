@@ -252,7 +252,10 @@ standalone workflow and does not combine a card list with a configuration form.
    timeout, and output rule.
 3. **Status check**: enable/disable switch and the same action editor.
 4. **Automatic checks**: standard interval, fast interval, and fast window.
-5. **Save bar**: sticky save/cancel actions.
+
+**Cancel** and **Save card** are page actions in the header, like
+**Edit card** and **Delete card** on Card Detail; the form has no separate
+save bar.
 
 The ID is optional on creation and immutable during editing. The command and
 its arguments are one **Command line** field, as typed in a terminal
@@ -380,8 +383,8 @@ name, `web/src/ui/cardColors.ts` lists the options. Red and green are left
 out because they mean **Problem** and **Healthy**.
 
 Views use semantic tokens rather than local hex values. The PrimeVue
-components that remain until ADR-0014 is complete (form controls, toast,
-confirmation dialog) take the same palette from `web/src/theme/preset.ts`.
+components that remain until ADR-0014 is complete (toast, confirmation
+dialog) take the same palette from `web/src/theme/preset.ts`.
 The app ships one light scheme; the OS dark mode is not followed.
 
 ### 8.3 Typography and density
@@ -400,7 +403,9 @@ The app ships one light scheme; the OS dark mode is not followed.
 Base components live in `web/src/ui/` (ADR-0014): `MButton` (primary,
 secondary, ghost, danger and danger-ghost; a router link with `to`),
 `MIcon` (Lucide icons by name from `ui/icons.ts`; an unknown name shows the
-ghost icon), `MSpinner`, `MTag`, `MMessage` and `MCard`. Shared patterns
+ghost icon), `MSpinner`, `MTag`, `MMessage` and `MCard`, and the form
+controls `MInput`, `MTextarea`, `MNumberInput`, `MSelect` and `MSwitch`
+(block 0074; select and switch on Reka UI). Shared patterns
 built from them live in `web/src/components` and are used by every view
 (block 0033):
 
@@ -409,8 +414,8 @@ built from them live in `web/src/components` and are used by every view
   notices go through the shared PrimeVue `Toast` in `App.vue` and the
   `useNotify` composable (§4 feedback channels);
 - `ActionCard`, `ActionControls`;
-- `ActionEditor`, `FormSection`, `CardIdentityFields`, `PollingFields`,
-  `SaveBar`; the unsaved-changes dialog is the shared `ConfirmDialog` driven
+- `ActionEditor`, `FormSection`, `CardIdentityFields`, `PollingFields`;
+  the unsaved-changes dialog is the shared `ConfirmDialog` driven
   by the `useUnsavedChangesGuard` composable;
 - `RunTable`, `StatusTimeline`, `StatusSummary`, `DetailPanel`,
   `DetailErrorState`.

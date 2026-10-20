@@ -13,7 +13,7 @@ one or more concrete implementation blocks (see the
 ## Current state
 
 As of 2026-10-20 all phases below are **Done**, the last closed block is
-[0073](blocks/0073-ui-foundation.md) and the current release is
+[0074](blocks/0074-ui-form-controls.md) and the current release is
 **v1.3.1** (tags `v1.0.0`, `v1.1.0`, `v1.2.0` to `v1.2.4`, `v1.3.0`,
 `v1.3.1`; `v1.2.0` has no GitHub Release because its CI run failed, fixed
 by block 0059; `v1.3.0` has none because `npm audit` failed on a new
@@ -49,9 +49,9 @@ the move to pull requests (block 0068), one release run per tag
    (blocks 0071, 0072). The owner asked on 2026-10-20 to replace PrimeVue:
    [ADR-0014](../architecture/decisions/0014-replace-primevue-with-reka-ui.md)
    (**Accepted**) replaces it with Reka UI, own styled components and
-   Lucide icons in four blocks, with a visual refresh. Block 0073 (icons,
-   buttons, surfaces, tokens) is done; next are 0074 (form controls), 0075
-   (toast and confirmation dialog) and 0076 (removal of PrimeVue). Until
+   Lucide icons in four blocks, with a visual refresh. Blocks 0073 (icons,
+   buttons, surfaces, tokens) and 0074 (form controls) are done; next are
+   0075 (toast and confirmation dialog) and 0076 (removal of PrimeVue). Until
    then, watch PrimeVue 4 for releases and security fixes. The icon change
    is incompatible for API clients, so the next release is **v2.0.0**.
 5. **Rollback on the Pi.** The README rollback procedure was last verified
@@ -358,6 +358,9 @@ plans its replacement.
      ghost for unknown values, own `MButton`/`MTag`/`MMessage`/`MCard`/
      `MSpinner`, refreshed tokens and header; the API accepts icon names
      only.
+  15. [0074 — UI form controls on Reka UI](blocks/0074-ui-form-controls.md)
+     — **Done** (2026-10-20); ADR-0014 part 2: own `MInput`, `MTextarea`,
+     `MNumberInput`, `MSelect` and `MSwitch` (select and switch on Reka UI).
 
   The open questions from the review are decided in
   [requirements.md, section 13](../requirements/requirements.md#13-decisions--project-review-2026-09-26)

@@ -3,7 +3,7 @@ import { h } from "vue";
 import { flushPromises, mount, type VueWrapper } from "@vue/test-utils";
 import { createMemoryHistory, createRouter, RouterView, type Router } from "vue-router";
 import PrimeVue from "primevue/config";
-import Select from "primevue/select";
+import MSelect from "@/ui/MSelect.vue";
 import { ApiError, createCard, getCard, updateCard, type ActionCard } from "@/api";
 import CardEditView from "@/views/CardEditView.vue";
 import { fakeConfirm } from "@/test/fakeConfirm";
@@ -170,8 +170,8 @@ describe("CardEditView", () => {
 		vi.mocked(updateCard).mockImplementation(async (card) => card);
 		const { wrapper } = await mountEdit("/cards/printer/edit");
 		const color = wrapper
-			.findAllComponents(Select)
-			.find((select) => select.props("ariaLabel") === "Color");
+			.findAllComponents(MSelect)
+			.find((select) => select.find("button").attributes("aria-label") === "Color");
 		if (!color) throw new Error("Color select not rendered");
 		expect(color.text()).toContain("Blue");
 
@@ -191,8 +191,8 @@ describe("CardEditView", () => {
 		vi.mocked(updateCard).mockImplementation(async (card) => card);
 		const { wrapper, confirm } = await mountEdit("/cards/printer/edit");
 		const color = wrapper
-			.findAllComponents(Select)
-			.find((select) => select.props("ariaLabel") === "Color");
+			.findAllComponents(MSelect)
+			.find((select) => select.find("button").attributes("aria-label") === "Color");
 		expect(color?.text()).toContain("None");
 
 		await inputInLabel(wrapper, "Name").setValue("Printer 2");
@@ -211,8 +211,8 @@ describe("CardEditView", () => {
 		vi.mocked(updateCard).mockImplementation(async (card) => card);
 		const { wrapper } = await mountEdit("/cards/printer/edit");
 		const icon = wrapper
-			.findAllComponents(Select)
-			.find((select) => select.props("ariaLabel") === "Icon");
+			.findAllComponents(MSelect)
+			.find((select) => select.find("button").attributes("aria-label") === "Icon");
 		if (!icon) throw new Error("Icon select not rendered");
 		expect(icon.text()).toContain("Unavailable icon");
 		expect(icon.html()).toMatch(/lucide-ghost/);
@@ -262,7 +262,8 @@ describe("CardEditView", () => {
 		const { wrapper } = await mountEdit("/cards/new/edit");
 		await inputInLabel(wrapper, "Name").setValue("PC");
 		await commandLine(wrapper).setValue("/usr/bin/wakeonlan AA:BB:CC:DD:EE:FF");
-		await wrapper.find("#status-enabled").setValue(true);
+		await wrapper.find("#status-enabled").trigger("click");
+		expect(wrapper.find("#status-enabled").attributes("aria-checked")).toBe("true");
 		await wrapper.findAll("input.command-line")[1].setValue("/usr/bin/ping -c 1 -W 2 192.168.1.10");
 		await wrapper
 			.findAll("button")

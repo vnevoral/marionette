@@ -88,7 +88,7 @@ test.describe("at 320 px", () => {
 		await createCard(request, { id: "narrow", name: "A card with a fairly long name" });
 		for (const width of [320, 412]) {
 			await page.setViewportSize({ width, height: 800 });
-			for (const path of ["/", "/cards/narrow"]) {
+			for (const path of ["/", "/cards/narrow", "/cards/narrow/edit"]) {
 				await page.goto(path);
 				await expect(page.locator(".loading-state")).toHaveCount(0);
 				const row = await page.locator(".page-header-row").boundingBox();

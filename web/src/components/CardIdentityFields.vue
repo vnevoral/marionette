@@ -1,12 +1,12 @@
 <script setup lang="ts">
 import { computed } from "vue";
-import InputText from "primevue/inputtext";
-import Select from "primevue/select";
-import Textarea from "primevue/textarea";
 import FormSection from "@/components/FormSection.vue";
 import { CARD_COLOR_OPTIONS, cardColorValue } from "@/ui/cardColors";
 import { CARD_ICON_OPTIONS, isCardIcon } from "@/ui/icons";
 import MIcon from "@/ui/MIcon.vue";
+import MInput from "@/ui/MInput.vue";
+import MSelect from "@/ui/MSelect.vue";
+import MTextarea from "@/ui/MTextarea.vue";
 import { FEEDBACK } from "@/ui/vocabulary";
 
 const props = defineProps<{
@@ -27,16 +27,6 @@ const iconError = computed(() => {
 	if (icon.value && !isCardIcon(icon.value)) return FEEDBACK.iconUnavailable;
 	return props.errors.icon === FEEDBACK.iconUnavailable ? "" : (props.errors.icon ?? "");
 });
-
-function iconLabel(value: unknown) {
-	return (
-		CARD_ICON_OPTIONS.find((option) => option.value === value)?.label ?? FEEDBACK.unavailableIcon
-	);
-}
-
-function colorLabel(value: unknown) {
-	return CARD_COLOR_OPTIONS.find((option) => option.value === (value ?? ""))?.label;
-}
 </script>
 
 <template>
@@ -48,71 +38,67 @@ function colorLabel(value: unknown) {
 		<div class="form-grid grid">
 			<label class="col-12 md:col-6"
 				>Name
-				<InputText v-model="name" :invalid="Boolean(errors.name)" />
+				<MInput v-model="name" :invalid="Boolean(errors.name)" />
 				<small v-if="errors.name" class="field-error">{{ errors.name }}</small>
 			</label>
 			<label class="col-12"
 				>Description
-				<Textarea v-model="description" rows="2" :invalid="Boolean(errors.description)" />
+				<MTextarea v-model="description" rows="2" :invalid="Boolean(errors.description)" />
 				<small v-if="errors.description" class="field-error">{{ errors.description }}</small>
 			</label>
 			<label class="col-12 md:col-6"
 				>Icon
-				<Select
+				<MSelect
 					v-model="icon"
-					:options="[...CARD_ICON_OPTIONS]"
-					option-label="label"
-					option-value="value"
+					:options="CARD_ICON_OPTIONS"
 					:invalid="Boolean(iconError)"
 					aria-label="Icon"
 				>
-					<template #value="slotProps">
-						<div v-if="slotProps.value" class="icon-option">
-							<MIcon :name="slotProps.value" />
-							<span>{{ iconLabel(slotProps.value) }}</span>
-						</div>
+					<template #value="{ option, value }">
+						<span v-if="value" class="icon-option">
+							<MIcon :name="value" />
+							<span>{{ option?.label ?? FEEDBACK.unavailableIcon }}</span>
+						</span>
 					</template>
-					<template #option="slotProps">
-						<div class="icon-option">
-							<MIcon :name="slotProps.option.value" />
-							<span>{{ slotProps.option.label }}</span>
-						</div>
+					<template #option="{ option }">
+						<span class="icon-option">
+							<MIcon :name="option.value" />
+							<span>{{ option.label }}</span>
+						</span>
 					</template>
-				</Select>
+				</MSelect>
 				<small v-if="iconError" class="field-error">{{ iconError }}</small>
 			</label>
 			<label class="col-12 md:col-6"
 				>Color
-				<Select
+				<MSelect
 					:model-value="color ?? ''"
-					:options="[...CARD_COLOR_OPTIONS]"
-					option-label="label"
-					option-value="value"
+					:options="CARD_COLOR_OPTIONS"
 					:invalid="Boolean(errors.color)"
 					aria-label="Color"
 					@update:model-value="color = $event"
 				>
-					<template #value="slotProps">
-						<div class="icon-option">
+					<template #value="{ option }">
+						<span class="icon-option">
 							<span
 								class="color-swatch"
-								:style="{ background: cardColorValue(slotProps.value) }"
+								:style="{ background: cardColorValue(option?.value) }"
 								aria-hidden="true"
 							/>
-							<span>{{ colorLabel(slotProps.value) }}</span>
-						</div>
+							<span>{{ option?.label }}</span>
+						</span>
 					</template>
-					<template #option="slotProps">
-						<div class="icon-option">
+					<template #option="{ option }">
+						<span class="icon-option">
 							<span
 								class="color-swatch"
-								:style="{ background: cardColorValue(slotProps.option.value) }"
+								:style="{ background: cardColorValue(option.value) }"
 								aria-hidden="true"
 							/>
-							<span>{{ slotProps.option.label }}</span>
-						</div>
+							<span>{{ option.label }}</span>
+						</span>
 					</template>
-				</Select>
+				</MSelect>
 				<small v-if="errors.color" class="field-error">{{ errors.color }}</small>
 			</label>
 		</div>

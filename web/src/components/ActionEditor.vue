@@ -1,11 +1,11 @@
 <script setup lang="ts">
 import { computed, ref, useId, watch } from "vue";
-import InputNumber from "primevue/inputnumber";
-import InputText from "primevue/inputtext";
-import Textarea from "primevue/textarea";
-import Select from "primevue/select";
 import type { Action } from "@/api";
 import MButton from "@/ui/MButton.vue";
+import MInput from "@/ui/MInput.vue";
+import MNumberInput from "@/ui/MNumberInput.vue";
+import MSelect from "@/ui/MSelect.vue";
+import MTextarea from "@/ui/MTextarea.vue";
 import { newRowId, type ActionFieldErrors, type EnvironmentRow } from "@/views/cardEditModel";
 import { parseCommandLine } from "@/views/commandLine";
 
@@ -102,7 +102,7 @@ function removeEnvironment(id: string) {
 			<div class="col-12 field">
 				<label :for="`${ids}-command`" class="field-label">Command line</label>
 				<component
-					:is="multiLine ? Textarea : InputText"
+					:is="multiLine ? MTextarea : MInput"
 					:id="`${ids}-command`"
 					class="command-line"
 					:auto-resize="multiLine || undefined"
@@ -113,7 +113,6 @@ function removeEnvironment(id: string) {
 					autocapitalize="off"
 					autocomplete="off"
 					:invalid="Boolean(commandError)"
-					:aria-invalid="Boolean(commandError)"
 					:aria-describedby="`${commandHelpId} ${commandPreviewId}`"
 					@update:model-value="updateCommandLine"
 				/>
@@ -137,7 +136,7 @@ function removeEnvironment(id: string) {
 			</div>
 			<label class="col-12 md:col-6"
 				>Working directory
-				<InputText
+				<MInput
 					:model-value="action.dir"
 					:invalid="Boolean(props.errors?.dir)"
 					@update:model-value="updateDirectory"
@@ -146,11 +145,10 @@ function removeEnvironment(id: string) {
 			</label>
 			<label class="col-12 md:col-6 lg:col-4"
 				>Timeout (seconds)
-				<InputNumber
+				<MNumberInput
 					:model-value="action.timeoutSec"
 					:min="1"
 					:invalid="Boolean(props.errors?.timeoutSec)"
-					:aria-invalid="Boolean(props.errors?.timeoutSec)"
 					@update:model-value="updateTimeout"
 				/>
 				<small v-if="props.errors?.timeoutSec" class="field-error">{{
@@ -159,18 +157,16 @@ function removeEnvironment(id: string) {
 			</label>
 			<div class="col-12 md:col-6 lg:col-4 field">
 				<span :id="ruleLabelId" class="field-label">Output rule</span>
-				<Select
+				<MSelect
 					:model-value="action.rule.type"
 					:options="RULE_OPTIONS"
-					option-label="label"
-					option-value="value"
 					:aria-labelledby="ruleLabelId"
 					@update:model-value="updateRuleType"
 				/>
 			</div>
 			<label v-if="action.rule.type !== 'exit_code'" class="col-12 md:col-6 lg:col-4"
 				>Regex pattern
-				<InputText
+				<MInput
 					:model-value="action.rule.pattern"
 					:invalid="Boolean(props.errors?.pattern)"
 					@update:model-value="updatePattern"
@@ -182,14 +178,14 @@ function removeEnvironment(id: string) {
 			<strong>Environment</strong>
 			<small v-if="props.errors?.env" class="field-error">{{ props.errors.env }}</small>
 			<div v-for="(row, index) in environment" :key="row.id" class="row-line env-row">
-				<InputText
+				<MInput
 					class="env-key"
 					placeholder="KEY"
 					:model-value="row.key"
 					:aria-label="`Variable ${index + 1} name`"
 					@update:model-value="updateEnvironment(row.id, 'key', $event)"
 				/>
-				<InputText
+				<MInput
 					class="env-value"
 					placeholder="value"
 					:model-value="row.value"
@@ -287,7 +283,7 @@ label,
 	align-items: center;
 	gap: var(--space-2);
 }
-.row-line :deep(.p-inputtext) {
+.row-line .m-input {
 	flex: 1 1 auto;
 	min-width: 0;
 }
@@ -299,6 +295,8 @@ label,
 }
 .add-row {
 	align-self: flex-start;
+	/* Line the ghost button's icon up with the fields above. */
+	margin-left: calc(-1 * var(--space-3));
 }
 @media (max-width: 30rem) {
 	.env-row {

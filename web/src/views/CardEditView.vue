@@ -1,18 +1,18 @@
 <script setup lang="ts">
 import { computed, reactive, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
-import ToggleSwitch from "primevue/toggleswitch";
 import { ApiError, createCard, getCard, updateCard, type ActionCard } from "@/api";
 import ActionEditor from "@/components/ActionEditor.vue";
 import CardIdentityFields from "@/components/CardIdentityFields.vue";
 import PageHeader from "@/components/PageHeader.vue";
 import PollingFields from "@/components/PollingFields.vue";
 import RequestState from "@/components/RequestState.vue";
-import SaveBar from "@/components/SaveBar.vue";
 import { useNotify } from "@/composables/useNotify";
 import { useUnsavedChangesGuard } from "@/composables/useUnsavedChangesGuard";
 import { knownCardColor } from "@/ui/cardColors";
+import MButton from "@/ui/MButton.vue";
 import MCard from "@/ui/MCard.vue";
+import MSwitch from "@/ui/MSwitch.vue";
 import { ACTIONS, FEEDBACK, LOADING } from "@/ui/vocabulary";
 import {
 	actionFrom,
@@ -191,14 +191,26 @@ useUnsavedChangesGuard(isDirty, () => saving.value);
 </script>
 
 <template>
-	<main class="page">
+	<main class="page editor-page">
 		<PageHeader
 			:eyebrow="isNew() ? 'New action card' : 'Edit action card'"
 			:title="isNew() ? 'New card' : 'Edit card'"
 			lede="Configure the identity, actions, and automatic checks for this card."
 			:back-to="backTo()"
 			:back-label="isNew() ? ACTIONS.backToOverview : ACTIONS.backToDetail"
-		/>
+		>
+			<!-- Save and cancel sit with the other page actions (UX spec §7.2). -->
+			<template v-if="!loading" #actions>
+				<MButton :label="ACTIONS.cancel" icon="x" :to="backTo()" />
+				<MButton
+					:label="ACTIONS.saveCard"
+					icon="check"
+					variant="primary"
+					:loading="saving"
+					@click="save"
+				/>
+			</template>
+		</PageHeader>
 
 		<div class="edit-feedback">
 			<RequestState :message="error" tone="error" />
@@ -208,7 +220,7 @@ useUnsavedChangesGuard(isDirty, () => saving.value);
 			<span>{{ LOADING.card }}</span>
 		</div>
 
-		<MCard v-else class="editor-card">
+		<MCard v-else>
 			<div class="editor-body">
 				<CardIdentityFields
 					v-model:name="form.name"
@@ -232,7 +244,7 @@ useUnsavedChangesGuard(isDirty, () => saving.value);
 				/>
 
 				<div class="status-toggle">
-					<ToggleSwitch v-model="statusEnabled" input-id="status-enabled" />
+					<MSwitch id="status-enabled" v-model="statusEnabled" />
 					<label for="status-enabled">Configure status action</label>
 				</div>
 
@@ -258,7 +270,6 @@ useUnsavedChangesGuard(isDirty, () => saving.value);
 					}"
 				/>
 			</div>
-			<SaveBar :saving="saving" :cancel-to="backTo()" @save="save" />
 		</MCard>
 	</main>
 </template>
@@ -273,8 +284,9 @@ useUnsavedChangesGuard(isDirty, () => saving.value);
 .edit-feedback:empty {
 	display: none;
 }
-.editor-card {
-	max-width: 960px;
+/* The header and the form share one centred column of the form's width. */
+.editor-page {
+	max-width: calc(960px + 2 * var(--page-padding-x));
 }
 .editor-body {
 	padding: var(--space-6);
