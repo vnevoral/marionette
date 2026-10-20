@@ -59,11 +59,18 @@ CSS on top of the existing tokens.
    Views use these components, not Reka UI directly.
 3. Icons come from **Lucide** (`@lucide/vue`, ISC) as individually
    imported SVG components, wrapped by one `MIcon` component that sets size
-   and `aria-hidden`; `primeicons` is removed. The card's stored `icon`
-   value keeps its `pi pi-<name>` form (ADR-0004, server validation, API):
-   it becomes a stable identifier that `web/src/ui/icons.ts` maps to a
-   Lucide icon, with a fallback for an unknown name, so no configuration
-   migration and no API change are needed.
+   and `aria-hidden`; `primeicons` is removed. The card's `icon` value
+   changes from a PrimeIcons class (`pi pi-home`) to the icon's name
+   (`home`, lowercase letters, digits and dashes, at most 64 characters);
+   `web/src/ui/icons.ts` maps the supported names to Lucide icons. The
+   owner decided (2026-10-20) that existing values are not migrated:
+   - a configuration with old values still loads (the icon is not part of
+     `ValidateEssential`, ADR-0004);
+   - a card whose icon the UI does not know shows the Lucide **ghost**
+     icon on the dashboard and in the detail;
+   - the editor offers only the supported icons; a card with an unknown
+     icon cannot be saved until a supported one is chosen, and the API
+     rejects the old form with 422 (`icon`).
 4. The migration is incremental. Both libraries coexist while views move
    over; each block keeps `make verify` and `make e2e` green. The last block
    removes `primevue`, `@primeuix/*`, `primeicons` and the preset.
@@ -124,6 +131,10 @@ library and icons (Vue 3, Vite and `vue-router` stay) and updates ADR-0007
 - Unit tests that install `primevue/config` change as their components
   move; the E2E suite (block 0041) checks each step from the browser,
   including 320 px and the accessibility scenarios.
+- The API no longer accepts `pi pi-<name>` icons, an incompatible API
+  change: the release with block 1 is **v2.0.0** (`docs/devops/ci-cd.md`,
+  release versioning). Configurations keep loading; each card gets its new
+  icon the next time it is edited.
 - AGENTS.md and the Vue instructions change from "PrimeVue components
   instead of custom UI elements" to "components from `web/src/ui/`".
 - Proposed block order, each a separate pull request:
