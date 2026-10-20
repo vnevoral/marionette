@@ -252,7 +252,10 @@ standalone workflow and does not combine a card list with a configuration form.
    timeout, and output rule.
 3. **Status check**: enable/disable switch and the same action editor.
 4. **Automatic checks**: standard interval, fast interval, and fast window.
-5. **Save bar**: sticky save/cancel actions.
+
+**Cancel** and **Save card** are page actions in the header, like
+**Edit card** and **Delete card** on Card Detail; the form has no separate
+save bar.
 
 The ID is optional on creation and immutable during editing. The command and
 its arguments are one **Command line** field, as typed in a terminal
@@ -411,8 +414,8 @@ built from them live in `web/src/components` and are used by every view
   notices go through the shared PrimeVue `Toast` in `App.vue` and the
   `useNotify` composable (§4 feedback channels);
 - `ActionCard`, `ActionControls`;
-- `ActionEditor`, `FormSection`, `CardIdentityFields`, `PollingFields`,
-  `SaveBar`; the unsaved-changes dialog is the shared `ConfirmDialog` driven
+- `ActionEditor`, `FormSection`, `CardIdentityFields`, `PollingFields`;
+  the unsaved-changes dialog is the shared `ConfirmDialog` driven
   by the `useUnsavedChangesGuard` composable;
 - `RunTable`, `StatusTimeline`, `StatusSummary`, `DetailPanel`,
   `DetailErrorState`.

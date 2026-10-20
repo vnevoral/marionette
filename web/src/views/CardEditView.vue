@@ -7,10 +7,10 @@ import CardIdentityFields from "@/components/CardIdentityFields.vue";
 import PageHeader from "@/components/PageHeader.vue";
 import PollingFields from "@/components/PollingFields.vue";
 import RequestState from "@/components/RequestState.vue";
-import SaveBar from "@/components/SaveBar.vue";
 import { useNotify } from "@/composables/useNotify";
 import { useUnsavedChangesGuard } from "@/composables/useUnsavedChangesGuard";
 import { knownCardColor } from "@/ui/cardColors";
+import MButton from "@/ui/MButton.vue";
 import MCard from "@/ui/MCard.vue";
 import MSwitch from "@/ui/MSwitch.vue";
 import { ACTIONS, FEEDBACK, LOADING } from "@/ui/vocabulary";
@@ -198,7 +198,19 @@ useUnsavedChangesGuard(isDirty, () => saving.value);
 			lede="Configure the identity, actions, and automatic checks for this card."
 			:back-to="backTo()"
 			:back-label="isNew() ? ACTIONS.backToOverview : ACTIONS.backToDetail"
-		/>
+		>
+			<!-- Save and cancel sit with the other page actions (UX spec §7.2). -->
+			<template v-if="!loading" #actions>
+				<MButton :label="ACTIONS.cancel" icon="x" :to="backTo()" />
+				<MButton
+					:label="ACTIONS.saveCard"
+					icon="check"
+					variant="primary"
+					:loading="saving"
+					@click="save"
+				/>
+			</template>
+		</PageHeader>
 
 		<div class="edit-feedback">
 			<RequestState :message="error" tone="error" />
@@ -258,7 +270,6 @@ useUnsavedChangesGuard(isDirty, () => saving.value);
 					}"
 				/>
 			</div>
-			<SaveBar :saving="saving" :cancel-to="backTo()" @save="save" />
 		</MCard>
 	</main>
 </template>

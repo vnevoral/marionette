@@ -75,5 +75,9 @@ See [Definition of Done](../../devops/definition-of-done.md).
   before pairing. The bundle grows for now (JS 152 → 162 kB gzip) because
   Reka UI and PrimeVue are both in it until block 0076.
 - **Deviations from the plan**: `MNumberInput` is a native number input,
-  not Reka UI `NumberField` (see Proposed solution).
-- **Documentation updated**: UX spec §8.4, roadmap.
+  not Reka UI `NumberField` (see Proposed solution). At the owner's
+  request after the visual check, **Cancel** and **Save card** moved from
+  the sticky `SaveBar` (which floated mid-page and left a gap under the
+  form) to the page header actions, like Card Detail; `SaveBar` is
+  removed and the e2e header-button check covers the edit page.
+- **Documentation updated**: UX spec §7.2, §8.4, roadmap.
