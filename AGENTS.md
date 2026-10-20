@@ -62,7 +62,7 @@ dependencies (no Node.js on the target, no separate web server).
 make ui-install     # once: npm install for web/
 make ui-dev          # Vite dev server :5173 (proxy /api -> :8080)
 make backend-dev     # Go backend with hot-reload (air) on :8080
-make pair            # pairing code from the running dev backend (./marionette.sock)
+make pair            # pairing code from the running dev backend (.dev/marionette.sock)
 make build           # build UI + embed + Go binary for the current platform
 make build-arm64     # cross-compile for Raspberry Pi (linux/arm64)
 make release-arm64   # release archive + .sha256; needs a clean tree and a vX.Y.Z tag on HEAD
@@ -77,7 +77,8 @@ For the web alone (`cd web`): `npm run lint`, `npm run lint:types`,
 `npm run format` / `npm run format:check`, `npm run build`
 (`vue-tsc -b && vite build`).
 
-The local dev configuration `./marionette.json` is ignored by git and is
+The local dev data lives in the git-ignored `.dev/` directory: the
+configuration `.dev/marionette.json` (paired devices in `.dev/devices.json`) is
 created from `deploy/dev-fixture.json` by `make dev-config` (called
 automatically from `make backend-dev` / `backend-run`).
 

@@ -72,15 +72,16 @@ make verify       # build UI + lint + tests; run before every commit
 make e2e          # browser tests against the built binary (Playwright, Chromium)
 ```
 
-The backend reads `./marionette.json`, which is git-ignored and created from
+The dev backend keeps its data in the git-ignored `.dev/` directory: it
+reads `.dev/marionette.json`, created from
 `deploy/dev-fixture.json` on the first `make backend-dev` (or `make
 dev-config`). Go 1.27 or newer (`go.mod`) and Node 22 (`web/.nvmrc`) are
 required; the dev container provides both.
 
 Access control is on in development too: the first start prints a pairing
 code in the backend output, and `make pair` prints a new one at any time
-(the dev backend listens on `./marionette.sock`). Enter it on the pairing
-screen once (the paired device is kept in `./devices.json`). Set
+(the dev backend listens on `.dev/marionette.sock`). Enter it on the pairing
+screen once (the paired device is kept in `.dev/devices.json`). Set
 `MARIONETTE_AUTH=off` to skip pairing while developing.
 
 ## Production build
