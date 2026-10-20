@@ -1,10 +1,11 @@
 <script setup lang="ts">
 import { nextTick, ref, useId } from "vue";
-import Button from "primevue/button";
 import InputText from "primevue/inputtext";
-import Tag from "primevue/tag";
 import { ApiError, renameDevice, type Device } from "@/api";
 import { formatDate } from "@/ui/format";
+import MButton from "@/ui/MButton.vue";
+import MIcon from "@/ui/MIcon.vue";
+import MTag from "@/ui/MTag.vue";
 import { ACCESS, ACTIONS, FEEDBACK } from "@/ui/vocabulary";
 
 // One paired device on the Devices page (FR-55) with in-place renaming
@@ -64,7 +65,7 @@ async function save() {
 <template>
 	<li class="device-row">
 		<div class="device-identity">
-			<i class="pi pi-desktop" aria-hidden="true" />
+			<span class="device-icon"><MIcon name="monitor" /></span>
 			<div class="device-body">
 				<form v-if="editing" class="device-rename" novalidate @submit.prevent="save">
 					<label :for="inputId" class="device-rename-label">{{ ACCESS.nameLabel }}</label>
@@ -80,27 +81,21 @@ async function save() {
 							@keydown.enter.prevent="save"
 							@keydown.esc.prevent="stopEditing"
 						/>
-						<Button
+						<MButton
 							type="submit"
 							:label="ACCESS.saveName"
-							icon="pi pi-check"
-							size="small"
+							icon="check"
+							variant="primary"
+							size="sm"
 							:loading="saving"
 						/>
-						<Button
-							type="button"
-							:label="ACTIONS.cancel"
-							severity="secondary"
-							outlined
-							size="small"
-							@click="stopEditing"
-						/>
+						<MButton :label="ACTIONS.cancel" size="sm" @click="stopEditing" />
 					</div>
 					<small v-if="nameError" :id="errorId" class="field-error">{{ nameError }}</small>
 				</form>
 				<p v-else class="device-name">
 					<span>{{ device.name }}</span>
-					<Tag v-if="device.current" :value="ACCESS.thisDevice" severity="secondary" />
+					<MTag v-if="device.current" class="device-current" :label="ACCESS.thisDevice" />
 				</p>
 				<p class="device-dates">
 					{{ ACCESS.pairedAt }} {{ formatDate(device.pairedAt) }} · {{ ACCESS.lastUsed }}
@@ -109,21 +104,17 @@ async function save() {
 			</div>
 		</div>
 		<div v-if="!editing" class="device-actions">
-			<Button
+			<MButton
 				ref="renameButton"
-				icon="pi pi-pencil"
-				text
-				rounded
-				severity="secondary"
+				icon="pencil"
+				variant="ghost"
 				class="device-rename-button"
 				:aria-label="ACCESS.renameDevice(device.name)"
 				@click="startEditing"
 			/>
-			<Button
-				icon="pi pi-trash"
-				text
-				rounded
-				severity="danger"
+			<MButton
+				icon="trash-2"
+				variant="danger-ghost"
 				class="device-remove-button"
 				:aria-label="`${ACCESS.removeDevice} ${device.name}`"
 				@click="emit('remove', device)"
@@ -138,7 +129,7 @@ async function save() {
 	align-items: center;
 	justify-content: space-between;
 	gap: var(--space-3);
-	padding: var(--space-3) 0;
+	padding: var(--space-4) 0;
 	border-top: 1px solid var(--color-border);
 }
 .device-identity {
@@ -148,9 +139,15 @@ async function save() {
 	gap: var(--space-3);
 	min-width: 0;
 }
-.device-identity > i {
-	margin-top: 0.2rem;
-	color: var(--color-accent);
+.device-icon {
+	display: grid;
+	width: 36px;
+	height: 36px;
+	flex: none;
+	place-items: center;
+	border-radius: var(--radius-sm);
+	background: var(--color-accent-soft);
+	color: var(--color-accent-strong);
 }
 .device-body {
 	flex: 1;

@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { RouterLink } from "vue-router";
-import Button from "primevue/button";
-import Message from "primevue/message";
+import MButton from "@/ui/MButton.vue";
+import MMessage from "@/ui/MMessage.vue";
 import { ACTIONS } from "@/ui/vocabulary";
 
 // Card detail failure states: a missing card (404) is final, anything else
@@ -11,17 +11,28 @@ const emit = defineEmits<{ retry: [] }>();
 </script>
 
 <template>
-	<Message v-if="notFound" severity="error" :closable="false">
+	<MMessage v-if="notFound" class="detail-error">
 		<h1>Card not found</h1>
 		<p>There is no card with the id "{{ cardID }}". It may have been deleted.</p>
-		<RouterLink to="/">{{ ACTIONS.returnToOverview }}</RouterLink>
-	</Message>
-	<Message v-else severity="error" :closable="false">
+		<RouterLink class="text-link" to="/">{{ ACTIONS.returnToOverview }}</RouterLink>
+	</MMessage>
+	<MMessage v-else class="detail-error">
 		<h1>Card unavailable</h1>
 		<p>{{ error }}</p>
 		<div class="flex align-items-center gap-3">
-			<Button :label="ACTIONS.tryAgain" text size="small" @click="emit('retry')" />
-			<RouterLink to="/">{{ ACTIONS.returnToOverview }}</RouterLink>
+			<MButton :label="ACTIONS.tryAgain" variant="ghost" size="sm" @click="emit('retry')" />
+			<RouterLink class="text-link" to="/">{{ ACTIONS.returnToOverview }}</RouterLink>
 		</div>
-	</Message>
+	</MMessage>
 </template>
+
+<style scoped>
+.detail-error h1 {
+	margin: 0;
+	font-size: 1.25rem;
+}
+.detail-error p {
+	margin: var(--space-2) 0 var(--space-3);
+	color: var(--color-ink);
+}
+</style>

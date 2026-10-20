@@ -1,5 +1,7 @@
+import { Ghost } from "@lucide/vue";
 import { describe, expect, it } from "vitest";
 import type { Run, StatusState } from "@/api";
+import { iconComponent } from "@/ui/icons";
 import {
 	NO_STATUS_CHECK,
 	OUTCOME,
@@ -19,7 +21,7 @@ describe("vocabulary", () => {
 			const presentation = statusPresentation(state);
 			expect(presentation).toBe(STATUS[state]);
 			expect(presentation.label).toBeTruthy();
-			expect(presentation.icon).toMatch(/^pi /);
+			expect(iconComponent(presentation.icon)).not.toBe(Ghost);
 			expect(rawValues).not.toContain(presentation.label.toLowerCase());
 		}
 		expect(statusPresentation("ok").label).toBe("Healthy");

@@ -1,9 +1,5 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref } from "vue";
-import { RouterLink } from "vue-router";
-import Button from "primevue/button";
-import Message from "primevue/message";
-import ProgressSpinner from "primevue/progressspinner";
 import {
 	listCards,
 	type ActionCard as Card,
@@ -19,6 +15,9 @@ import { expectsFollowUpCheck, supersedes } from "@/composables/useCardStatus";
 import { useStatusEvents } from "@/composables/useStatusEvents";
 import { messageVisibleMs } from "@/composables/useTransientMessage";
 import type { ActionKind, PendingRequest, RequestResult } from "@/types";
+import MButton from "@/ui/MButton.vue";
+import MMessage from "@/ui/MMessage.vue";
+import MSpinner from "@/ui/MSpinner.vue";
 import { ACTIONS, EMPTY, FEEDBACK, LOADING, runOutcomeMessage } from "@/ui/vocabulary";
 
 const cards = ref<Card[]>([]);
@@ -202,32 +201,31 @@ onBeforeUnmount(() => {
 	<main class="page">
 		<PageHeader eyebrow="Marionette control" title="Overview" :lede="lede">
 			<template #actions>
-				<Button
+				<MButton
 					:label="ACTIONS.refresh"
-					icon="pi pi-refresh"
-					severity="secondary"
-					outlined
+					icon="refresh-cw"
 					:loading="loading"
 					@click="loadDashboard"
 				/>
-				<Button v-if="cards.length" v-slot="slotProps" as-child>
-					<RouterLink :class="[slotProps.class, 'primary-action-button']" to="/cards/new/edit">
-						<i class="pi pi-plus p-button-icon p-button-icon-left" aria-hidden="true" />
-						<span class="p-button-label">{{ ACTIONS.newCard }}</span>
-					</RouterLink>
-				</Button>
+				<MButton
+					v-if="cards.length"
+					:label="ACTIONS.newCard"
+					icon="plus"
+					variant="primary"
+					to="/cards/new/edit"
+				/>
 			</template>
 		</PageHeader>
 
-		<Message v-if="error" severity="error" :closable="false">
+		<MMessage v-if="error" class="dashboard-error">
 			<div class="flex flex-wrap align-items-center justify-content-between gap-3">
 				<span>{{ error }}</span>
-				<Button :label="ACTIONS.tryAgain" text size="small" @click="loadDashboard" />
+				<MButton :label="ACTIONS.tryAgain" variant="ghost" size="sm" @click="loadDashboard" />
 			</div>
-		</Message>
+		</MMessage>
 
 		<div v-if="loading" class="loading-state" role="status" aria-live="polite">
-			<ProgressSpinner :aria-label="LOADING.cards" />
+			<MSpinner :label="LOADING.cards" size="2rem" />
 			<span>{{ LOADING.cards }}</span>
 		</div>
 
@@ -246,20 +244,18 @@ onBeforeUnmount(() => {
 			</div>
 		</section>
 
-		<EmptyState v-else icon="pi pi-inbox" :title="EMPTY.cards.title" :body="EMPTY.cards.body">
+		<EmptyState v-else icon="inbox" :title="EMPTY.cards.title" :body="EMPTY.cards.body">
 			<template #action>
-				<Button v-slot="slotProps" as-child>
-					<RouterLink :class="[slotProps.class, 'primary-action-button']" to="/cards/new/edit">
-						<i class="pi pi-plus p-button-icon p-button-icon-left" aria-hidden="true" />
-						<span class="p-button-label">{{ EMPTY.cards.action }}</span>
-					</RouterLink>
-				</Button>
+				<MButton :label="EMPTY.cards.action" icon="plus" variant="primary" to="/cards/new/edit" />
 			</template>
 		</EmptyState>
 	</main>
 </template>
 
 <style scoped>
+.dashboard-error {
+	margin-bottom: var(--space-4);
+}
 .dashboard-grid {
 	margin: calc(-1 * var(--space-2));
 }

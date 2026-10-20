@@ -1,14 +1,14 @@
 <script setup lang="ts">
 import { computed } from "vue";
 import { RouterLink } from "vue-router";
-import Card from "primevue/card";
 import type { ActionCard, StatusSnapshot } from "@/api";
 import ActionControls from "@/components/ActionControls.vue";
 import ActionNote from "@/components/ActionNote.vue";
 import StatusBadge from "@/components/StatusBadge.vue";
 import type { PendingRequest, RequestResult } from "@/types";
 import { cardColorValue } from "@/ui/cardColors";
-import { DEFAULT_CARD_ICON } from "@/ui/icons";
+import MCard from "@/ui/MCard.vue";
+import MIcon from "@/ui/MIcon.vue";
 import { lastCheckedLabel } from "@/ui/format";
 import {
 	ACTIONS,
@@ -45,32 +45,28 @@ const lastChecked = computed(() =>
 	props.card.status ? lastCheckedLabel(props.status?.checkedAt) : "",
 );
 
-// The colour stripe (FR-10a) is drawn by the border and an inset shadow, so a
-// coloured card has the same size as one without a colour.
+// The colour stripe (FR-10a) along the top edge; see the style below.
 const stripe = computed(() => cardColorValue(props.card.color));
 
 const detailLink = computed(() => `/cards/${encodeURIComponent(props.card.id)}`);
 </script>
 
 <template>
-	<Card
+	<MCard
+		as="article"
 		class="action-card"
 		:class="{ 'has-color': stripe }"
 		:data-color="stripe ? card.color : undefined"
 		:style="stripe ? { '--card-stripe': stripe } : undefined"
 	>
-		<template #header>
-			<div class="card-banner">
-				<div class="card-icon" aria-hidden="true">
-					<i :class="card.icon || DEFAULT_CARD_ICON" />
-				</div>
-				<StatusBadge v-bind="badge" />
+		<div class="card-banner">
+			<div class="card-icon">
+				<MIcon :name="card.icon" />
 			</div>
-		</template>
-		<template #title>
-			<span class="card-title">{{ card.name }}</span>
-		</template>
-		<template #content>
+			<StatusBadge v-bind="badge" />
+		</div>
+		<div class="card-content">
+			<h3 class="card-title">{{ card.name }}</h3>
 			<p class="card-description">{{ card.description || EMPTY.description }}</p>
 			<ActionNote
 				class="card-checked"
@@ -80,84 +76,86 @@ const detailLink = computed(() => `/cards/${encodeURIComponent(props.card.id)}`)
 				single-line
 			/>
 			<p v-if="card.status && statusUnavailable" class="card-unavailable">
-				<i class="pi pi-exclamation-circle" aria-hidden="true" />
+				<MIcon name="circle-alert" />
 				<span>{{ FEEDBACK.statusUnavailable }}</span>
 			</p>
-		</template>
-		<template #footer>
-			<div class="card-footer">
-				<RouterLink class="text-link details-link" :to="detailLink">
-					<span>{{ ACTIONS.viewDetails }}</span>
-					<i class="pi pi-arrow-up-right" aria-hidden="true" />
-				</RouterLink>
-				<ActionControls
-					:has-status="Boolean(card.status)"
-					:pending="pending"
-					@run="emit('run')"
-					@check="emit('check')"
-				/>
-			</div>
-		</template>
-	</Card>
+		</div>
+		<div class="card-footer">
+			<RouterLink class="text-link details-link" :to="detailLink">
+				<span>{{ ACTIONS.viewDetails }}</span>
+				<MIcon name="arrow-up-right" />
+			</RouterLink>
+			<ActionControls
+				:has-status="Boolean(card.status)"
+				:pending="pending"
+				@run="emit('run')"
+				@check="emit('check')"
+			/>
+		</div>
+	</MCard>
 </template>
 
 <style scoped>
 .action-card {
+	display: flex;
 	min-width: 0;
 	height: 100%;
-	border: 1px solid var(--color-border);
-	background: var(--color-surface);
-	box-shadow: var(--shadow-subtle);
+	flex-direction: column;
+	gap: var(--space-4);
+	padding: var(--space-6);
+	transition:
+		box-shadow 160ms ease,
+		border-color 160ms ease;
 }
+.action-card:hover {
+	border-color: var(--color-border-strong);
+	box-shadow: var(--shadow-md);
+}
+/* The colour stripe is an inset shadow so a coloured card keeps its size. */
 .action-card.has-color {
 	border-top-color: var(--card-stripe);
 	box-shadow:
-		inset 0 5px 0 var(--card-stripe),
-		var(--shadow-subtle);
+		inset 0 6px 0 var(--card-stripe),
+		var(--shadow-sm);
 }
-.action-card :deep(.p-card-body) {
-	display: flex;
-	flex-direction: column;
-	gap: var(--space-4);
-	height: 100%;
-}
-.action-card :deep(.p-card-content) {
-	flex: 1;
-}
-.action-card :deep(.p-card-title) {
-	margin: 0;
-	font-family: var(--font-display);
-	font-size: 1.45rem;
-	font-weight: 500;
+.action-card.has-color:hover {
+	box-shadow:
+		inset 0 6px 0 var(--card-stripe),
+		var(--shadow-md);
 }
 .card-banner {
 	display: flex;
 	align-items: center;
 	justify-content: space-between;
-	padding: var(--space-4) var(--space-4) 0;
+	gap: var(--space-3);
 }
 .card-icon {
 	display: grid;
 	width: 44px;
 	height: 44px;
+	flex: none;
 	place-items: center;
-	border-radius: var(--radius-sm);
+	border-radius: var(--radius-md);
 	background: var(--color-accent-soft);
-	color: var(--color-accent);
-	font-size: 1.35rem;
+	color: var(--color-accent-strong);
+	font-size: 1.25rem;
 }
-.card-unavailable {
+.card-content {
 	display: flex;
-	align-items: center;
+	flex: 1;
+	flex-direction: column;
 	gap: var(--space-2);
-	margin: var(--space-1) 0 0;
-	color: var(--color-warning-strong);
-	font-size: 0.85rem;
+	min-width: 0;
 }
 .card-title {
-	display: block;
+	margin: 0;
 	overflow: hidden;
 	color: var(--color-ink);
+	font-family: var(--font-display);
+	font-size: 1.125rem;
+	font-weight: var(--font-weight-semibold);
+	letter-spacing: -0.01em;
+	line-height: 1.35;
 	text-overflow: ellipsis;
 	white-space: nowrap;
 }
@@ -168,18 +166,30 @@ const detailLink = computed(() => `/cards/${encodeURIComponent(props.card.id)}`)
 	-webkit-box-orient: vertical;
 	-webkit-line-clamp: 3;
 	color: var(--color-muted);
+	font-size: 0.9375rem;
 	line-height: 1.5;
 }
 .card-checked {
-	margin: var(--space-3) 0 0;
+	margin: auto 0 0;
+	padding-top: var(--space-2);
+}
+.card-unavailable {
+	display: flex;
+	align-items: center;
+	gap: var(--space-2);
+	margin: 0;
+	color: var(--color-warning-strong);
+	font-size: 0.85rem;
 }
 .card-footer {
 	display: flex;
 	flex-direction: column;
 	gap: var(--space-3);
+	padding-top: var(--space-4);
+	border-top: 1px solid var(--color-border);
 }
 .details-link {
 	align-self: flex-start;
-	font-size: 0.88rem;
+	font-size: 0.875rem;
 }
 </style>

@@ -1,5 +1,6 @@
 // Shared UI types. Vocabulary (labels, icons) lives in src/ui/vocabulary.ts;
 // this module only holds the shapes the views and components agree on.
+import type { IconName } from "@/ui/icons";
 
 /** Semantic colour of a status badge or feedback line; never the only carrier of meaning. */
 export type StatusTone = "healthy" | "problem" | "unknown" | "info" | "warning";
@@ -7,7 +8,7 @@ export type StatusTone = "healthy" | "problem" | "unknown" | "info" | "warning";
 /** How a state is shown: text, icon and tone together (FR-25). */
 export interface Presentation {
 	label: string;
-	icon: string;
+	icon: IconName;
 	tone: StatusTone;
 }
 

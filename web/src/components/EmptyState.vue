@@ -1,10 +1,12 @@
 <script setup lang="ts">
+import MIcon from "@/ui/MIcon.vue";
+
 defineProps<{ icon: string; title: string; body: string }>();
 </script>
 
 <template>
 	<section class="empty-state" :aria-label="title">
-		<div class="empty-icon" aria-hidden="true"><i :class="icon" /></div>
+		<div class="empty-icon"><MIcon :name="icon" /></div>
 		<h2>{{ title }}</h2>
 		<p>{{ body }}</p>
 		<slot name="action" />
@@ -27,14 +29,17 @@ defineProps<{ icon: string; title: string; body: string }>();
 	margin: 0;
 	color: var(--color-muted);
 }
+.empty-state h2 {
+	margin-top: var(--space-2);
+}
 .empty-icon {
 	display: grid;
-	width: 56px;
-	height: 56px;
+	width: 64px;
+	height: 64px;
 	place-items: center;
-	border-radius: 50%;
+	border-radius: var(--radius-lg);
 	background: var(--color-accent-soft);
-	color: var(--color-accent);
-	font-size: 1.5rem;
+	color: var(--color-accent-strong);
+	font-size: 1.75rem;
 }
 </style>

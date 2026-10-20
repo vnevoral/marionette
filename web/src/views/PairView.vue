@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from "vue";
 import { useRoute, useRouter } from "vue-router";
-import Button from "primevue/button";
 import InputText from "primevue/inputtext";
 import { ApiError, pairDevice } from "@/api";
 import InlineError from "@/components/InlineError.vue";
@@ -10,6 +9,7 @@ import { loadSession, setSession, useSession } from "@/composables/useSession";
 import { useNotify } from "@/composables/useNotify";
 import { safeNext } from "@/router/params";
 import { suggestDeviceName } from "@/ui/deviceName";
+import MButton from "@/ui/MButton.vue";
 import { ACCESS, FEEDBACK } from "@/ui/vocabulary";
 
 // Pairing screen (FR-51..FR-53): one code, once per browser. The code may
@@ -116,11 +116,12 @@ onMounted(() => {
 					<small v-if="nameError" class="field-error">{{ nameError }}</small>
 				</label>
 				<InlineError :message="error" />
-				<Button
+				<MButton
 					type="submit"
 					:label="ACCESS.pairAction"
-					icon="pi pi-link"
-					class="primary-action-button pair-submit"
+					icon="link"
+					variant="primary"
+					class="pair-submit"
 					:loading="pairing"
 				/>
 			</form>
@@ -159,10 +160,12 @@ onMounted(() => {
 	display: block;
 	overflow-x: auto;
 	padding: var(--space-3);
+	border: 1px solid var(--color-border);
 	border-radius: var(--radius-sm);
-	background: var(--color-canvas);
+	background: var(--color-surface-sunken);
 	color: var(--color-ink);
-	font-size: 0.85rem;
+	font-family: var(--font-mono);
+	font-size: 0.8125rem;
 	white-space: pre;
 }
 .pair-form {
@@ -177,7 +180,7 @@ onMounted(() => {
 	font-weight: var(--font-weight-medium);
 }
 .pair-code {
-	font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+	font-family: var(--font-mono);
 	font-size: 1.25rem;
 	letter-spacing: 0.12em;
 }

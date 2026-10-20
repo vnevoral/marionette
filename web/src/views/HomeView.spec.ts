@@ -137,14 +137,14 @@ describe("HomeView", () => {
 		expect(enqueuePrimary).toHaveBeenCalledWith("printer");
 		expect(buttonByLabel(card, "Run action").attributes("disabled")).toBeDefined();
 		expect(buttonByLabel(card, "Check status").attributes("disabled")).toBeDefined();
-		expect(buttonByLabel(card, "Run action").classes()).toContain("p-button-loading");
+		expect(buttonByLabel(card, "Run action").classes()).toContain("m-button-loading");
 		expect(card.text()).toContain("Running");
 
 		FakeEventSource.last().status({ cardId: "printer", snapshot: snapshot(after, "fail") });
 		await flushPromises();
 		expect(buttonByLabel(card, "Run action").attributes("disabled")).toBeUndefined();
 		expect(buttonByLabel(card, "Check status").attributes("disabled")).toBeUndefined();
-		expect(buttonByLabel(card, "Run action").classes()).not.toContain("p-button-loading");
+		expect(buttonByLabel(card, "Run action").classes()).not.toContain("m-button-loading");
 		// The badge shows the new state; the card keeps its Last checked line
 		// and only announces the outcome (UX spec §4).
 		expect(card.text()).toContain("Problem");
@@ -198,7 +198,7 @@ describe("HomeView", () => {
 		await buttonByLabel(card, "Run action").trigger("click");
 		await flushPromises();
 		expect(buttonByLabel(card, "Run action").attributes("disabled")).toBeUndefined();
-		expect(buttonByLabel(card, "Run action").classes()).not.toContain("p-button-loading");
+		expect(buttonByLabel(card, "Run action").classes()).not.toContain("m-button-loading");
 		expect(noteText(card)).toBe("queue is full");
 		expect(card.find(".action-note").classes()).toContain("action-note-error");
 		expect(card.text()).toContain("Healthy");

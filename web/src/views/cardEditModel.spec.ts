@@ -117,6 +117,18 @@ describe("validate", () => {
 		);
 	});
 
+	it("asks for a supported icon instead of one the UI no longer knows (ADR-0014)", () => {
+		const form = validForm();
+		form.icon = "pi pi-home";
+		expect(checked({ form }).fieldErrors).toEqual({
+			icon: "This icon is no longer available. Choose a new one.",
+		});
+		form.icon = "house";
+		expect(checked({ form }).firstError).toBe("");
+		form.icon = "";
+		expect(checked({ form }).firstError).toBe("");
+	});
+
 	it("checks the status action only when it is enabled", () => {
 		expect(checked({ statusLine: "ping |" }).firstError).toBe("");
 		expect(checked({ statusEnabled: true }).fieldErrors).toEqual({

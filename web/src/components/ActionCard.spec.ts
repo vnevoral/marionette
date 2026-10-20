@@ -88,7 +88,7 @@ describe("ActionCard", () => {
 			pending: { action: "status", phase: "running" },
 		});
 		expect(running.find(".status-badge").classes()).toContain("status-info");
-		expect(running.findAll("button")[1].classes()).toContain("p-button-loading");
+		expect(running.findAll("button")[1].classes()).toContain("m-button-loading");
 	});
 
 	it("keeps an updated status quiet and shows other outcomes in place of Last checked", () => {

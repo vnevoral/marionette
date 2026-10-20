@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, ref } from "vue";
-import Button from "primevue/button";
 import InputText from "primevue/inputtext";
 import type { PairingCode } from "@/api";
+import MButton from "@/ui/MButton.vue";
 import { ACCESS } from "@/ui/vocabulary";
 
 // A freshly created pairing code for another device (FR-54): the code in
@@ -47,25 +47,19 @@ async function copyLink() {
 					aria-label="Pairing link"
 					@focus="($event.target as HTMLInputElement).select()"
 				/>
-				<Button
+				<MButton
 					v-if="canCopy"
-					type="button"
 					:label="copied ? ACCESS.linkCopied : ACCESS.copyLink"
-					icon="pi pi-copy"
-					severity="secondary"
-					outlined
+					:icon="copied ? 'check' : 'copy'"
 					@click="copyLink"
 				/>
 			</div>
 		</template>
 		<p v-else class="pairing-code-hint">{{ ACCESS.codeExpired }}</p>
-		<Button
+		<MButton
 			v-if="expired"
-			type="button"
 			:label="ACCESS.newCode"
-			icon="pi pi-refresh"
-			severity="secondary"
-			outlined
+			icon="refresh-cw"
 			class="pairing-renew"
 			@click="emit('renew')"
 		/>
@@ -86,7 +80,7 @@ async function copyLink() {
 	display: block;
 	margin: 0;
 	color: var(--color-ink);
-	font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+	font-family: var(--font-mono);
 	font-size: 2rem;
 	font-weight: var(--font-weight-semibold);
 	letter-spacing: 0.15em;

@@ -23,12 +23,9 @@ defineProps<{ title: string; description?: string; headingId: string }>();
 }
 .section-heading h2 {
 	margin: 0;
-	font-family: var(--font-display);
-	font-size: 1.35rem;
-	font-weight: 500;
 }
 .section-heading p {
-	margin: var(--space-3) 0 0;
+	margin: var(--space-1) 0 0;
 	color: var(--color-muted);
 }
 </style>

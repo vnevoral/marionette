@@ -1,8 +1,6 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, ref, watch } from "vue";
-import { RouterLink, useRoute, useRouter } from "vue-router";
-import Button from "primevue/button";
-import ProgressSpinner from "primevue/progressspinner";
+import { useRoute, useRouter } from "vue-router";
 import { useConfirm } from "primevue/useconfirm";
 import { ApiError, deleteCard, getCard, type ActionCard } from "@/api";
 import ActionControls from "@/components/ActionControls.vue";
@@ -23,6 +21,8 @@ import { useNotify } from "@/composables/useNotify";
 import { useTransientMessage, useTransientResult } from "@/composables/useTransientMessage";
 import { singleParam } from "@/router/params";
 import type { ActionKind, PendingRequest } from "@/types";
+import MButton from "@/ui/MButton.vue";
+import MSpinner from "@/ui/MSpinner.vue";
 import {
 	ACTIONS,
 	EMPTY,
@@ -175,7 +175,7 @@ onBeforeUnmount(() => {
 <template>
 	<main class="page">
 		<div v-if="loading" class="loading-state" role="status" aria-live="polite">
-			<ProgressSpinner :aria-label="LOADING.detail" />
+			<MSpinner :label="LOADING.detail" size="2rem" />
 			<span>{{ LOADING.detail }}</span>
 		</div>
 
@@ -199,20 +199,16 @@ onBeforeUnmount(() => {
 					<CardIdentityTile :icon="card.icon" />
 				</template>
 				<template #actions>
-					<Button v-slot="slotProps" as-child>
-						<RouterLink
-							:class="[slotProps.class, 'primary-action-button']"
-							:to="`/cards/${encodeURIComponent(card.id)}/edit`"
-						>
-							<i class="pi pi-pencil p-button-icon p-button-icon-left" aria-hidden="true" />
-							<span class="p-button-label">{{ ACTIONS.editCard }}</span>
-						</RouterLink>
-					</Button>
-					<Button
+					<MButton
+						:label="ACTIONS.editCard"
+						icon="pencil"
+						variant="primary"
+						:to="`/cards/${encodeURIComponent(card.id)}/edit`"
+					/>
+					<MButton
 						:label="ACTIONS.deleteCard"
-						icon="pi pi-trash"
-						severity="danger"
-						text
+						icon="trash-2"
+						variant="danger-ghost"
 						:loading="deleting"
 						:disabled="deleting || Boolean(pending)"
 						@click="removeCard"
@@ -235,7 +231,7 @@ onBeforeUnmount(() => {
 					</DetailPanel>
 				</div>
 				<div class="col-12 md:col-6 p-2">
-					<DetailPanel title="Actions" icon="pi pi-bolt">
+					<DetailPanel title="Actions" icon="zap">
 						<ActionControls
 							:has-status="Boolean(card.status)"
 							:pending="pending"

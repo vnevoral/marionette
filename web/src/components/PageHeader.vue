@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { RouterLink } from "vue-router";
+import MIcon from "@/ui/MIcon.vue";
 
 defineProps<{
 	title: string;
@@ -13,7 +14,7 @@ defineProps<{
 <template>
 	<header class="page-header">
 		<RouterLink v-if="backTo" class="text-link back-link" :to="backTo">
-			<i class="pi pi-arrow-left" aria-hidden="true" />
+			<MIcon name="arrow-left" />
 			<span>{{ backLabel }}</span>
 		</RouterLink>
 		<div class="page-header-row">
@@ -38,8 +39,12 @@ defineProps<{
 .page-header {
 	display: flex;
 	flex-direction: column;
-	gap: var(--space-6);
+	gap: var(--space-4);
 	margin-bottom: var(--space-8);
+}
+.back-link {
+	align-self: flex-start;
+	font-size: 0.9rem;
 }
 .page-header-row {
 	display: flex;
@@ -76,9 +81,13 @@ defineProps<{
 	}
 }
 @media (max-width: 24rem) {
+	/* Stacked, a zero flex basis would collapse each button's height. */
 	.page-header-actions {
 		flex-direction: column;
 		align-items: stretch;
+	}
+	.page-header-actions > :deep(*) {
+		flex: none;
 	}
 }
 </style>

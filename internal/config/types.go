@@ -37,12 +37,11 @@ const (
 	MaxEnvKeyLength      = 128
 	MaxEnvValueLength    = 4096
 	MaxTimeoutSec        = 3600
-	// IconPrefix is the PrimeIcons class prefix accepted for card icons.
-	IconPrefix = "pi pi-"
 )
 
 var (
 	cardIDPattern = regexp.MustCompile(`^[A-Za-z0-9_-]+$`)
+	iconPattern   = regexp.MustCompile(`^[a-z0-9]+(-[a-z0-9]+)*$`)
 	envKeyPattern = regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_]*$`)
 )
 
@@ -272,7 +271,7 @@ func (card ActionCard) validate(limits bool) fieldErrors {
 		fields.add("description", lengthReason(MaxDescriptionLength))
 	}
 	if limits && !ValidIcon(card.Icon) {
-		fields.add("icon", fmt.Sprintf("must be empty or a %q class of at most %d characters", IconPrefix, MaxIconLength))
+		fields.add("icon", fmt.Sprintf("must be empty or an icon name (lowercase letters and digits separated by single dashes) of at most %d characters", MaxIconLength))
 	}
 	if limits && !ValidCardColor(card.Color) {
 		fields.add("color", "must be empty or one of: "+strings.Join(CardColors, ", "))
@@ -308,26 +307,12 @@ func ValidCardColor(color string) bool {
 	return color == "" || slices.Contains(CardColors, color)
 }
 
-// ValidIcon reports whether an icon value is empty or a PrimeIcons class
-// ("pi pi-<name>") within the length limit. The name part may contain only
-// lowercase letters, digits and dashes.
+// ValidIcon reports whether an icon value is empty or an icon name within
+// the length limit: lowercase letters and digits in groups separated by
+// single dashes, such as "hard-drive" (ADR-0014). Whether the UI knows the
+// name is not checked here; an unknown one is shown as a placeholder.
 func ValidIcon(icon string) bool {
-	if icon == "" {
-		return true
-	}
-	if len(icon) > MaxIconLength || !strings.HasPrefix(icon, IconPrefix) {
-		return false
-	}
-	name := strings.TrimPrefix(icon, IconPrefix)
-	if name == "" {
-		return false
-	}
-	for _, r := range name {
-		if (r < 'a' || r > 'z') && (r < '0' || r > '9') && r != '-' {
-			return false
-		}
-	}
-	return true
+	return icon == "" || len(icon) <= MaxIconLength && iconPattern.MatchString(icon)
 }
 
 // RunOutcome describes the result of one action execution.

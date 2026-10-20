@@ -1,9 +1,9 @@
 import { definePreset } from "@primeuix/themes";
 import Aura from "@primeuix/themes/aura";
 
-// Marionette's PrimeVue preset (ADR-0009, UX spec §8.2): the sage/green
-// palette from tokens.css expressed as Aura semantic tokens, so components
-// pick the colours up natively and no CSS override needs the important flag.
+// Marionette's PrimeVue preset (ADR-0009, UX spec §8.2): the palette from
+// tokens.css expressed as Aura semantic tokens, so the PrimeVue components
+// that remain until ADR-0014 is complete match the app's own components.
 const MarionettePreset = definePreset(Aura, {
 	semantic: {
 		primary: {
@@ -22,8 +22,12 @@ const MarionettePreset = definePreset(Aura, {
 		focusRing: {
 			width: "3px",
 			style: "solid",
-			color: "rgb(47 113 129 / 35%)",
+			color: "rgb(31 111 139 / 35%)",
 			offset: "2px",
+		},
+		formField: {
+			borderRadius: "8px",
+			paddingY: "0.5625rem",
 		},
 		colorScheme: {
 			light: {

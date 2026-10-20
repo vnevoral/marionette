@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { DEFAULT_CARD_ICON } from "@/ui/icons";
+import MIcon from "@/ui/MIcon.vue";
 
 // The icon tile in the card detail header. The card colour (FR-10a) is shown
 // on the Current status panel instead (block 0062).
@@ -8,7 +8,7 @@ defineProps<{ icon?: string }>();
 
 <template>
 	<div class="identity-tile" aria-hidden="true">
-		<i :class="icon || DEFAULT_CARD_ICON" />
+		<MIcon :name="icon" />
 	</div>
 </template>
 
@@ -19,9 +19,9 @@ defineProps<{ icon?: string }>();
 	height: 64px;
 	flex-shrink: 0;
 	place-items: center;
-	border-radius: var(--radius-md);
+	border-radius: var(--radius-lg);
 	background: var(--color-accent-soft);
-	color: var(--color-accent);
-	font-size: 1.6rem;
+	color: var(--color-accent-strong);
+	font-size: 1.75rem;
 }
 </style>

@@ -1,8 +1,6 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref } from "vue";
 import { useRouter } from "vue-router";
-import Button from "primevue/button";
-import ProgressSpinner from "primevue/progressspinner";
 import { useConfirm } from "primevue/useconfirm";
 import { createPairingCode, listDevices, removeDevice, type Device, type PairingCode } from "@/api";
 import DetailPanel from "@/components/DetailPanel.vue";
@@ -15,6 +13,8 @@ import RequestState from "@/components/RequestState.vue";
 import { useNotify } from "@/composables/useNotify";
 import { markUnpaired, setSession, useSession } from "@/composables/useSession";
 import { useTransientMessage } from "@/composables/useTransientMessage";
+import MButton from "@/ui/MButton.vue";
+import MSpinner from "@/ui/MSpinner.vue";
 import { ACCESS, ACTIONS, FEEDBACK, LOADING } from "@/ui/vocabulary";
 
 // Paired devices (FR-54, FR-55, FR-57): list, rename, remove, and a code for
@@ -149,10 +149,10 @@ onBeforeUnmount(stopWatching);
 			:lede="accessDisabled ? undefined : ACCESS.devicesLede(expiryDays)"
 		>
 			<template v-if="!accessDisabled" #actions>
-				<Button
+				<MButton
 					:label="ACCESS.pairNewDevice"
-					icon="pi pi-plus"
-					class="primary-action-button"
+					icon="plus"
+					variant="primary"
 					:loading="creatingCode"
 					@click="newCode"
 				/>
@@ -161,7 +161,7 @@ onBeforeUnmount(stopWatching);
 
 		<EmptyState
 			v-if="accessDisabled"
-			icon="pi pi-lock-open"
+			icon="lock-open"
 			title="Access control is disabled"
 			body="This server runs with MARIONETTE_AUTH=off: every browser that reaches it can use Marionette and no devices are paired."
 		/>
@@ -170,17 +170,12 @@ onBeforeUnmount(stopWatching);
 			<RequestState class="devices-feedback" :message="feedback.message" :tone="feedback.tone" />
 			<InlineError :message="error" />
 
-			<DetailPanel
-				v-if="pairing"
-				:title="ACCESS.pairNewDevice"
-				icon="pi pi-link"
-				class="devices-code"
-			>
+			<DetailPanel v-if="pairing" :title="ACCESS.pairNewDevice" icon="link" class="devices-code">
 				<PairingCodePanel :pairing="pairing" @renew="newCode" />
 			</DetailPanel>
 
 			<div v-if="loading" class="loading-state" role="status" aria-live="polite">
-				<ProgressSpinner :aria-label="LOADING.devices" />
+				<MSpinner :label="LOADING.devices" size="2rem" />
 				<span>{{ LOADING.devices }}</span>
 			</div>
 

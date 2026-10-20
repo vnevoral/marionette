@@ -322,48 +322,50 @@ that.
 
 ### 8.1 Visual direction
 
-The direction is **quiet botanical operations**: an airy sage canvas, soft
-green surfaces, dark green-gray ink, and one confident natural-green action
-accent. The base palette is intentionally restrained and close to monochrome;
-blue, amber, and red appear only when they communicate a distinct operational
-state. Avoid purple gradients, glass panels, decorative orbs, marketing hero
-sections, and nested cards.
+The direction is **quiet botanical operations**, refreshed in block 0073:
+a light neutral-green canvas, white framed surfaces with a hairline border
+and a soft layered shadow, dark green-gray ink, and one confident
+natural-green action accent. The base palette is restrained and close to
+monochrome; blue, amber, and red appear only when they communicate a
+distinct operational state, as soft tinted badges. The header is a plain
+sticky white bar with the navigation as pills (the active page on the
+accent tint). Avoid purple gradients, glass panels, decorative orbs,
+marketing hero sections, and nested cards.
 
 ### 8.2 Shared tokens
 
 Tokens are defined once in `web/src/styles/tokens.css` and consumed by all
-views (values as implemented in blocks 0019/0020 and confirmed in 0033):
+views (block 0073). The main values:
 
 ```css
 :root {
-  --color-canvas: #eef2f1;
-  --color-surface: #f8faf9;
-  --color-surface-raised: #ffffff;
-  --color-ink: #26332f;
-  --color-muted: #68746f;
-  --color-border: #d7e0dd;
-  --color-border-strong: #b9c9c3;
-  --color-accent: #4b8969;
-  --color-accent-strong: #397254;
-  --color-accent-soft: #e6f1e8;
-  --color-success: #4f8c68;
-  --color-info: #557f8a;
-  --color-info-soft: #e9f2f3;
-  --color-warning: #ad7e3f;
-  --color-warning-soft: #f8f0e2;
-  --color-danger: #b45d56;
-  --color-danger-soft: #f7e7e5;
-  --color-focus: #2f7181;
-  --radius-sm: 6px;
-  --radius-md: 10px;
-  --space-1: 4px;
-  --space-2: 8px;
-  --space-3: 12px;
-  --space-4: 16px;
-  --space-6: 24px;
-  --space-8: 32px;
+  --color-canvas: #f3f5f4;
+  --color-surface: #ffffff;
+  --color-surface-sunken: #f6f8f7;
+  --color-ink: #1f2a26;
+  --color-muted: #5f6b66;
+  --color-border: #e1e7e4;
+  --color-border-strong: #c5d0cb;
+  --color-accent: #2f7d57;        /* 5.0:1 with white */
+  --color-accent-strong: #256847;
+  --color-accent-soft: #e7f3ec;
+  --color-info: #2d6f86;          /* -strong #24596b, -soft #e6f1f5 */
+  --color-warning: #a86b12;       /* -strong #8a560b, -soft #fbf1df */
+  --color-danger: #c2413a;        /* -strong #a3342e, -soft #fbe9e7 */
+  --color-focus: #1f6f8b;
+  --radius-sm: 8px;               /* controls */
+  --radius-md: 12px;              /* icon tiles, messages */
+  --radius-lg: 16px;              /* cards and panels */
+  --shadow-xs / -sm / -md / -lg;  /* layered: hairline + ambient blur */
+  --control-height: 2.5rem;       /* -sm: 2rem */
+  --font-ui: system-ui stack;     /* --font-mono for commands and codes */
+  --space-1: 4px;  --space-2: 8px;  --space-3: 12px;
+  --space-4: 16px; --space-6: 24px; --space-8: 32px;
 }
 ```
+
+Every text pair the components use meets WCAG AA (4.5:1); the soft tints
+carry the `-strong` shade as text.
 
 Layout utilities (`grid`, `col-12`, `md:col-4`, `md:col-6`, `lg:col-4`,
 `flex`, `flex-column`, `flex-wrap`, `align-items-center`,
@@ -377,16 +379,17 @@ Card colours (FR-10a) are the tokens `--card-color-black`, `-blue`,
 name, `web/src/ui/cardColors.ts` lists the options. Red and green are left
 out because they mean **Problem** and **Healthy**.
 
-Views use semantic tokens rather than local hex values. PrimeVue components
-take the same palette from `web/src/theme/preset.ts` (`definePreset(Aura, …)`:
-primary and surface scales, form field, text, content and overlay tokens), so
-no component style is overridden with `!important`. The app ships one light
-scheme; the OS dark mode is not followed.
+Views use semantic tokens rather than local hex values. The PrimeVue
+components that remain until ADR-0014 is complete (form controls, toast,
+confirmation dialog) take the same palette from `web/src/theme/preset.ts`.
+The app ships one light scheme; the OS dark mode is not followed.
 
 ### 8.3 Typography and density
 
-- Use one expressive display family and one readable UI sans-serif family;
-  typography does not change between screens.
+- One UI sans-serif family (the platform's system font) and one monospace
+  family for commands and codes; typography does not change between
+  screens. Page titles are semibold with tight letter-spacing
+  (1.75–2.5 rem); card and panel titles are 1.125 rem semibold.
 - Body text is at least 16 px; supporting text is at least 13 px.
 - Card headings never use hero-scale type.
 - Spacing follows a 4/8 px rhythm.
@@ -394,7 +397,11 @@ scheme; the OS dark mode is not followed.
 
 ### 8.4 Shared components
 
-Shared patterns live in `web/src/components` and are used by every view
+Base components live in `web/src/ui/` (ADR-0014): `MButton` (primary,
+secondary, ghost, danger and danger-ghost; a router link with `to`),
+`MIcon` (Lucide icons by name from `ui/icons.ts`; an unknown name shows the
+ghost icon), `MSpinner`, `MTag`, `MMessage` and `MCard`. Shared patterns
+built from them live in `web/src/components` and are used by every view
 (block 0033):
 
 - `AppShell`, `PageHeader`, `ConnectionStatus`;

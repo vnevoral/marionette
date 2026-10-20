@@ -2,6 +2,7 @@
 import { computed } from "vue";
 import type { StatusChange, StatusSnapshot } from "@/api";
 import RunOutput from "@/components/RunOutput.vue";
+import MIcon from "@/ui/MIcon.vue";
 import { formatDate, formatDuration, transitionDuration } from "@/ui/format";
 import { EMPTY, FEEDBACK, outcomePresentation } from "@/ui/vocabulary";
 
@@ -26,7 +27,7 @@ const lastOutcome = computed(() =>
 
 <template>
 	<p v-if="hasStatus && unavailable" class="summary-unavailable">
-		<i class="pi pi-exclamation-circle" aria-hidden="true" />
+		<MIcon name="circle-alert" />
 		<span>{{ FEEDBACK.statusUnavailable }}</span>
 	</p>
 	<dl v-if="hasStatus" class="summary-list">

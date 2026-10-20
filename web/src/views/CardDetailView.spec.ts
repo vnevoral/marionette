@@ -155,9 +155,9 @@ describe("CardDetailView", () => {
 	});
 
 	it("shows the card colour on the Current status panel, not on the icon tile", async () => {
-		vi.mocked(getCard).mockResolvedValue({ ...cards.lamp, icon: "pi pi-bolt", color: "teal" });
+		vi.mocked(getCard).mockResolvedValue({ ...cards.lamp, icon: "zap", color: "teal" });
 		const { wrapper } = await mountDetail("lamp");
-		expect(wrapper.findComponent(CardIdentityTile).props()).toEqual({ icon: "pi pi-bolt" });
+		expect(wrapper.findComponent(CardIdentityTile).props()).toEqual({ icon: "zap" });
 		const panels = wrapper.findAllComponents(DetailPanel);
 		const colored = panels.filter((panel) => panel.props("color") === "teal");
 		expect(colored.map((panel) => panel.props("title"))).toEqual(["Current status"]);

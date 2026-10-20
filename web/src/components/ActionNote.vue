@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed } from "vue";
 import type { PendingRequest, RequestResult } from "@/types";
+import MIcon from "@/ui/MIcon.vue";
 import { REQUEST } from "@/ui/vocabulary";
 
 // The quiet line of a card or the detail Actions panel (UX spec §4): it shows
@@ -32,10 +33,7 @@ const announcement = computed(() =>
 		:title="singleLine && visible ? visible.message : undefined"
 	>
 		<template v-if="visible">
-			<i
-				:class="visible.tone === 'error' ? 'pi pi-exclamation-circle' : 'pi pi-check'"
-				aria-hidden="true"
-			/>
+			<MIcon class="action-note-icon" :name="visible.tone === 'error' ? 'circle-alert' : 'check'" />
 			<span class="action-note-text">{{ visible.message }}</span>
 		</template>
 		<span v-else class="action-note-text">{{ fallback }}</span>
@@ -53,6 +51,9 @@ const announcement = computed(() =>
 	color: var(--color-muted);
 	font-size: 0.85rem;
 	line-height: 1.5;
+}
+.action-note-icon {
+	align-self: center;
 }
 .action-note-single {
 	height: 1.5em;

@@ -165,12 +165,13 @@ as follows (block 0025):
   starts with an empty configuration; the original content is thus never
   overwritten; if the rename fails, the application refuses to start;
 - **a card violates only the current limits** (lengths, ID characters,
-  icon class, `MaxTimeoutSec`, interval relation — full `Validate`) — the
-  card is loaded as stored, with a `card violates current limits` warning;
-  tightening a limit in a new version therefore never makes configuration
-  disappear. Full validation applies at the API boundary (card
-  creation/update), so the card gets fixed on its first edit; the engine
-  and the scheduler work with `ValidateEssential` (block 0038);
+  icon value, such as an old `pi pi-<name>` class, `MaxTimeoutSec`,
+  interval relation — full `Validate`) — the card is loaded as stored,
+  with a `card violates current limits` warning; tightening a limit in a
+  new version therefore never makes configuration disappear. Full
+  validation applies at the API boundary (card creation/update), so the
+  card gets fixed on its first edit; the engine and the scheduler work
+  with `ValidateEssential` (block 0038);
 - **the file cannot be read** (e.g. permissions) — the application starts
   with an empty configuration in read-only mode: every change via the API
   returns 500 and is rolled back in memory until the operator makes the file
@@ -281,7 +282,7 @@ Card value limits (constants `config.Max*`, ADR-0004 "Value limits"):
 | `id`                                  | `^[A-Za-z0-9_-]{1,64}$`; server-generated IDs (`card-<32 hex>`) comply |
 | `name`                                | 1–120 characters                                                   |
 | `description`                         | ≤ 2000 characters                                                  |
-| `icon`                                | empty or `pi pi-<name>` (lowercase letters, digits, `-`), ≤ 64 characters |
+| `icon`                                | empty or an icon name such as `hard-drive` (lowercase letters and digits separated by single `-`), ≤ 64 characters (ADR-0014) |
 | `color`                               | empty or `black`, `blue`, `teal`, `purple`, `pink`, `orange`, `yellow` (FR-10a) |
 | `*.command`                           | 1–512 characters                                                   |
 | `*.args`                              | ≤ 64 items, each ≤ 1024 characters                                 |
