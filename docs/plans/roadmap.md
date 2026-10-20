@@ -13,7 +13,7 @@ one or more concrete implementation blocks (see the
 ## Current state
 
 As of 2026-10-20 all phases below are **Done**, the last closed block is
-[0079](blocks/0079-repo-cleanup.md) and the current release is
+[0080](blocks/0080-dev-data-directory.md) and the current release is
 **v2.0.0** (tags `v1.0.0`, `v1.1.0`, `v1.2.0` to `v1.2.4`, `v1.3.0`,
 `v1.3.1`, `v2.0.0`; `v1.2.0` has no GitHub Release because its CI run
 failed, fixed by block 0059; `v1.3.0` has none because `npm audit` failed on a new
@@ -43,7 +43,8 @@ the move to pull requests (block 0068), one release run per tag
 (block 0071), `primeicons` on MIT 7.x (block 0072), the replacement of
 PrimeVue by Reka UI, own components and Lucide (ADR-0014, blocks
 0073–0076), hand-written release notes (block 0077), the Dependabot
-cooldown (block 0078) and the repository cleanup (block 0079), all
+cooldown (block 0078), the repository cleanup (block 0079) and the dev
+data directory (block 0080), all
 2026-10-20. The UI bundle is about 340 kB (113 kB gzip) since PrimeVue is
 gone, below the Vite warning, so the bundle-size item is dropped.
 
@@ -373,6 +374,10 @@ passkeys once there is TLS (ADR-0011), UI localization (ADR-0007).
      (2026-10-20); the UI build output is no longer versioned (a
      placeholder page without `make ui-build`), unused UI variants, tokens
      and constants removed, stale documentation and dev tooling corrected.
+  21. [0080 — Dev data directory](blocks/0080-dev-data-directory.md) —
+     **Done** (2026-10-20); the dev configuration, paired devices and
+     control socket live in the git-ignored `.dev/` instead of the
+     repository root.
 
   The open questions from the review are decided in
   [requirements.md, section 13](../requirements/requirements.md#13-decisions--project-review-2026-09-26)

@@ -1,10 +1,12 @@
 SHELL := /bin/bash
 APP_NAME := marionette
 DIST_DIR := internal/webui/dist
-DEV_CONFIG := ./marionette.json
+# Local dev data (configuration, paired devices, control socket), git-ignored
+DEV_DIR := .dev
+DEV_CONFIG := $(DEV_DIR)/marionette.json
 DEV_FIXTURE := deploy/dev-fixture.json
 # Control socket of the dev backend, used by `make pair`
-DEV_CONTROL_SOCKET := ./marionette.sock
+DEV_CONTROL_SOCKET := $(DEV_DIR)/marionette.sock
 VERSION ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo dev)
 LDFLAGS := -X main.version=$(VERSION)
 # Release version from the tag on HEAD; expanded only by release-arm64, which
@@ -36,6 +38,7 @@ ui-test:
 
 ## Create the local dev configuration from the fixture if it does not exist yet
 dev-config:
+	@mkdir -p $(DEV_DIR)
 	@test -f $(DEV_CONFIG) || { cp $(DEV_FIXTURE) $(DEV_CONFIG) && echo "created $(DEV_CONFIG) from $(DEV_FIXTURE)"; }
 
 ## Run the Go backend using the currently embedded UI build
