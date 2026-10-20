@@ -40,7 +40,7 @@ reports go1.27.3, 2026-10-20).
    through standard pull requests; the development workflow and
    `AGENTS.md` are updated accordingly. Planned as block
    [0068 — Changes reach `main` through pull requests](blocks/0068-pull-request-workflow.md)
-   (**Proposed**).
+   (**Approved**).
 2. **Duplicate release runs for one tag.** GitHub started two Release runs
    for the `v1.2.4` tag push; the second failed with "a release with the
    same tag name already exists" (the release itself was fine). Proposal:

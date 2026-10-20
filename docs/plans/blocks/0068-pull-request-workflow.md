@@ -4,7 +4,7 @@
 - **Requirements**: NFR-05, NFR-06 (testability, maintainability); no
   product requirement changes
 - **ADRs**: none (repository process, not architecture)
-- **Status**: Proposed
+- **Status**: Approved
 - **Dependencies**: none; roadmap backlog item 1 (decided 2026-10-20)
 
 ## Goal
@@ -45,9 +45,10 @@ skip CI before the change lands.
 
 ## Approval
 
-- **Approved by**:
-- **Approval date**: pending
-- **Decision notes**:
+- **Approved by**: project owner
+- **Approval date**: 2026-10-20
+- **Decision notes**: Squash merge only; the admin bypass stays for pull
+  requests only.
 
 ## Proposed solution
 
