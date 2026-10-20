@@ -1,7 +1,7 @@
 # ADR-0014: Replace PrimeVue with Reka UI and own styled components
 
-- **Status**: Proposed
-- **Date**: 2026-10-20
+- **Status**: Accepted
+- **Date**: 2026-10-20 (accepted by the owner the same day)
 
 ## Context
 
@@ -59,12 +59,21 @@ CSS on top of the existing tokens.
    Views use these components, not Reka UI directly.
 3. Icons come from **Lucide** (`@lucide/vue`, ISC) as individually
    imported SVG components, wrapped by one `MIcon` component that sets size
-   and `aria-hidden`; `primeicons` is removed.
+   and `aria-hidden`; `primeicons` is removed. The card's stored `icon`
+   value keeps its `pi pi-<name>` form (ADR-0004, server validation, API):
+   it becomes a stable identifier that `web/src/ui/icons.ts` maps to a
+   Lucide icon, with a fallback for an unknown name, so no configuration
+   migration and no API change are needed.
 4. The migration is incremental. Both libraries coexist while views move
    over; each block keeps `make verify` and `make e2e` green. The last block
    removes `primevue`, `@primeuix/*`, `primeicons` and the preset.
 5. A new major version of Reka UI or Lucide needs a changelog and licence
    check, as for any key UI dependency (`docs/devops/ci-cd.md`).
+6. The migration is also a visual refresh (owner, 2026-10-20): the layout
+   of the screens (UX spec §2, §5–§7) stays, while tokens, typography,
+   buttons, badges, form controls and overlays get a more current look
+   within the visual direction of UX spec §8.1. The UX specification is
+   updated with the new values.
 
 FR-23 changes from "Vue 3 + PrimeVue" to "Vue 3 with accessible headless
 primitives (Reka UI) and the project's own styled components" once this
@@ -102,9 +111,9 @@ library and icons (Vue 3, Vite and `vue-router` stay) and updates ADR-0007
 
 - No PrimeTek package in the bundle and no licence key, for anyone who
   builds the project.
-- The look stays the same: the new components reproduce today's sizes,
-  colours and states from `tokens.css`; the Aura preset and its contrast
-  fixes disappear.
+- The screens keep their layout and behaviour; their look is refreshed
+  from `tokens.css` (point 6). The Aura preset and its contrast fixes
+  disappear; contrast is checked again for the new palette (NFR-09).
 - More code owned by the project: about a dozen small components with
   their CSS and Vitest tests. Behaviour that Reka UI provides (keyboard,
   focus, ARIA) is covered by its tests; the project tests its own props,

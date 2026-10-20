@@ -21,7 +21,7 @@ advisory for `source-map-js`, fixed in the lockfile for `v1.3.1`). `v1.2.2`
 contains blocks 0060 and 0061 (Go 1.27, golangci-lint v2, SSE subscription
 order), `v1.2.3` block 0062 (card color on the Current status panel),
 `v1.2.4` block 0063 (page header actions on mobile) and `v1.3.1` blocks
-0064 and 0065 (`marionette pair`). The requirements are at v0.13.
+0064 and 0065 (`marionette pair`). The requirements are at v0.14.
 `v1.3.1` runs on the reference Raspberry Pi; the owner deployed it and
 verified `sudo marionette pair` there on 2026-10-12 (the upgrade and
 rollback procedure from the README was verified with `v1.2.1`). New work starts as a new requirement and block
@@ -48,8 +48,8 @@ the move to pull requests (block 0068), one release run per tag
    License with a key); the project stays on the MIT lines meanwhile
    (blocks 0071, 0072). The owner asked on 2026-10-20 to replace PrimeVue:
    [ADR-0014](../architecture/decisions/0014-replace-primevue-with-reka-ui.md)
-   (**Proposed**) proposes Reka UI, own styled components and Lucide
-   icons in four blocks. Until it is done, watch PrimeVue 4 for releases
+   (**Accepted**) replaces it with Reka UI, own styled components and
+   Lucide icons in four blocks, with a visual refresh. Until it is done, watch PrimeVue 4 for releases
    and security fixes.
 5. **Rollback on the Pi.** The README rollback procedure was last verified
    with `v1.2.1`; the unit and the control socket changed since (block
@@ -79,7 +79,7 @@ plans its replacement.
 ## Planning notes
 
 - Phase 1 is closed: `docs/requirements/requirements.md` was at v0.5 at
-  that point (now v0.13; open questions resolved, see section 7 of the document) and
+  that point (now v0.14; open questions resolved, see section 7 of the document) and
   [ADR-0004](../architecture/decisions/0004-action-card-domain-model.md) is
   accepted, including run history, output rules, polling and the
   concurrency limit.

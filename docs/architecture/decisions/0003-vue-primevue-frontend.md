@@ -1,6 +1,6 @@
 # ADR-0003: Vue 3 + PrimeVue for the frontend
 
-- **Status**: Accepted
+- **Status**: Accepted; component library and icons superseded by ADR-0014
 - **Date**: 2026-09-25
 
 ## Context
@@ -63,3 +63,8 @@ after reviewing the changelog/migration and updating this ADR.
 > PrimeUI License with a license key as well; the project had used `^8` since
 > its first commit. It is pinned to the MIT 7.x line, which has every icon
 > the UI uses, and Dependabot ignores its major versions.
+
+> Added 2026-10-20: [ADR-0014](0014-replace-primevue-with-reka-ui.md)
+> replaces PrimeVue, its themes and `primeicons` with Reka UI, the project's
+> own styled components and Lucide icons. Vue 3, Vite and `vue-router` stay
+> as decided here.
