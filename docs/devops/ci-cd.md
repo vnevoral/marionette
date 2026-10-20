@@ -6,7 +6,9 @@ On every push and pull request:
 
 1. **backend** — `golangci-lint` (version pinned identically to the
    devcontainer, configuration `.golangci.yml`), `go build ./...`,
-   `go vet ./...`, `go test -race -count=1 ./...` on linux/amd64, `bash -n`
+   `go vet ./...`, `go test -race -count=1 ./...` on linux/amd64,
+   `govulncheck ./...` (known vulnerabilities in called Go code and the
+   standard library, block 0070; locally `make vulncheck`), `bash -n`
    and a staged test of the install script (`deploy/install_test.sh`) and a
    test of the release version rule (`deploy/release_version_test.sh`) and
    of release publishing (`deploy/publish_release_test.sh`).
@@ -27,7 +29,8 @@ The `ci.yml` workflow can also be called from another workflow
 (`workflow_call`); the release workflow below uses it so that a release
 passes the same checks.
 
-The same suite (except the `e2e` job, locally `make e2e`) is run locally by
+The same suite (except the `e2e` job, locally `make e2e`, and the online
+checks `npm audit` and `govulncheck`, locally `make vulncheck`) is run locally by
 `make verify`; CI only mirrors it. The CI run
 must pass cleanly (lint warnings fail the build, they are not suppressed)
 before merging into the main branch.
@@ -135,6 +138,9 @@ step 3.
 - golangci-lint: v2, pinned to the same version in the dev container and
   in `ci.yml` (`golangci/golangci-lint-action`); configuration in
   `.golangci.yml`.
+- govulncheck: pinned in `ci.yml` and the `vulncheck` target of the
+  `Makefile` (`golang.org/x/vuln/cmd/govulncheck@vX.Y.Z`, run with
+  `go run`); raise it together with golangci-lint.
 - npm (`web/`): keep PrimeVue on the stable major branch (`v4-stable`
   dist-tag), see
   [ADR-0003](../architecture/decisions/0003-vue-primevue-frontend.md).

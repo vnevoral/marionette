@@ -65,6 +65,7 @@ make build           # build UI + embed + Go binary for the current platform
 make build-arm64     # cross-compile for Raspberry Pi (linux/arm64)
 make release-arm64   # release archive + .sha256; needs a clean tree and a vX.Y.Z tag on HEAD
 make e2e             # Playwright tests against the built binary (not part of verify)
+make vulncheck       # govulncheck over the Go code (online, not part of verify)
 make test            # go test -race ./... + npm test (Vitest)
 make lint            # golangci-lint + eslint + vue-tsc + prettier --check
 make verify          # the single validation command: build UI + lint + test + go build/vet

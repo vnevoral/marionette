@@ -12,7 +12,7 @@ LDFLAGS := -X main.version=$(VERSION)
 override RELEASE_VERSION = $(shell bash deploy/release_version.sh 2>/dev/null)
 override RELEASE_ARCHIVE = $(APP_NAME)-$(RELEASE_VERSION)-linux-arm64.tar.gz
 
-.PHONY: ui-install ui-build ui-dev ui-lint ui-test deploy-test release-test e2e dev-config backend-run backend-dev pair build build-arm64 release-arm64 test lint verify clean
+.PHONY: ui-install ui-build ui-dev ui-lint ui-test deploy-test release-test vulncheck e2e dev-config backend-run backend-dev pair build build-arm64 release-arm64 test lint verify clean
 
 ## Install UI dependencies
 ui-install:
@@ -84,6 +84,12 @@ release-test:
 	bash deploy/release_version_test.sh
 	bash -n deploy/publish_release.sh
 	bash deploy/publish_release_test.sh
+
+## Known vulnerabilities in called Go code and the standard library. Needs
+## the online vulnerability database, so it is not part of `verify`; CI runs
+## it in the backend job.
+vulncheck:
+	go run golang.org/x/vuln/cmd/govulncheck@v1.8.0 ./...
 
 ## End-to-end tests: real binary with the embedded SPA in headless Chromium
 ## (Playwright). Needs `npx playwright install chromium` once; not part of
