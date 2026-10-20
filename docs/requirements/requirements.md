@@ -1,4 +1,4 @@
-# Marionette Requirements (SRS) — v0.13
+# Marionette Requirements (SRS) — v0.14
 
 > Status: **refined** (phase 1 and UX specification, 2026-09-25; extended with
 > an SSE stream for live status changes, 2026-09-25; extended with two polling
@@ -11,7 +11,8 @@
 > added FR-05, FR-21a and FR-22a after validation on a Raspberry Pi, 2026-09-26;
 > FR-57 device renaming, 2026-09-27; FR-10a card color, 2026-09-27;
 > FR-06, FR-41a and FR-42a, 2026-09-27; FR-58 pairing code from the host,
-> 2026-10-12; FR-06 installing the latest release, 2026-10-20).
+> 2026-10-12; FR-06 installing the latest release, 2026-10-20; FR-23 UI
+> components without PrimeVue, ADR-0014, 2026-10-20).
 > The open questions from v0.1 were decided
 > with the project owner, see [Phase 1 decisions](#7-phase-1-decisions-2026-09-25),
 > [Decisions — polling and termination](#9-decisions--polling-and-termination-2026-09-25)
@@ -168,7 +169,12 @@ distributed as a single executable file.
   the editor with an explanation. The stored form of the action, the API and
   execution do not change (FR-11, NFR-01 a); see
   [ADR-0012](../architecture/decisions/0012-single-line-command-editor.md).
-- **FR-23**: The UI is built on Vue 3 + PrimeVue (see
+- **FR-23** _(changed 2026-10-20)_: The UI is built on Vue 3 with
+  accessible headless primitives (Reka UI), the project's own styled
+  components and Lucide icons; every dependency of the UI bundle is under
+  a permissive open-source licence that needs no licence key (see
+  [ADR-0014](../architecture/decisions/0014-replace-primevue-with-reka-ui.md),
+  which supersedes the component choice of
   [ADR-0003](../architecture/decisions/0003-vue-primevue-frontend.md)).
 
 - **FR-24**: The UI has a unified information architecture for the operator

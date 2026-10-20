@@ -21,7 +21,7 @@ advisory for `source-map-js`, fixed in the lockfile for `v1.3.1`). `v1.2.2`
 contains blocks 0060 and 0061 (Go 1.27, golangci-lint v2, SSE subscription
 order), `v1.2.3` block 0062 (card color on the Current status panel),
 `v1.2.4` block 0063 (page header actions on mobile) and `v1.3.1` blocks
-0064 and 0065 (`marionette pair`). The requirements are at v0.13.
+0064 and 0065 (`marionette pair`). The requirements are at v0.14.
 `v1.3.1` runs on the reference Raspberry Pi; the owner deployed it and
 verified `sudo marionette pair` there on 2026-10-12 (the upgrade and
 rollback procedure from the README was verified with `v1.2.1`). New work starts as a new requirement and block
@@ -43,14 +43,14 @@ the move to pull requests (block 0068), one release run per tag
 2. **happy-dom 21.** Major version of a test dependency.
 3. **Bundle size.** The main JS chunk is about 610 kB (150 kB gzip) and
    Vite warns above 500 kB; code splitting would reduce it. Low priority.
-4. **PrimeVue 4 support.** PrimeVue 5 is no longer MIT: the free PrimeUI
-   Community License is per developer, needs a license key that must not
-   be published, and directs open-source projects to the MIT versions
-   (PrimeVue 4 and earlier). The project stays on the `v4-stable`
-   dist-tag. Added 2026-10-20 at the owner's request: watch whether v4
-   still gets releases, security fixes above all; when it stops, an ADR
-   compares PrimeVue 5 under the Community License with an MIT component
-   library and the effort of a replacement.
+4. **Replace PrimeVue.** PrimeVue 5, `@primeuix/themes` 3.x and
+   `primeicons` 8.x are under the PrimeUI License (per-developer Community
+   License with a key); the project stays on the MIT lines meanwhile
+   (blocks 0071, 0072). The owner asked on 2026-10-20 to replace PrimeVue:
+   [ADR-0014](../architecture/decisions/0014-replace-primevue-with-reka-ui.md)
+   (**Accepted**) replaces it with Reka UI, own styled components and
+   Lucide icons in four blocks, with a visual refresh. Until it is done, watch PrimeVue 4 for releases
+   and security fixes.
 5. **Rollback on the Pi.** The README rollback procedure was last verified
    with `v1.2.1`; the unit and the control socket changed since (block
    0065). Repeat it with the next upgrade.
@@ -58,7 +58,7 @@ the move to pull requests (block 0068), one release run per tag
 Deferred features, only on a concrete need: API tokens for scripts and
 passkeys once there is TLS (ADR-0011), UI localization (ADR-0007). PrimeVue
 5 is not planned (commercial license, ADR-0003/ADR-0010); backlog item 4
-watches v4 support.
+plans its replacement.
 
 ## Phase overview
 
@@ -79,7 +79,7 @@ watches v4 support.
 ## Planning notes
 
 - Phase 1 is closed: `docs/requirements/requirements.md` was at v0.5 at
-  that point (now v0.13; open questions resolved, see section 7 of the document) and
+  that point (now v0.14; open questions resolved, see section 7 of the document) and
   [ADR-0004](../architecture/decisions/0004-action-card-domain-model.md) is
   accepted, including run history, output rules, polling and the
   concurrency limit.

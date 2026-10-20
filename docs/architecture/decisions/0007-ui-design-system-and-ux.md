@@ -47,3 +47,8 @@ Czech is not part of this phase.
 - No new runtime dependency or PrimeVue major version change is introduced.
 - The default UI language is English; any further localization is a future
   extension.
+
+> Added 2026-10-20: under [ADR-0014](0014-replace-primevue-with-reka-ui.md)
+> the project's component layer in `web/src/ui/` is the source of the basic
+> components instead of PrimeVue; the shared shell, tokens and patterns
+> decided here stay, with a refreshed look.
