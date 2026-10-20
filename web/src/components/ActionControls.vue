@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import Button from "primevue/button";
+import MButton from "@/ui/MButton.vue";
 import type { PendingRequest } from "@/types";
 import { ACTIONS } from "@/ui/vocabulary";
 
@@ -20,20 +20,18 @@ function blocked() {
 
 <template>
 	<div class="action-controls">
-		<Button
+		<MButton
 			:label="ACTIONS.run"
-			icon="pi pi-play"
-			class="primary-action-button"
+			icon="play"
+			variant="primary"
 			:loading="pending?.action === 'primary'"
 			:disabled="blocked()"
 			@click="emit('run')"
 		/>
-		<Button
+		<MButton
 			v-if="hasStatus"
 			:label="ACTIONS.check"
-			icon="pi pi-heart"
-			severity="secondary"
-			outlined
+			icon="activity"
 			:loading="pending?.action === 'status'"
 			:disabled="blocked()"
 			@click="emit('check')"
@@ -47,7 +45,7 @@ function blocked() {
 	flex-wrap: wrap;
 	gap: var(--space-2);
 }
-.action-controls :deep(.p-button) {
+.action-controls > * {
 	flex: 1 1 auto;
 }
 @media (max-width: 24rem) {

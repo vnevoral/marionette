@@ -2,7 +2,8 @@
 // client-side validation. They have no Vue or router dependencies so they can
 // be unit-tested directly (block 0030).
 import type { Action, ActionCard } from "@/api";
-import { DEFAULT_CARD_ICON } from "@/ui/icons";
+import { DEFAULT_CARD_ICON, isCardIcon } from "@/ui/icons";
+import { FEEDBACK } from "@/ui/vocabulary";
 import { formatCommandLine, parseCommandLine } from "@/views/commandLine";
 
 import type { EnvironmentRow } from "@/types";
@@ -131,6 +132,7 @@ export function validate(
 		if (!firstError) firstError = message;
 	};
 	if (!form.name.trim()) addError("name", "Card name is required");
+	if (form.icon && !isCardIcon(form.icon)) addError("icon", FEEDBACK.iconUnavailable);
 	const primaryError = commandLineError(state.primaryLine, "Primary");
 	if (primaryError) addError("primaryCommand", primaryError);
 	if (form.primary.timeoutSec <= 0) addError("primaryTimeout", "Primary timeout must be positive");

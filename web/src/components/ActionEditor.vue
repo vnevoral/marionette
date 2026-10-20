@@ -1,11 +1,11 @@
 <script setup lang="ts">
 import { computed, ref, useId, watch } from "vue";
-import Button from "primevue/button";
 import InputNumber from "primevue/inputnumber";
 import InputText from "primevue/inputtext";
 import Textarea from "primevue/textarea";
 import Select from "primevue/select";
 import type { Action } from "@/api";
+import MButton from "@/ui/MButton.vue";
 import { newRowId, type ActionFieldErrors, type EnvironmentRow } from "@/views/cardEditModel";
 import { parseCommandLine } from "@/views/commandLine";
 
@@ -196,22 +196,18 @@ function removeEnvironment(id: string) {
 					:aria-label="`Variable ${index + 1} value`"
 					@update:model-value="updateEnvironment(row.id, 'value', $event)"
 				/>
-				<Button
-					type="button"
-					icon="pi pi-times"
-					text
-					rounded
-					severity="secondary"
+				<MButton
+					icon="x"
+					variant="ghost"
 					:aria-label="`Remove variable ${index + 1}`"
 					@click="removeEnvironment(row.id)"
 				/>
 			</div>
-			<Button
-				type="button"
+			<MButton
 				label="Add variable"
-				icon="pi pi-plus"
-				text
-				size="small"
+				icon="plus"
+				variant="ghost"
+				size="sm"
 				class="add-row"
 				@click="addEnvironment"
 			/>
@@ -227,8 +223,6 @@ function removeEnvironment(id: string) {
 }
 .action-editor h2 {
 	margin: 0 0 1rem;
-	font-size: 1.35rem;
-	font-weight: 500;
 }
 label,
 .field {
@@ -241,7 +235,7 @@ label,
 	font-weight: var(--font-weight-medium);
 }
 .command-line {
-	font-family: monospace;
+	font-family: var(--font-mono);
 }
 .field-help {
 	color: var(--color-muted);
@@ -273,14 +267,16 @@ label,
 	overflow-wrap: anywhere;
 	border: 1px solid var(--color-border);
 	border-radius: var(--radius-sm);
-	background: var(--color-canvas);
+	background: var(--color-surface-sunken);
 	color: var(--color-ink);
-	font-family: monospace;
+	font-family: var(--font-mono);
+	font-size: 0.8125rem;
 	white-space: pre-wrap;
 }
 .preview-words .preview-command {
-	border-color: var(--color-accent);
-	color: var(--color-accent);
+	border-color: var(--color-success-border);
+	background: var(--color-accent-soft);
+	color: var(--color-accent-strong);
 }
 .preview-words em {
 	color: var(--color-muted);

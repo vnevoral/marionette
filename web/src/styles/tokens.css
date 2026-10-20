@@ -1,26 +1,36 @@
 :root {
-	--color-canvas: #eef2f1;
-	--color-surface: #f8faf9;
+	/* Palette (UX spec §8.2): a quiet neutral canvas, white surfaces and one
+	   natural-green accent; blue, amber and red only for states. Every text
+	   pair used by the components meets WCAG AA (4.5:1). */
+	--color-canvas: #f3f5f4;
+	--color-surface: #ffffff;
+	--color-surface-sunken: #f6f8f7;
 	--color-surface-raised: #ffffff;
-	--color-ink: #26332f;
-	--color-muted: #68746f;
-	--color-border: #d7e0dd;
-	--color-border-strong: #b9c9c3;
-	--color-accent: #4b8969;
-	--color-accent-strong: #397254;
-	--color-accent-soft: #e6f1e8;
-	--color-accent-soft-hover: #d8ebdc;
-	--color-success: #4f8c68;
-	--color-success-strong: #397254;
-	--color-info: #557f8a;
-	--color-info-soft: #e9f2f3;
-	--color-warning: #ad7e3f;
-	--color-warning-strong: #94652d;
-	--color-warning-soft: #f8f0e2;
-	--color-danger: #b45d56;
-	--color-danger-strong: #a24b45;
-	--color-danger-soft: #f7e7e5;
-	--color-focus: #2f7181;
+	--color-ink: #1f2a26;
+	--color-muted: #5f6b66;
+	--color-muted-strong: #4a5651;
+	--color-border: #e1e7e4;
+	--color-border-strong: #c5d0cb;
+	--color-accent: #2f7d57;
+	--color-accent-strong: #256847;
+	--color-accent-soft: #e7f3ec;
+	--color-accent-soft-hover: #d6ebdf;
+	--color-success: #2f7d57;
+	--color-success-strong: #256847;
+	--color-success-border: #b9dcc8;
+	--color-info: #2d6f86;
+	--color-info-strong: #24596b;
+	--color-info-soft: #e6f1f5;
+	--color-info-border: #bcd9e3;
+	--color-warning: #a86b12;
+	--color-warning-strong: #8a560b;
+	--color-warning-soft: #fbf1df;
+	--color-warning-border: #ecd3a5;
+	--color-danger: #c2413a;
+	--color-danger-strong: #a3342e;
+	--color-danger-soft: #fbe9e7;
+	--color-danger-border: #f0c4bf;
+	--color-focus: #1f6f8b;
 	--color-on-accent: #ffffff;
 	/* Card colours (FR-10a, ui/cardColors.ts): labels only, never a state. */
 	--card-color-black: #26332f;
@@ -30,27 +40,38 @@
 	--card-color-pink: #c95b8f;
 	--card-color-orange: #e07b39;
 	--card-color-yellow: #e0b53a;
-	--radius-sm: 6px;
-	--radius-md: 10px;
-	--shadow-subtle: 0 1rem 2.5rem rgb(36 75 57 / 8%);
+	--radius-sm: 8px;
+	--radius-md: 12px;
+	--radius-lg: 16px;
+	/* Layered shadows: a hairline for depth plus a soft ambient blur. */
+	--shadow-xs: 0 1px 2px rgb(16 40 30 / 6%);
+	--shadow-sm: 0 1px 2px rgb(16 40 30 / 5%), 0 2px 8px rgb(16 40 30 / 4%);
+	--shadow-md: 0 1px 3px rgb(16 40 30 / 6%), 0 8px 24px rgb(16 40 30 / 8%);
+	--shadow-lg: 0 4px 12px rgb(16 40 30 / 8%), 0 20px 48px rgb(16 40 30 / 14%);
+	--shadow-subtle: var(--shadow-sm);
+	--control-height: 2.5rem;
+	--control-height-sm: 2rem;
 	--page-max-width: 1200px;
 	--page-padding-x: clamp(var(--space-4), 5vw, 64px);
-	--page-padding-y: clamp(var(--space-6), 5vw, 64px);
+	--page-padding-y: clamp(var(--space-6), 4vw, 48px);
 	--space-1: 4px;
 	--space-2: 8px;
 	--space-3: 12px;
 	--space-4: 16px;
 	--space-6: 24px;
 	--space-8: 32px;
-	--font-ui: "Avenir Next", "Segoe UI", sans-serif;
-	--font-display: "Avenir Next", "Segoe UI", sans-serif;
+	--font-ui:
+		ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+	--font-display: var(--font-ui);
+	--font-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
 	--font-weight-regular: 400;
 	--font-weight-medium: 500;
 	--font-weight-semibold: 600;
 }
 
-/* PrimeVue colours come from src/theme/preset.ts (definePreset); this file
-   only holds the app's own tokens, resets and shared layout classes. */
+/* The remaining PrimeVue components take their colours from
+   src/theme/preset.ts until ADR-0014 removes them; this file holds the
+   app's own tokens, resets and shared layout classes. */
 
 * {
 	box-sizing: border-box;
@@ -64,7 +85,7 @@
 html {
 	background: var(--color-canvas);
 	font-family: var(--font-ui);
-	scrollbar-color: #aab8b3 var(--color-canvas);
+	scrollbar-color: #b7c3be var(--color-canvas);
 	scrollbar-width: auto;
 }
 
@@ -75,6 +96,9 @@ body {
 	color: var(--color-ink);
 	font-family: var(--font-ui);
 	font-weight: var(--font-weight-regular);
+	line-height: 1.5;
+	-webkit-font-smoothing: antialiased;
+	-moz-osx-font-smoothing: grayscale;
 }
 
 ::-webkit-scrollbar {
@@ -89,11 +113,11 @@ body {
 ::-webkit-scrollbar-thumb {
 	border: 3px solid var(--color-canvas);
 	border-radius: 999px;
-	background: #aab8b3;
+	background: #b7c3be;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-	background: #899b94;
+	background: #98a69f;
 }
 
 button,
@@ -116,24 +140,27 @@ select {
 .page h2 {
 	margin: 0;
 	font-family: var(--font-display);
-	font-weight: 500;
+	font-weight: var(--font-weight-semibold);
+	letter-spacing: -0.015em;
 }
 
 .page h1 {
-	font-size: clamp(2.25rem, 5vw, 4rem);
-	line-height: 1;
+	font-size: clamp(1.75rem, 3.5vw, 2.5rem);
+	line-height: 1.15;
+	letter-spacing: -0.025em;
 }
 
 .page h2 {
-	font-size: 1.35rem;
+	font-size: 1.125rem;
+	line-height: 1.3;
 }
 
 .eyebrow {
-	margin: 0 0 var(--space-3);
-	color: var(--color-accent);
+	margin: 0 0 var(--space-2);
+	color: var(--color-accent-strong);
 	font-size: 0.75rem;
 	font-weight: var(--font-weight-semibold);
-	letter-spacing: 0.14em;
+	letter-spacing: 0.08em;
 	text-transform: uppercase;
 }
 
@@ -151,11 +178,12 @@ select {
 	color: var(--color-muted);
 }
 
+/* Framed work surface (ui/MCard.vue, UX spec §8.3); never nested. */
 .panel {
 	border: 1px solid var(--color-border);
-	border-radius: var(--radius-md);
+	border-radius: var(--radius-lg);
 	background: var(--color-surface);
-	box-shadow: var(--shadow-subtle);
+	box-shadow: var(--shadow-sm);
 }
 
 .text-link {
@@ -172,25 +200,9 @@ select {
 	text-decoration: underline;
 }
 
-/* Shared by real Buttons and router links rendered through <Button asChild>. */
-.primary-action-button.p-button {
-	text-decoration: none;
-	border-color: var(--color-accent);
-	background: var(--color-accent-soft);
-	box-shadow: none;
-	color: var(--color-accent-strong);
-	font-weight: var(--font-weight-semibold);
-}
-
-.primary-action-button.p-button:hover {
-	border-color: var(--color-accent-strong);
-	background: var(--color-accent-soft-hover);
-	color: var(--color-accent-strong);
-}
-
 .field-error {
-	color: var(--color-danger);
-	font-size: 0.78rem;
+	color: var(--color-danger-strong);
+	font-size: 0.8125rem;
 }
 
 .form-grid .p-inputtext,
@@ -215,7 +227,7 @@ select {
 	line-height: 1.2;
 }
 
-.icon-option i {
+.icon-option .m-icon {
 	display: inline-flex;
 	width: 1.25rem;
 	flex: 0 0 1.25rem;

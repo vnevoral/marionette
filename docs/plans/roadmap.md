@@ -13,7 +13,7 @@ one or more concrete implementation blocks (see the
 ## Current state
 
 As of 2026-10-20 all phases below are **Done**, the last closed block is
-[0072](blocks/0072-primeicons-mit.md) and the current release is
+[0073](blocks/0073-ui-foundation.md) and the current release is
 **v1.3.1** (tags `v1.0.0`, `v1.1.0`, `v1.2.0` to `v1.2.4`, `v1.3.0`,
 `v1.3.1`; `v1.2.0` has no GitHub Release because its CI run failed, fixed
 by block 0059; `v1.3.0` has none because `npm audit` failed on a new
@@ -49,8 +49,11 @@ the move to pull requests (block 0068), one release run per tag
    (blocks 0071, 0072). The owner asked on 2026-10-20 to replace PrimeVue:
    [ADR-0014](../architecture/decisions/0014-replace-primevue-with-reka-ui.md)
    (**Accepted**) replaces it with Reka UI, own styled components and
-   Lucide icons in four blocks, with a visual refresh. Until it is done, watch PrimeVue 4 for releases
-   and security fixes.
+   Lucide icons in four blocks, with a visual refresh. Block 0073 (icons,
+   buttons, surfaces, tokens) is done; next are 0074 (form controls), 0075
+   (toast and confirmation dialog) and 0076 (removal of PrimeVue). Until
+   then, watch PrimeVue 4 for releases and security fixes. The icon change
+   is incompatible for API clients, so the next release is **v2.0.0**.
 5. **Rollback on the Pi.** The README rollback procedure was last verified
    with `v1.2.1`; the unit and the control socket changed since (block
    0065). Repeat it with the next upgrade.
@@ -350,6 +353,11 @@ plans its replacement.
   13. [0072 — `primeicons` on the MIT 7.x line](blocks/0072-primeicons-mit.md)
      — **Done** (2026-10-20); `primeicons` 8.x is under the PrimeUI License,
      7.0.0 is MIT and has every icon the UI uses.
+  14. [0073 — UI foundation (tokens, icons, buttons, surfaces)](blocks/0073-ui-foundation.md)
+     — **Done** (2026-10-20); ADR-0014 part 1: Lucide icons by name with a
+     ghost for unknown values, own `MButton`/`MTag`/`MMessage`/`MCard`/
+     `MSpinner`, refreshed tokens and header; the API accepts icon names
+     only.
 
   The open questions from the review are decided in
   [requirements.md, section 13](../requirements/requirements.md#13-decisions--project-review-2026-09-26)

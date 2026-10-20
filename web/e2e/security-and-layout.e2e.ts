@@ -100,7 +100,7 @@ test.describe("at 320 px", () => {
 				const widths = [];
 				for (const button of buttons) {
 					widths.push((await button.boundingBox())!.width);
-					const lines = await button.locator(".p-button-label").evaluate((label) => {
+					const lines = await button.locator(".m-button-label").evaluate((label) => {
 						const range = document.createRange();
 						range.selectNodeContents(label);
 						return new Set(Array.from(range.getClientRects()).map((rect) => Math.round(rect.top)))

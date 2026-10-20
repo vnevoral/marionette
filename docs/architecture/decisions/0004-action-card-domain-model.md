@@ -146,3 +146,12 @@ Validation returns all errors at once as a `ValidationError` with a
 `Fields` map (JSON path → reason); the API exposes it as 422 with a `fields`
 field. The exact values are the `config.Max*` constants and the table in
 `docs/architecture/overview.md`.
+
+## Note 2026-10-20 — Icon names (ADR-0014, block 0073)
+
+The `icon` value is an icon name such as `house` or `hard-drive`
+(`^[a-z0-9]+(-[a-z0-9]+)*$`, ≤ 64 characters) instead of a PrimeIcons
+class `pi pi-<name>`. The API rejects the old form with 422; a stored card
+with an old value still loads (the icon is not part of
+`ValidateEssential`) and the UI shows a placeholder icon for it until the
+card is saved with a supported icon.

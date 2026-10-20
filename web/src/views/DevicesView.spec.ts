@@ -73,8 +73,8 @@ describe("DevicesView", () => {
 		const { wrapper } = await mountDevices();
 		const rows = wrapper.findAll(".device-row");
 		expect(rows.map((row) => row.find(".device-name span").text())).toEqual(["Laptop", "Phone"]);
-		expect(rows[0].find(".p-tag").text()).toBe("This device");
-		expect(rows[1].find(".p-tag").exists()).toBe(false);
+		expect(rows[0].find(".device-current").text()).toBe("This device");
+		expect(rows[1].find(".device-current").exists()).toBe(false);
 		expect(wrapper.text()).toContain("not used for 30 days must pair again");
 		expect(rows[1].find(".device-remove-button").attributes("aria-label")).toBe(
 			"Remove device Phone",

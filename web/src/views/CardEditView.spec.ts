@@ -18,7 +18,7 @@ const printer: ActionCard = {
 	id: "printer",
 	name: "Printer",
 	description: "",
-	icon: "pi pi-desktop",
+	icon: "monitor",
 	primary: {
 		command: "wake",
 		args: ["--now"],
@@ -203,6 +203,39 @@ describe("CardEditView", () => {
 		await flushPromises();
 		expect(vi.mocked(updateCard).mock.calls[0][0]).toMatchObject({ color: "" });
 		expect(confirm.require).not.toHaveBeenCalled();
+		wrapper.unmount();
+	});
+
+	it("shows an icon the UI no longer knows as unavailable and saves only a supported one", async () => {
+		vi.mocked(getCard).mockResolvedValue({ ...printer, icon: "pi pi-print" });
+		vi.mocked(updateCard).mockImplementation(async (card) => card);
+		const { wrapper } = await mountEdit("/cards/printer/edit");
+		const icon = wrapper
+			.findAllComponents(Select)
+			.find((select) => select.props("ariaLabel") === "Icon");
+		if (!icon) throw new Error("Icon select not rendered");
+		expect(icon.text()).toContain("Unavailable icon");
+		expect(icon.html()).toMatch(/lucide-ghost/);
+		const label = () => wrapper.findAll("label").find((node) => node.text().startsWith("Icon"));
+		expect(label()?.find(".field-error").text()).toBe(
+			"This icon is no longer available. Choose a new one.",
+		);
+		const save = () =>
+			wrapper
+				.findAll("button")
+				.find((b) => b.text().includes("Save card"))!
+				.trigger("click");
+
+		await save();
+		await flushPromises();
+		expect(updateCard).not.toHaveBeenCalled();
+
+		icon.vm.$emit("update:modelValue", "printer");
+		await flushPromises();
+		expect(label()?.find(".field-error").exists()).toBe(false);
+		await save();
+		await flushPromises();
+		expect(vi.mocked(updateCard).mock.calls[0][0]).toMatchObject({ icon: "printer" });
 		wrapper.unmount();
 	});
 

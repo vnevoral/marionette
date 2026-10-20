@@ -14,17 +14,24 @@ defineProps<{ output: string; truncated?: boolean }>();
 </template>
 
 <style scoped>
-.run-output {
-	color: var(--color-info);
+.run-output summary {
+	width: fit-content;
+	color: var(--color-info-strong);
+	font-size: 0.875rem;
+	font-weight: var(--font-weight-medium);
+	cursor: pointer;
 }
 .run-output pre {
 	max-width: 100%;
 	margin: var(--space-3) 0 0;
 	padding: var(--space-3);
 	overflow: auto;
-	background: var(--color-canvas);
+	border: 1px solid var(--color-border);
+	border-radius: var(--radius-sm);
+	background: var(--color-surface-sunken);
 	color: var(--color-ink);
-	font-family: monospace;
+	font-family: var(--font-mono);
+	font-size: 0.8125rem;
 	white-space: pre-wrap;
 }
 </style>

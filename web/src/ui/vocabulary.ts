@@ -5,28 +5,28 @@ import type { Run, StatusState } from "@/api";
 import type { PendingPhase, Presentation } from "@/types";
 
 export const STATUS = {
-	ok: { label: "Healthy", icon: "pi pi-check-circle", tone: "healthy" },
-	fail: { label: "Problem", icon: "pi pi-exclamation-triangle", tone: "problem" },
-	unknown: { label: "Unknown", icon: "pi pi-question-circle", tone: "unknown" },
+	ok: { label: "Healthy", icon: "circle-check", tone: "healthy" },
+	fail: { label: "Problem", icon: "triangle-alert", tone: "problem" },
+	unknown: { label: "Unknown", icon: "circle-question-mark", tone: "unknown" },
 } as const satisfies Record<StatusState, Presentation>;
 
 export const NO_STATUS_CHECK: Presentation = {
 	label: "No status check",
-	icon: "pi pi-minus-circle",
+	icon: "circle-minus",
 	tone: "unknown",
 };
 
 /** Queued is amber with a queue icon, Running is blue with a spinner (spec §4). */
 export const REQUEST = {
-	queued: { label: "Queued", icon: "pi pi-hourglass", tone: "warning" },
-	running: { label: "Running", icon: "pi pi-spin pi-spinner", tone: "info" },
+	queued: { label: "Queued", icon: "hourglass", tone: "warning" },
+	running: { label: "Running", icon: "loader-circle", tone: "info" },
 } as const satisfies Record<PendingPhase, Presentation>;
 
 export const OUTCOME = {
-	ok: { label: "Successful", icon: "pi pi-check-circle", tone: "healthy" },
-	fail: { label: "Failed", icon: "pi pi-times-circle", tone: "problem" },
-	timeout: { label: "Timed out", icon: "pi pi-clock", tone: "warning" },
-	canceled: { label: "Canceled", icon: "pi pi-ban", tone: "unknown" },
+	ok: { label: "Successful", icon: "circle-check", tone: "healthy" },
+	fail: { label: "Failed", icon: "circle-x", tone: "problem" },
+	timeout: { label: "Timed out", icon: "clock", tone: "warning" },
+	canceled: { label: "Canceled", icon: "ban", tone: "unknown" },
 } as const satisfies Record<Run["outcome"], Presentation>;
 
 /** Presentation of a device state; an unknown or missing value reads as Unknown. */
@@ -94,6 +94,8 @@ export const FEEDBACK = {
 	deleting: "Deleting card...",
 	unableToQueue: "Unable to queue action",
 	unableToSave: "Unable to save card",
+	iconUnavailable: "This icon is no longer available. Choose a new one.",
+	unavailableIcon: "Unavailable icon",
 	unableToDelete: "Unable to delete card",
 	unableToLoadCards: "Unable to load cards",
 	unableToLoadCard: "Unable to load card",

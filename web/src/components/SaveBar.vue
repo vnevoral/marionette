@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { RouterLink } from "vue-router";
-import Button from "primevue/button";
+import MButton from "@/ui/MButton.vue";
 import { ACTIONS } from "@/ui/vocabulary";
 
 // Sticky save/cancel bar of the card form (UX spec §7.2).
@@ -11,10 +11,10 @@ const emit = defineEmits<{ save: [] }>();
 <template>
 	<div class="save-bar">
 		<RouterLink class="text-link" :to="cancelTo">{{ ACTIONS.cancel }}</RouterLink>
-		<Button
+		<MButton
 			:label="ACTIONS.saveCard"
-			icon="pi pi-check"
-			class="primary-action-button"
+			icon="check"
+			variant="primary"
 			:loading="saving"
 			@click="emit('save')"
 		/>
@@ -31,10 +31,9 @@ const emit = defineEmits<{ save: [] }>();
 	align-items: center;
 	justify-content: flex-end;
 	gap: var(--space-3);
-	margin: 0 calc(-1 * var(--space-4));
-	padding: var(--space-3) var(--space-4);
+	padding: var(--space-4) var(--space-6);
 	border-top: 1px solid var(--color-border);
-	background: color-mix(in srgb, var(--color-surface) 94%, transparent);
-	backdrop-filter: blur(4px);
+	border-radius: 0 0 var(--radius-lg) var(--radius-lg);
+	background: var(--color-surface);
 }
 </style>

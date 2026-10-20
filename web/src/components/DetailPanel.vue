@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import { computed } from "vue";
 import { cardColorValue } from "@/ui/cardColors";
+import MCard from "@/ui/MCard.vue";
+import MIcon from "@/ui/MIcon.vue";
 
 // Framed work surface of the detail view with a heading row: title, optional
 // count or decorative icon, and a slot for a badge. A card colour (FR-10a) is
@@ -18,8 +20,8 @@ const stripe = computed(() => cardColorValue(props.color));
 </script>
 
 <template>
-	<section
-		class="panel detail-panel"
+	<MCard
+		class="detail-panel"
 		:class="{ 'has-color': stripe }"
 		:data-color="stripe ? color : undefined"
 		:style="stripe ? { '--card-stripe': stripe } : undefined"
@@ -29,11 +31,11 @@ const stripe = computed(() => cardColorValue(props.color));
 			<h2 :id="headingId">{{ title }}</h2>
 			<slot name="badge">
 				<span v-if="count !== undefined" class="panel-count">{{ count }}</span>
-				<i v-else-if="icon" :class="icon" class="panel-icon" aria-hidden="true" />
+				<MIcon v-else-if="icon" :name="icon" class="panel-icon" />
 			</slot>
 		</div>
 		<slot />
-	</section>
+	</MCard>
 </template>
 
 <style scoped>
@@ -44,8 +46,8 @@ const stripe = computed(() => cardColorValue(props.color));
 .detail-panel.has-color {
 	border-top-color: var(--card-stripe);
 	box-shadow:
-		inset 0 5px 0 var(--card-stripe),
-		var(--shadow-subtle);
+		inset 0 6px 0 var(--card-stripe),
+		var(--shadow-sm);
 }
 .panel-heading {
 	display: flex;
@@ -54,18 +56,17 @@ const stripe = computed(() => cardColorValue(props.color));
 	gap: var(--space-3);
 	margin-bottom: var(--space-4);
 }
-.panel-heading h2 {
-	font-size: 1.45rem;
-}
 .panel-icon {
-	color: var(--color-accent);
+	color: var(--color-accent-strong);
+	font-size: 1.25rem;
 }
 .panel-count {
 	display: grid;
 	min-width: 28px;
 	height: 28px;
+	padding: 0 var(--space-2);
 	place-items: center;
-	border-radius: 50%;
+	border-radius: 999px;
 	background: var(--color-accent-soft);
 	color: var(--color-accent-strong);
 	font-size: 0.8rem;

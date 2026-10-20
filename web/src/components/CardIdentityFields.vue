@@ -1,12 +1,15 @@
 <script setup lang="ts">
+import { computed } from "vue";
 import InputText from "primevue/inputtext";
 import Select from "primevue/select";
 import Textarea from "primevue/textarea";
 import FormSection from "@/components/FormSection.vue";
 import { CARD_COLOR_OPTIONS, cardColorValue } from "@/ui/cardColors";
-import { CARD_ICON_OPTIONS } from "@/ui/icons";
+import { CARD_ICON_OPTIONS, isCardIcon } from "@/ui/icons";
+import MIcon from "@/ui/MIcon.vue";
+import { FEEDBACK } from "@/ui/vocabulary";
 
-defineProps<{
+const props = defineProps<{
 	errors: { name?: string; description?: string; icon?: string; color?: string };
 }>();
 
@@ -16,8 +19,19 @@ const icon = defineModel<string | undefined>("icon", { required: true });
 // "" (None) and a missing colour are the same; the Select shows None for both.
 const color = defineModel<string | undefined>("color", { required: true });
 
+// A stored icon the UI no longer knows (an old `pi pi-*` value) shows as the
+// ghost with a request to choose a supported one; saving is blocked until
+// then (cardEditModel.validate, ADR-0014). That message follows the field
+// live; any other icon error is the server's and stays until the next save.
+const iconError = computed(() => {
+	if (icon.value && !isCardIcon(icon.value)) return FEEDBACK.iconUnavailable;
+	return props.errors.icon === FEEDBACK.iconUnavailable ? "" : (props.errors.icon ?? "");
+});
+
 function iconLabel(value: unknown) {
-	return CARD_ICON_OPTIONS.find((option) => option.value === value)?.label;
+	return (
+		CARD_ICON_OPTIONS.find((option) => option.value === value)?.label ?? FEEDBACK.unavailableIcon
+	);
 }
 
 function colorLabel(value: unknown) {
@@ -49,23 +63,23 @@ function colorLabel(value: unknown) {
 					:options="[...CARD_ICON_OPTIONS]"
 					option-label="label"
 					option-value="value"
-					:invalid="Boolean(errors.icon)"
+					:invalid="Boolean(iconError)"
 					aria-label="Icon"
 				>
 					<template #value="slotProps">
 						<div v-if="slotProps.value" class="icon-option">
-							<i :class="slotProps.value" aria-hidden="true" />
+							<MIcon :name="slotProps.value" />
 							<span>{{ iconLabel(slotProps.value) }}</span>
 						</div>
 					</template>
 					<template #option="slotProps">
 						<div class="icon-option">
-							<i :class="slotProps.option.value" aria-hidden="true" />
+							<MIcon :name="slotProps.option.value" />
 							<span>{{ slotProps.option.label }}</span>
 						</div>
 					</template>
 				</Select>
-				<small v-if="errors.icon" class="field-error">{{ errors.icon }}</small>
+				<small v-if="iconError" class="field-error">{{ iconError }}</small>
 			</label>
 			<label class="col-12 md:col-6"
 				>Color

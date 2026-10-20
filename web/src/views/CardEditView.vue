@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import { computed, reactive, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
-import Card from "primevue/card";
 import ToggleSwitch from "primevue/toggleswitch";
 import { ApiError, createCard, getCard, updateCard, type ActionCard } from "@/api";
 import ActionEditor from "@/components/ActionEditor.vue";
@@ -13,6 +12,7 @@ import SaveBar from "@/components/SaveBar.vue";
 import { useNotify } from "@/composables/useNotify";
 import { useUnsavedChangesGuard } from "@/composables/useUnsavedChangesGuard";
 import { knownCardColor } from "@/ui/cardColors";
+import MCard from "@/ui/MCard.vue";
 import { ACTIONS, FEEDBACK, LOADING } from "@/ui/vocabulary";
 import {
 	actionFrom,
@@ -208,8 +208,8 @@ useUnsavedChangesGuard(isDirty, () => saving.value);
 			<span>{{ LOADING.card }}</span>
 		</div>
 
-		<Card v-else class="editor-card">
-			<template #content>
+		<MCard v-else class="editor-card">
+			<div class="editor-body">
 				<CardIdentityFields
 					v-model:name="form.name"
 					v-model:description="form.description"
@@ -257,11 +257,9 @@ useUnsavedChangesGuard(isDirty, () => saving.value);
 						fastPollingWindowSeconds: fieldErrors.fastPollingWindowSeconds,
 					}"
 				/>
-			</template>
-			<template #footer>
-				<SaveBar :saving="saving" :cancel-to="backTo()" @save="save" />
-			</template>
-		</Card>
+			</div>
+			<SaveBar :saving="saving" :cancel-to="backTo()" @save="save" />
+		</MCard>
 	</main>
 </template>
 
@@ -277,10 +275,9 @@ useUnsavedChangesGuard(isDirty, () => saving.value);
 }
 .editor-card {
 	max-width: 960px;
-	border: 1px solid var(--color-border);
-	border-radius: var(--radius-md);
-	background: var(--color-surface);
-	box-shadow: var(--shadow-subtle);
+}
+.editor-body {
+	padding: var(--space-6);
 }
 .status-toggle {
 	display: flex;
