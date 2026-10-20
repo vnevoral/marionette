@@ -1,4 +1,4 @@
-# golangci-lint configuration (v2.14). `make lint` is the single entry point.
+# golangci-lint configuration (v2 schema). `make lint` is the single entry point.
 version: "2"
 
 linters:

@@ -112,5 +112,7 @@ verify: ui-build lint test
 	go build ./...
 	go vet ./...
 
+## Remove build output (bin/ and the UI build; dist/.gitkeep stays)
 clean:
-	rm -rf bin $(DIST_DIR)
+	rm -rf bin
+	find $(DIST_DIR) -mindepth 1 ! -name .gitkeep -delete

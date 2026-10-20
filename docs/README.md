@@ -12,6 +12,8 @@ the code.
   components and their relationships
 - [architecture/decisions/](architecture/decisions) — log of architecture
   decisions (ADR)
+- [ux/ui-ux-specification.md](ux/ui-ux-specification.md) — screens,
+  interactions and the visual system of the web UI
 - [plans/roadmap.md](plans/roadmap.md) — project phases and implementation
   blocks
 - [devops/testing-strategy.md](devops/testing-strategy.md) — how testing is
@@ -21,6 +23,8 @@ the code.
   binding shared planning and implementation process
 - [devops/definition-of-done.md](devops/definition-of-done.md) — exit check
   for when a block is done
+- [releases/](releases) — hand-written release notes, one file per tag
+  (block 0077)
 
 ## Contributors
 

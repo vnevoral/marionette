@@ -4,7 +4,8 @@ import { inject, reactive, type App, type InjectionKey } from "vue";
 // confirmation question at a time. main.ts installs the service; MToastHost
 // and MConfirmHost in App.vue render its state; tests provide a fake.
 
-export type ToastTone = "success" | "info" | "error";
+// Toasts are success notices only (UX spec §4); errors stay inline.
+export type ToastTone = "success";
 
 export interface ToastOptions {
 	tone: ToastTone;

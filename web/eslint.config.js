@@ -42,8 +42,6 @@ export default tseslint.config(
 			"coverage/**",
 			"test-results/**",
 			"playwright-report/**",
-			"vite.config.js",
-			"vite.config.d.ts",
 		],
 	},
 );

@@ -49,13 +49,14 @@ running version is shown in the UI footer and in `GET /api/health`.
 - `cmd/marionette` — application entrypoint (composition, logging, lifecycle)
 - `internal/server` — HTTP layer (API routes, SSE, SPA fallback)
 - `internal/access` — paired devices, pairing codes and device tokens
+- `internal/control` — local control socket for `marionette pair`
 - `internal/config` — card domain model, in-memory store, JSON persistence
 - `internal/execengine` — action execution (process groups, timeouts, minimal environment)
 - `internal/status` — status checks and polling scheduler
 - `internal/actions` — background action queue
 - `internal/events` — event broker feeding SSE (status changes, recorded runs)
 - `internal/fsutil` — atomic file writes
-- `internal/webui` — embeds `web/dist` (the built SPA) into the Go binary via `go:embed`
+- `internal/webui` — embeds `internal/webui/dist` (the built SPA, not versioned) into the Go binary via `go:embed`; without a UI build it serves a placeholder page
 - `web` — Vue 3 SPA source (own components on Reka UI, Lucide icons; built with Vite)
 
 ## Development

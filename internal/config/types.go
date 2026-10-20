@@ -12,13 +12,10 @@ import (
 	"time"
 )
 
-// Default values recommended for newly created action cards and settings.
+// Default settings used when the configuration does not set them.
 const (
-	DefaultHistorySize                = 20
-	DefaultMaxConcurrentActions       = 4
-	DefaultPollingIntervalSeconds     = 60
-	DefaultFastPollingIntervalSeconds = 10
-	DefaultFastPollingWindowSeconds   = 120
+	DefaultHistorySize          = 20
+	DefaultMaxConcurrentActions = 4
 )
 
 // Limits applied by Validate to user-supplied values (block 0028). They keep

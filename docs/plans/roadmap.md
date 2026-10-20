@@ -13,7 +13,7 @@ one or more concrete implementation blocks (see the
 ## Current state
 
 As of 2026-10-20 all phases below are **Done**, the last closed block is
-[0078](blocks/0078-dependabot-cooldown.md) and the current release is
+[0079](blocks/0079-repo-cleanup.md) and the current release is
 **v2.0.0** (tags `v1.0.0`, `v1.1.0`, `v1.2.0` to `v1.2.4`, `v1.3.0`,
 `v1.3.1`, `v2.0.0`; `v1.2.0` has no GitHub Release because its CI run
 failed, fixed by block 0059; `v1.3.0` has none because `npm audit` failed on a new
@@ -21,7 +21,7 @@ advisory for `source-map-js`, fixed in the lockfile for `v1.3.1`). `v1.2.2`
 contains blocks 0060 and 0061 (Go 1.27, golangci-lint v2, SSE subscription
 order), `v1.2.3` block 0062 (card color on the Current status panel),
 `v1.2.4` block 0063 (page header actions on mobile), `v1.3.1` blocks
-0064 and 0065 (`marionette pair`) and `v2.0.0` blocks 0068 to 0077 (the
+0064 and 0065 (`marionette pair`) and `v2.0.0` blocks 0066 to 0077 (the
 new UI on Reka UI and Lucide, card icons as names, hand-written release
 notes; published 2026-10-20, the first release with notes in
 `docs/releases/`). The requirements are at v0.14.
@@ -40,32 +40,22 @@ approved the items as proposed on 2026-10-20; each item becomes a block
 Done since: the dev container rebuild (`go version` reports go1.27.3),
 the move to pull requests (block 0068), one release run per tag
 (block 0069), `govulncheck` in CI (block 0070), `@primeuix/themes`
-(block 0071) and `primeicons` on MIT 7.x (block 0072), all 2026-10-20.
+(block 0071), `primeicons` on MIT 7.x (block 0072), the replacement of
+PrimeVue by Reka UI, own components and Lucide (ADR-0014, blocks
+0073–0076), hand-written release notes (block 0077), the Dependabot
+cooldown (block 0078) and the repository cleanup (block 0079), all
+2026-10-20. The UI bundle is about 340 kB (113 kB gzip) since PrimeVue is
+gone, below the Vite warning, so the bundle-size item is dropped.
 
 1. **TypeScript 7.** Major version; needs a changelog check and an ADR
    (`docs/devops/ci-cd.md`).
 2. **happy-dom 21.** Major version of a test dependency.
-3. **Bundle size.** The main JS chunk is about 610 kB (150 kB gzip) and
-   Vite warns above 500 kB; code splitting would reduce it. Low priority.
-4. **Replace PrimeVue.** PrimeVue 5, `@primeuix/themes` 3.x and
-   `primeicons` 8.x are under the PrimeUI License (per-developer Community
-   License with a key); the project stays on the MIT lines meanwhile
-   (blocks 0071, 0072). The owner asked on 2026-10-20 to replace PrimeVue:
-   [ADR-0014](../architecture/decisions/0014-replace-primevue-with-reka-ui.md)
-   (**Accepted**) replaces it with Reka UI, own styled components and
-   Lucide icons in four blocks, with a visual refresh. **Done**: blocks
-   0073 (icons, buttons, surfaces, tokens), 0074 (form controls), 0075
-   (toast and confirmation dialog) and 0076 (packages removed). The icon
-   change is incompatible for API clients, so the next release is
-   **v2.0.0**, with hand-written release notes (block 0077); released
-   2026-10-20.
-5. **Rollback on the Pi.** The README rollback procedure was last verified
+3. **Rollback on the Pi.** The README rollback procedure was last verified
    with `v1.2.1`; the unit and the control socket changed since (block
    0065). Repeat it with the upgrade to `v2.0.0`.
 
 Deferred features, only on a concrete need: API tokens for scripts and
-passkeys once there is TLS (ADR-0011), UI localization (ADR-0007). PrimeVue
-was replaced by Reka UI and own components (ADR-0014, backlog item 4).
+passkeys once there is TLS (ADR-0011), UI localization (ADR-0007).
 
 ## Phase overview
 
@@ -122,7 +112,7 @@ was replaced by Reka UI and own components (ADR-0014, backlog item 4).
 
   Blocks 0010–0012 are done.
 
-- Phase 6 starts with block 0013:
+- Phase 6 was broken down into blocks 0013 and 0014, which are done:
   - [0013 — Card dashboard and action controls](blocks/0013-dashboard-overview.md)
   - [0014 — Action card management](blocks/0014-card-management.md)
 
@@ -379,6 +369,10 @@ was replaced by Reka UI and own components (ADR-0014, backlog item 4).
   19. [0078 — Dependabot cooldown](blocks/0078-dependabot-cooldown.md) —
      **Done** (2026-10-20); Dependabot proposes only versions at least 14
      days old, the two-week rule is documented.
+  20. [0079 — Repository cleanup](blocks/0079-repo-cleanup.md) — **Done**
+     (2026-10-20); the UI build output is no longer versioned (a
+     placeholder page without `make ui-build`), unused UI variants, tokens
+     and constants removed, stale documentation and dev tooling corrected.
 
   The open questions from the review are decided in
   [requirements.md, section 13](../requirements/requirements.md#13-decisions--project-review-2026-09-26)

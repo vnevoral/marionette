@@ -116,7 +116,7 @@ describe("MToastHost", () => {
 		vi.useFakeTimers();
 		try {
 			const feedback = mountHost(MToastHost);
-			feedback.toast.add({ tone: "info", summary: "Saved", life: 4000 });
+			feedback.toast.add({ tone: "success", summary: "Saved", life: 4000 });
 			await flushPromises();
 			expect(feedback.state.toasts).toHaveLength(1);
 			vi.advanceTimersByTime(4000);

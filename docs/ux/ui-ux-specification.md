@@ -1,10 +1,10 @@
 # Marionette UI/UX Specification
 
-- **Version**: 0.1
-- **Status**: Proposed for implementation
-- **Date**: 2026-09-25
+- **Version**: 0.2
+- **Status**: Implemented
+- **Date**: 2026-10-20
 - **Language**: English (`en-US`)
-- **References**: FR-20..29, NFR-08..10, ADR-0003, ADR-0007
+- **References**: FR-20..29, NFR-08..10, ADR-0003, ADR-0007, ADR-0014
 
 ## 1. Product model
 
@@ -35,7 +35,7 @@ Every primary screen uses the same shell:
 - centered content with a maximum width of 1200 px;
 - mobile navigation collapses into a compact top bar without hiding the
   current section or the main action;
-- a quiet footer with the running version (`Marionette v1.2.1`, FR-41a)
+- a quiet footer with the running version (`Marionette vX.Y.Z`, FR-41a)
   from `/api/health`, read again when the status stream reconnects (a
   service restart during an upgrade); it is hidden when the version cannot
   be read.
@@ -151,8 +151,8 @@ Feedback channels:
 - **Toast** (top right; full width minus the 16 px gutter on phones; about
   4 s, paused while hovered or focused, closable, swipe right to dismiss
   on touch) only for the outcome of an operation that ends by leaving or
-  replacing the page, so the notice survives the navigation: **Card saved**
-  and **Card deleted**. Toasts are success notices only; an error never
+  replacing the page, so the notice survives the navigation: **Card saved**,
+  **Card deleted**, **Device paired** and **This device was removed**. Toasts are success notices only; an error never
   appears only in a toast.
 
 Status always includes text, an icon, and a semantic color:
@@ -186,7 +186,7 @@ Every card has the same hierarchy:
   card without a status action so every card keeps its height;
 - primary **Run action** button;
 - secondary **Check status** button when a status action exists;
-- overflow menu with **View details** and **Edit**.
+- a **View details** link to the card detail.
 
 A card with a colour (FR-10a) has a 6 px stripe of that colour along its
 top edge, drawn by the top border and an inset shadow so the card keeps
@@ -430,7 +430,7 @@ dates and durations are formatted in `web/src/ui/format.ts`.
 
 - All controls are keyboard reachable in logical order.
 - Focus rings remain visible and are never removed by CSS.
-- Icon-only controls have `aria-label` and a tooltip; text buttons use clear
+- Icon-only controls have an `aria-label`; text buttons use clear
   action labels.
 - Status changes and errors use appropriate live regions without spamming
   assistive technology.
@@ -455,7 +455,7 @@ Before closing a UX block, verify:
 
 ## 11. Implementation sequence
 
-- **UX-01**: tokens, PrimeVue theme, and shared `AppShell`;
+- **UX-01**: tokens and shared `AppShell`;
 - **UX-02**: overview and action/status feedback;
 - **UX-03**: management and form system;
 - **UX-04**: card detail, runs, and status timeline;

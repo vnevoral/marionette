@@ -84,7 +84,8 @@ end-to-end flows); see
 - **Storage:** the configuration stays a single JSON file; a database needs
   an ADR.
 - **Commit messages** follow the `type: summary` style used in the history
-  (`feat:`, `fix:`, `docs:`, `refactor:`, `test:`, `chore:`).
+  (`feat:`, `fix:`, `docs:`, `refactor:`, `test:`, `chore:`, `ci:`;
+  Dependabot uses `build(deps):`).
 
 AI coding agents working in this repository start at
 [AGENTS.md](AGENTS.md).

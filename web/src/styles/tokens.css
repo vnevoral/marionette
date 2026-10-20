@@ -5,7 +5,6 @@
 	--color-canvas: #f3f5f4;
 	--color-surface: #ffffff;
 	--color-surface-sunken: #f6f8f7;
-	--color-surface-raised: #ffffff;
 	--color-ink: #1f2a26;
 	--color-muted: #5f6b66;
 	--color-muted-strong: #4a5651;
@@ -14,11 +13,9 @@
 	--color-accent: #2f7d57;
 	--color-accent-strong: #256847;
 	--color-accent-soft: #e7f3ec;
-	--color-accent-soft-hover: #d6ebdf;
 	--color-success: #2f7d57;
 	--color-success-strong: #256847;
 	--color-success-border: #b9dcc8;
-	--color-info: #2d6f86;
 	--color-info-strong: #24596b;
 	--color-info-soft: #e6f1f5;
 	--color-info-border: #bcd9e3;
@@ -48,7 +45,6 @@
 	--shadow-sm: 0 1px 2px rgb(16 40 30 / 5%), 0 2px 8px rgb(16 40 30 / 4%);
 	--shadow-md: 0 1px 3px rgb(16 40 30 / 6%), 0 8px 24px rgb(16 40 30 / 8%);
 	--shadow-lg: 0 4px 12px rgb(16 40 30 / 8%), 0 20px 48px rgb(16 40 30 / 14%);
-	--shadow-subtle: var(--shadow-sm);
 	--control-height: 2.5rem;
 	--control-height-sm: 2rem;
 	--page-max-width: 1200px;
