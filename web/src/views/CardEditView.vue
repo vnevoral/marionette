@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import { computed, reactive, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
-import ToggleSwitch from "primevue/toggleswitch";
 import { ApiError, createCard, getCard, updateCard, type ActionCard } from "@/api";
 import ActionEditor from "@/components/ActionEditor.vue";
 import CardIdentityFields from "@/components/CardIdentityFields.vue";
@@ -13,6 +12,7 @@ import { useNotify } from "@/composables/useNotify";
 import { useUnsavedChangesGuard } from "@/composables/useUnsavedChangesGuard";
 import { knownCardColor } from "@/ui/cardColors";
 import MCard from "@/ui/MCard.vue";
+import MSwitch from "@/ui/MSwitch.vue";
 import { ACTIONS, FEEDBACK, LOADING } from "@/ui/vocabulary";
 import {
 	actionFrom,
@@ -232,7 +232,7 @@ useUnsavedChangesGuard(isDirty, () => saving.value);
 				/>
 
 				<div class="status-toggle">
-					<ToggleSwitch v-model="statusEnabled" input-id="status-enabled" />
+					<MSwitch id="status-enabled" v-model="statusEnabled" />
 					<label for="status-enabled">Configure status action</label>
 				</div>
 

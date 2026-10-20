@@ -140,32 +140,6 @@ const MarionettePreset = definePreset(Aura, {
 				},
 			},
 		},
-		toggleswitch: {
-			root: {
-				width: "2.75rem",
-				height: "1.5rem",
-				borderColor: "{surface.300}",
-				hoverBorderColor: "{surface.400}",
-				checkedBorderColor: "{primary.color}",
-				checkedHoverBorderColor: "{primary.hover.color}",
-			},
-			colorScheme: {
-				light: {
-					root: {
-						background: "#d7dfdc",
-						hoverBackground: "#c9d4d0",
-						checkedBackground: "{primary.color}",
-						checkedHoverBackground: "{primary.hover.color}",
-					},
-					handle: {
-						background: "{surface.0}",
-						hoverBackground: "{surface.0}",
-						checkedBackground: "{surface.0}",
-						checkedHoverBackground: "{surface.0}",
-					},
-				},
-			},
-		},
 	},
 });
 

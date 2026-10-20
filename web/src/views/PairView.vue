@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from "vue";
 import { useRoute, useRouter } from "vue-router";
-import InputText from "primevue/inputtext";
 import { ApiError, pairDevice } from "@/api";
 import InlineError from "@/components/InlineError.vue";
 import PageHeader from "@/components/PageHeader.vue";
@@ -10,6 +9,7 @@ import { useNotify } from "@/composables/useNotify";
 import { safeNext } from "@/router/params";
 import { suggestDeviceName } from "@/ui/deviceName";
 import MButton from "@/ui/MButton.vue";
+import MInput from "@/ui/MInput.vue";
 import { ACCESS, FEEDBACK } from "@/ui/vocabulary";
 
 // Pairing screen (FR-51..FR-53): one code, once per browser. The code may
@@ -93,7 +93,7 @@ onMounted(() => {
 			<form class="pair-form" novalidate @submit.prevent="pair">
 				<label class="pair-field"
 					>{{ ACCESS.codeLabel }}
-					<InputText
+					<MInput
 						:model-value="code"
 						class="pair-code"
 						autocomplete="one-time-code"
@@ -107,12 +107,7 @@ onMounted(() => {
 				</label>
 				<label class="pair-field"
 					>{{ ACCESS.nameLabel }}
-					<InputText
-						v-model="name"
-						maxlength="64"
-						autocomplete="off"
-						:invalid="Boolean(nameError)"
-					/>
+					<MInput v-model="name" maxlength="64" autocomplete="off" :invalid="Boolean(nameError)" />
 					<small v-if="nameError" class="field-error">{{ nameError }}</small>
 				</label>
 				<InlineError :message="error" />

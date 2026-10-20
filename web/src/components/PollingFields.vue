@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import InputNumber from "primevue/inputnumber";
 import FormSection from "@/components/FormSection.vue";
+import MNumberInput from "@/ui/MNumberInput.vue";
 
 defineProps<{
 	errors: {
@@ -26,7 +26,7 @@ const fastWindow = defineModel<number | undefined>("fastPollingWindowSeconds", {
 		<div class="form-grid grid">
 			<label class="col-12 md:col-4"
 				>Polling interval (seconds)
-				<InputNumber
+				<MNumberInput
 					v-model="interval"
 					:min="0"
 					:invalid="Boolean(errors.pollingIntervalSeconds)"
@@ -37,7 +37,7 @@ const fastWindow = defineModel<number | undefined>("fastPollingWindowSeconds", {
 			</label>
 			<label class="col-12 md:col-4"
 				>Fast interval (seconds)
-				<InputNumber
+				<MNumberInput
 					v-model="fastInterval"
 					:min="0"
 					:invalid="Boolean(errors.fastPollingIntervalSeconds)"
@@ -48,7 +48,7 @@ const fastWindow = defineModel<number | undefined>("fastPollingWindowSeconds", {
 			</label>
 			<label class="col-12 md:col-4"
 				>Fast window (seconds)
-				<InputNumber
+				<MNumberInput
 					v-model="fastWindow"
 					:min="0"
 					:invalid="Boolean(errors.fastPollingWindowSeconds)"

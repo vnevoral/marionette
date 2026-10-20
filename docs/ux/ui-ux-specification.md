@@ -380,8 +380,8 @@ name, `web/src/ui/cardColors.ts` lists the options. Red and green are left
 out because they mean **Problem** and **Healthy**.
 
 Views use semantic tokens rather than local hex values. The PrimeVue
-components that remain until ADR-0014 is complete (form controls, toast,
-confirmation dialog) take the same palette from `web/src/theme/preset.ts`.
+components that remain until ADR-0014 is complete (toast, confirmation
+dialog) take the same palette from `web/src/theme/preset.ts`.
 The app ships one light scheme; the OS dark mode is not followed.
 
 ### 8.3 Typography and density
@@ -400,7 +400,9 @@ The app ships one light scheme; the OS dark mode is not followed.
 Base components live in `web/src/ui/` (ADR-0014): `MButton` (primary,
 secondary, ghost, danger and danger-ghost; a router link with `to`),
 `MIcon` (Lucide icons by name from `ui/icons.ts`; an unknown name shows the
-ghost icon), `MSpinner`, `MTag`, `MMessage` and `MCard`. Shared patterns
+ghost icon), `MSpinner`, `MTag`, `MMessage` and `MCard`, and the form
+controls `MInput`, `MTextarea`, `MNumberInput`, `MSelect` and `MSwitch`
+(block 0074; select and switch on Reka UI). Shared patterns
 built from them live in `web/src/components` and are used by every view
 (block 0033):
 

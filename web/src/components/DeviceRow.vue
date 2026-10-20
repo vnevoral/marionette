@@ -1,10 +1,10 @@
 <script setup lang="ts">
 import { nextTick, ref, useId } from "vue";
-import InputText from "primevue/inputtext";
 import { ApiError, renameDevice, type Device } from "@/api";
 import { formatDate } from "@/ui/format";
 import MButton from "@/ui/MButton.vue";
 import MIcon from "@/ui/MIcon.vue";
+import MInput from "@/ui/MInput.vue";
 import MTag from "@/ui/MTag.vue";
 import { ACCESS, ACTIONS, FEEDBACK } from "@/ui/vocabulary";
 
@@ -70,7 +70,7 @@ async function save() {
 				<form v-if="editing" class="device-rename" novalidate @submit.prevent="save">
 					<label :for="inputId" class="device-rename-label">{{ ACCESS.nameLabel }}</label>
 					<div class="device-rename-controls">
-						<InputText
+						<MInput
 							:id="inputId"
 							ref="nameInput"
 							v-model="draft"
@@ -188,7 +188,7 @@ async function save() {
 	align-items: center;
 	gap: var(--space-2);
 }
-.device-rename-controls > input {
+.device-rename-controls > .m-input {
 	flex: 1 1 12rem;
 	min-width: 0;
 }

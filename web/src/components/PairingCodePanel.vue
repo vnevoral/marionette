@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, ref } from "vue";
-import InputText from "primevue/inputtext";
 import type { PairingCode } from "@/api";
 import MButton from "@/ui/MButton.vue";
+import MInput from "@/ui/MInput.vue";
 import { ACCESS } from "@/ui/vocabulary";
 
 // A freshly created pairing code for another device (FR-54): the code in
@@ -41,7 +41,7 @@ async function copyLink() {
 			<output class="pairing-code" aria-label="Pairing code">{{ pairing.code }}</output>
 			<p class="pairing-code-expiry" aria-live="off">{{ ACCESS.codeExpiresIn(remaining) }}</p>
 			<div class="pairing-link">
-				<InputText
+				<MInput
 					:model-value="link"
 					readonly
 					aria-label="Pairing link"
@@ -90,7 +90,7 @@ async function copyLink() {
 	flex-wrap: wrap;
 	gap: var(--space-2);
 }
-.pairing-link :deep(.p-inputtext) {
+.pairing-link .m-input {
 	flex: 1 1 14rem;
 	min-width: 0;
 }
