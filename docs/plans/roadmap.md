@@ -13,7 +13,7 @@ one or more concrete implementation blocks (see the
 ## Current state
 
 As of 2026-10-20 all phases below are **Done**, the last closed block is
-[0067](blocks/0067-latest-release.md) and the current release is
+[0068](blocks/0068-pull-request-workflow.md) and the current release is
 **v1.3.1** (tags `v1.0.0`, `v1.1.0`, `v1.2.0` to `v1.2.4`, `v1.3.0`,
 `v1.3.1`; `v1.2.0` has no GitHub Release because its CI run failed, fixed
 by block 0059; `v1.3.0` has none because `npm audit` failed on a new
@@ -25,40 +25,35 @@ order), `v1.2.3` block 0062 (card color on the Current status panel),
 `v1.3.1` runs on the reference Raspberry Pi; the owner deployed it and
 verified `sudo marionette pair` there on 2026-10-12 (the upgrade and
 rollback procedure from the README was verified with `v1.2.1`). New work starts as a new requirement and block
-per the development workflow.
+per the development workflow and reaches `main` through a pull request
+(block 0068).
 
 ## Backlog
 
 Known follow-up work, recorded on 2026-10-20 after block 0067. The owner
-approved items 1–8 as proposed on 2026-10-20; each item becomes a block
+approved the items as proposed on 2026-10-20; each item becomes a block
 (and an ADR where noted) before it is implemented. Ordered by priority.
-The dev container rebuild that was originally first is done (`go version`
-reports go1.27.3, 2026-10-20).
+Done since: the dev container rebuild (`go version` reports go1.27.3) and
+the move to pull requests (block 0068), both 2026-10-20.
 
-1. **Move to pull requests.** Direct pushes to `main` bypass the ruleset
-   that requires the three CI checks. Decided 2026-10-20: all changes go
-   through standard pull requests; the development workflow and
-   `AGENTS.md` are updated accordingly. Planned as block
-   [0068 — Changes reach `main` through pull requests](blocks/0068-pull-request-workflow.md)
-   (**Approved**).
-2. **Duplicate release runs for one tag.** GitHub started two Release runs
+1. **Duplicate release runs for one tag.** GitHub started two Release runs
    for the `v1.2.4` tag push; the second failed with "a release with the
    same tag name already exists" (the release itself was fine). Proposal:
    a `concurrency` group per tag in `release.yml` and skipping an existing
    release instead of failing.
-3. **`govulncheck` in CI.** The outdated Go in the dev container was found
+2. **`govulncheck` in CI.** The outdated Go in the dev container was found
    by chance (block 0066). A `govulncheck ./...` step in `ci.yml` would
    check Go the way `npm audit` checks the web part.
-4. **`@primevue/themes` → `@primeuix/themes`.** The package is deprecated
+3. **`@primevue/themes` → `@primeuix/themes`.** The package is deprecated
    and only wraps `@primeuix/themes`; `web/src/theme/preset.ts` imports
    `definePreset` and Aura from it. An import and dependency change,
    PrimeVue stays on v4.
-5. **TypeScript 7.** Major version; needs a changelog check and an ADR
+4. **TypeScript 7.** Major version; needs a changelog check and an ADR
    (`docs/devops/ci-cd.md`).
-6. **happy-dom 21.** Major version of a test dependency.
-7. **Bundle size.** The main JS chunk is about 610 kB (150 kB gzip) and
+5. **happy-dom 21.** Major version of a test dependency.
+6. **Bundle size.** The main JS chunk is about 610 kB (150 kB gzip) and
    Vite warns above 500 kB; code splitting would reduce it. Low priority.
-8. **Rollback on the Pi.** The README rollback procedure was last verified
+7. **Rollback on the Pi.** The README rollback procedure was last verified
    with `v1.2.1`; the unit and the control socket changed since (block
    0065). Repeat it with the next upgrade.
 
@@ -340,6 +335,9 @@ passkeys once there is TLS (ADR-0011), UI localization (ADR-0007). PrimeVue
   8. [0067 — Installing the latest release](blocks/0067-latest-release.md)
      — **Done** (2026-10-20); FR-06, the README installs GitHub's Latest
      release without typing its version.
+  9. [0068 — Changes reach `main` through pull requests](blocks/0068-pull-request-workflow.md)
+     — **Done** (2026-10-20); the "Protect main" ruleset requires a pull
+     request, the admin bypass applies only within one, squash merge only.
 
   The open questions from the review are decided in
   [requirements.md, section 13](../requirements/requirements.md#13-decisions--project-review-2026-09-26)

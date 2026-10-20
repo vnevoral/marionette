@@ -91,7 +91,11 @@ AI coding agents working in this repository start at
 
 ## Pull requests
 
+- Every change reaches `main` through a pull request, the maintainer's
+  included; direct pushes to `main` are refused.
 - Keep a pull request focused on one change.
+- The pull request is squash-merged with its title as the commit subject,
+  so write the title in the `type: summary` style.
 - Fill in the pull request template: what changed, why, which requirement
   or block it covers and how it was verified.
 - Update the documentation that describes the changed behavior (README,

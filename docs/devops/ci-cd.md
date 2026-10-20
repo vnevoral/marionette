@@ -29,7 +29,25 @@ passes the same checks.
 The same suite (except the `e2e` job, locally `make e2e`) is run locally by
 `make verify`; CI only mirrors it. The CI run
 must pass cleanly (lint warnings fail the build, they are not suppressed)
-before merging into the main branch. Dependabot (`.github/dependabot.yml`)
+before merging into the main branch.
+
+### Pull requests and `main`
+
+Changes reach `main` only through pull requests (block 0068). The
+"Protect main" ruleset on the default branch:
+
+- requires a pull request (0 approvals, the project has a single
+  maintainer) and the `backend`, `web` and `e2e` checks;
+- forbids deleting `main` and force pushes;
+- lets the admin role bypass the rules only within a pull request (an
+  emergency merge, for example during a CI outage); direct pushes are
+  refused for everyone.
+
+Pull requests are squash-merged (merge commits and rebase merges are
+disabled): the commit subject is the pull request title, the body the
+branch's commit messages, and the branch is deleted after the merge.
+
+Dependabot (`.github/dependabot.yml`)
 opens weekly PRs for Go modules, npm and GitHub Actions; major versions of
 key UI dependencies are excluded (ADR-0003, ADR-0010).
 
@@ -58,7 +76,9 @@ version from `git describe`.
 
 ### Procedure (release from CI, block 0057)
 
-1. On a clean tree, create a tag: `git tag -a vX.Y.Z -m "…"`.
+1. After the last pull request is merged, update `main`
+   (`git switch main && git pull`) and on a clean tree create a tag:
+   `git tag -a vX.Y.Z -m "…"`. Tags are not covered by the branch ruleset.
 2. `git push origin vX.Y.Z`. Pushing a tag of the form `v*.*.*` triggers
    `.github/workflows/release.yml`:
    - the `ci` job calls the whole `ci.yml` (backend, web, e2e); if it does

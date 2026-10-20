@@ -118,6 +118,12 @@ For the individual steps use the prompts in `.github/prompts/`:
 - `/plan-block` — elaborate a roadmap phase into a concrete implementation block
 - `/implement-block` — implement one approved block incl. tests
 
+Changes reach `main` only through a pull request (block 0068): work on a
+branch, push it and open a pull request with the template filled in; never
+push to `main`. GitHub refuses direct pushes, the three CI checks must
+pass and the pull request is squash-merged with its title as the commit
+subject, so the title follows the `type: summary` style.
+
 Do not implement functionality that is not covered by a requirement, any
 accepted ADR, and an approved implementation block in the roadmap. The
 detailed rules for statuses, approval, deviations and the Definition of
