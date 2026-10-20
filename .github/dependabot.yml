@@ -4,10 +4,16 @@ updates:
     directory: /
     schedule:
       interval: weekly
+    # Only versions at least two weeks old (ci-cd.md, block 0078).
+    cooldown:
+      default-days: 14
   - package-ecosystem: npm
     directory: /web
     schedule:
       interval: weekly
+    # Only versions at least two weeks old (ci-cd.md, block 0078).
+    cooldown:
+      default-days: 14
     ignore:
       # Major upgrades of core UI dependencies require an ADR (ADR-0003,
       # ADR-0014); a new major of reka-ui or @lucide/vue is also checked
@@ -28,3 +34,6 @@ updates:
     directory: /
     schedule:
       interval: weekly
+    # Only versions at least two weeks old (ci-cd.md, block 0078).
+    cooldown:
+      default-days: 14

@@ -96,7 +96,11 @@ Done refer to it). During fast iteration you can use the partial
   returned, `panic` is not used outside the `internal/webui` initialization
   of the embedded FS.
 - Vue/TS: `<script setup lang="ts">`, the shared components in `web/src/ui/`
-  (on Reka UI, ADR-0014) instead of ad-hoc UI elements, tab indentation (see `.prettierrc.json`), ESLint flat config.
+  (on Reka UI, ADR-0014) instead of ad-hoc UI elements, tab indentation
+  (see `.prettierrc.json`), ESLint flat config.
+- Dependencies: add or update to a version released at least two weeks
+  earlier (security fixes excepted); see "Dependency versioning" in
+  [docs/devops/ci-cd.md](docs/devops/ci-cd.md).
 - The application configuration (action cards) is a single JSON file — do
   not introduce an external database without a new ADR that justifies it
   (see [ADR-0004](docs/architecture/decisions/0004-action-card-domain-model.md)).

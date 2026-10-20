@@ -13,7 +13,7 @@ one or more concrete implementation blocks (see the
 ## Current state
 
 As of 2026-10-20 all phases below are **Done**, the last closed block is
-[0077](blocks/0077-release-notes.md) and the current release is
+[0078](blocks/0078-dependabot-cooldown.md) and the current release is
 **v2.0.0** (tags `v1.0.0`, `v1.1.0`, `v1.2.0` to `v1.2.4`, `v1.3.0`,
 `v1.3.1`, `v2.0.0`; `v1.2.0` has no GitHub Release because its CI run
 failed, fixed by block 0059; `v1.3.0` has none because `npm audit` failed on a new
@@ -376,6 +376,9 @@ was replaced by Reka UI and own components (ADR-0014, backlog item 4).
   18. [0077 — Hand-written release notes](blocks/0077-release-notes.md) —
      **Done** (2026-10-20); every tag needs `docs/releases/<tag>.md`, the
      Release workflow fails at once without it; notes for v2.0.0.
+  19. [0078 — Dependabot cooldown](blocks/0078-dependabot-cooldown.md) —
+     **Done** (2026-10-20); Dependabot proposes only versions at least 14
+     days old, the two-week rule is documented.
 
   The open questions from the review are decided in
   [requirements.md, section 13](../requirements/requirements.md#13-decisions--project-review-2026-09-26)
