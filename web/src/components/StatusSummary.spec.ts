@@ -1,6 +1,5 @@
 import { describe, expect, it } from "vitest";
 import { mount } from "@vue/test-utils";
-import PrimeVue from "primevue/config";
 import type { Run, StatusSnapshot } from "@/api";
 import StatusSummary from "@/components/StatusSummary.vue";
 
@@ -28,7 +27,6 @@ function mountSummary(props: {
 }) {
 	return mount(StatusSummary, {
 		props: { hasStatus: true, ...props },
-		global: { plugins: [PrimeVue] },
 	});
 }
 

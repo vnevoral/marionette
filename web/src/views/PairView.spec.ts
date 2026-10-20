@@ -2,7 +2,6 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { flushPromises, mount } from "@vue/test-utils";
 import { h } from "vue";
 import { createMemoryHistory, createRouter, RouterView } from "vue-router";
-import PrimeVue from "primevue/config";
 import { ApiError, getSession, pairDevice, type Device } from "@/api";
 import { setSession, useSession } from "@/composables/useSession";
 import { fakeToast } from "@/test/fakeToast";
@@ -35,7 +34,7 @@ async function mountPair(path: string) {
 	const toast = fakeToast();
 	const wrapper = mount(
 		{ render: () => h(RouterView) },
-		{ global: { plugins: [router, PrimeVue], provide: toast.provide } },
+		{ global: { plugins: [router], provide: toast.provide } },
 	);
 	await flushPromises();
 	return { wrapper, router, toast };

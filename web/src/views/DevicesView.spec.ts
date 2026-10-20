@@ -2,7 +2,6 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { flushPromises, mount } from "@vue/test-utils";
 import { h } from "vue";
 import { createMemoryHistory, createRouter } from "vue-router";
-import PrimeVue from "primevue/config";
 import {
 	ApiError,
 	createPairingCode,
@@ -50,7 +49,7 @@ async function mountDevices() {
 	const confirm = fakeConfirm();
 	const toast = fakeToast();
 	const wrapper = mount(DevicesView, {
-		global: { plugins: [router, PrimeVue], provide: { ...confirm.provide, ...toast.provide } },
+		global: { plugins: [router], provide: { ...confirm.provide, ...toast.provide } },
 	});
 	await flushPromises();
 	return { wrapper, router, confirm, toast };

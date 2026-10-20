@@ -145,3 +145,8 @@ library and icons (Vue 3, Vite and `vue-router` stay) and updates ADR-0007
   3. feedback: toast and confirmation dialog, the services removed;
   4. removal of PrimeVue, `@primeuix/*`, `primeicons` and the preset;
      documentation (FR-23, ADR-0003/0007 notes, UX spec).
+
+> Added 2026-10-20: implemented in blocks 0073 (foundation), 0074 (form
+> controls), 0075 (toast and confirmation dialog) and 0076 (removal). No
+> PrimeTek package is left; the JS bundle went from 152 kB to 114 kB gzip.
+> Dependabot ignores the major versions of `reka-ui` and `@lucide/vue`.

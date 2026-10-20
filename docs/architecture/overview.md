@@ -28,7 +28,7 @@ reshaped each one.
 | ---------------------- | ----------------- | --------------------------------------------------------------- | ------------------------------------------- |
 | HTTP server / routing  | `internal/server` | API routes, SPA fallback with cache headers                     | Implemented — phase 5, 0028                 |
 | Embedded UI            | `internal/webui`  | `go:embed` `web/dist`                                           | Implemented                                 |
-| SPA (Vue 3 + PrimeVue) | `web/src`         | Dashboard, card detail, card editor, pairing and Devices screens, version footer; shared SSE stream with REST fallback (`composables/`), status vocabulary and formatting (`ui/`), shared components (`components/`), PrimeVue preset (`theme/`) | Implemented — phases 6, 8, 9 (0029–0059)    |
+| SPA (Vue 3, Reka UI)   | `web/src`         | Dashboard, card detail, card editor, pairing and Devices screens, version footer; shared SSE stream with REST fallback (`composables/`), status vocabulary, formatting, base components and icons (`ui/`, ADR-0014), shared patterns (`components/`) | Implemented — phases 6, 8, 9 (0029–0059)    |
 | Device access          | `internal/access` | Paired devices, pairing codes, device tokens, `devices.json` persistence (ADR-0011) | Implemented — 0043, 0052                    |
 | Control socket         | `internal/control` | Local Unix socket for `marionette pair` (one route, pairing code), and its client (ADR-0013) | Implemented — 0065                          |
 | Entrypoint and CLI     | `cmd/marionette`  | Service composition, lifecycle and shutdown; `marionette pair` / `help` subcommands | Implemented — 0034, 0065                    |

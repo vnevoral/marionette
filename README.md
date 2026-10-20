@@ -6,8 +6,7 @@
 
 Marionette is a small self-hosted web dashboard for running predefined
 commands on a Linux host and watching the result. It ships as a single
-binary (Go backend with an embedded Vue 3 + PrimeVue single-page
-application) that runs as a systemd service; the reference target is a
+binary (Go backend with an embedded Vue 3 single-page application) that runs as a systemd service; the reference target is a
 Raspberry Pi running Ubuntu (linux/arm64). Nothing else — no Node.js, no
 database, no separate web server — is installed on the target.
 
@@ -15,7 +14,7 @@ Released versions and their notes are on
 [GitHub Releases](https://github.com/vnevoral/marionette/releases). The
 running version is shown in the UI footer and in `GET /api/health`.
 
-![Marionette dashboard with one action card](docs/images/dashboard.png)
+![Marionette dashboard with three action cards: two healthy, one with a problem](docs/images/dashboard.png)
 
 ## Features
 
@@ -57,7 +56,7 @@ running version is shown in the UI footer and in `GET /api/health`.
 - `internal/events` — event broker feeding SSE (status changes, recorded runs)
 - `internal/fsutil` — atomic file writes
 - `internal/webui` — embeds `web/dist` (the built SPA) into the Go binary via `go:embed`
-- `web` — Vue 3 + PrimeVue SPA source (built with Vite)
+- `web` — Vue 3 SPA source (own components on Reka UI, Lucide icons; built with Vite)
 
 ## Development
 

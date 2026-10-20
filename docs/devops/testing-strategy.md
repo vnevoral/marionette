@@ -32,7 +32,7 @@
   `prettier --check` are a mandatory part of CI and `make verify`.
 - Unit and component tests run in **Vitest** (`npm test`, part of
   `make test` and of the CI job `web`) in the `happy-dom` environment;
-  components are mounted via Vue Test Utils with the PrimeVue plugin. The
+  components are mounted via Vue Test Utils. The
   `src/**/*.spec.ts` files sit next to the code under test, share the Vite
   configuration (`vitest.config.ts`, alias `@`) and do not end up in the
   bundle. Tested are the pure logic (the API layer `api.ts` via a `fetch`
@@ -43,13 +43,14 @@
   that `onBeforeRouteLeave` applies; `ActionEditor` including accessible
   names, `ConnectionStatus`, `StatusBadge`, `ActionCard` for each state,
   `StatusTimeline` with durations) and the vocabulary/formatting
-  (`ui/vocabulary`, `ui/format`) — the appearance of the PrimeVue components
-  themselves is not tested. REST
+  (`ui/vocabulary`, `ui/format`) and the base components in `ui/` (props,
+  states, wiring; keyboard and ARIA behaviour of the Reka UI primitives is
+  covered by Reka UI itself). REST
   functions are mocked via `vi.mock("@/api")` with a partial override, SSE
   via the shared `src/test/fakeEventSource.ts`
-  (`vi.stubGlobal("EventSource", …)`), the confirmation dialog via
-  `src/test/fakeConfirm.ts` (provide instead of `ConfirmationService`, the
-  test calls `accept`/`reject`).
+  (`vi.stubGlobal("EventSource", …)`), the confirmation dialog and the toast via
+  `src/test/fakeConfirm.ts` and `src/test/fakeToast.ts` (they provide the
+  `ui/feedback.ts` services; the test calls `accept`/`reject`).
   Coverage: `npm run test:coverage` (v8); the goal for `api.ts` and pure
   modules is ~80 %+. Every view (including `PairView` and `DevicesView`)
   has its own spec; `useCardActivity` is covered through

@@ -10,15 +10,11 @@ updates:
       interval: weekly
     ignore:
       # Major upgrades of core UI dependencies require an ADR (ADR-0003,
-      # ADR-0010: PrimeVue 5 changed its licence, the project stays on v4;
-      # @primeuix/themes 3.x belongs to PrimeVue 5).
-      - dependency-name: primevue
+      # ADR-0014); a new major of reka-ui or @lucide/vue is also checked
+      # for a licence change.
+      - dependency-name: reka-ui
         update-types: ["version-update:semver-major"]
-      - dependency-name: "@primeuix/themes"
-        update-types: ["version-update:semver-major"]
-      # primeicons 8.x is under the PrimeUI License too; 7.x is MIT
-      # (block 0072).
-      - dependency-name: primeicons
+      - dependency-name: "@lucide/vue"
         update-types: ["version-update:semver-major"]
       - dependency-name: vue
         update-types: ["version-update:semver-major"]

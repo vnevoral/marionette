@@ -48,7 +48,7 @@ only then change the code.
 - `internal/events` — event broker for SSE (status changes, recorded runs)
 - `internal/fsutil` — atomic file writes shared by the config and device stores
 - `internal/webui` — `go:embed` of the built `web/dist` into the binary
-- `web` — Vue 3 + PrimeVue 4 (Aura theme) SPA, built via Vite into
+- `web` — Vue 3 SPA with own components on Reka UI and Lucide icons, built via Vite into
   `internal/webui/dist`
 
 The result of `make build` is a single binary with no external runtime
@@ -95,8 +95,8 @@ Done refer to it). During fast iteration you can use the partial
   `make lint`), packages without unnecessary abstractions, errors are
   returned, `panic` is not used outside the `internal/webui` initialization
   of the embedded FS.
-- Vue/TS: `<script setup lang="ts">`, PrimeVue components instead of custom
-  UI elements, tab indentation (see `.prettierrc.json`), ESLint flat config.
+- Vue/TS: `<script setup lang="ts">`, the shared components in `web/src/ui/`
+  (on Reka UI, ADR-0014) instead of ad-hoc UI elements, tab indentation (see `.prettierrc.json`), ESLint flat config.
 - The application configuration (action cards) is a single JSON file — do
   not introduce an external database without a new ADR that justifies it
   (see [ADR-0004](docs/architecture/decisions/0004-action-card-domain-model.md)).
