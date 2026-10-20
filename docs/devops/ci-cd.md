@@ -69,7 +69,9 @@ release is `v1.0.0`):
 - **MAJOR** — an incompatible change to the configuration, API or
   installation procedure.
 
-The tag is created and pushed by the project owner. `make release-arm64`
+The tag is created and pushed by the project owner, or by the coding agent
+when the owner asks for a release; the agent then also writes the release
+notes. `make release-arm64`
 takes the version exclusively from a tag of the form `vMAJOR.MINOR.PATCH`
 exactly on `HEAD` (`deploy/release_version.sh`) and refuses to build a
 release if `HEAD` has no such tag or the working tree contains uncommitted
@@ -80,11 +82,16 @@ version from `git describe`.
 
 ### Procedure (release from CI, block 0057)
 
-1. After the last pull request is merged, update `main`
+1. Write the release notes `docs/releases/vX.Y.Z.md` (format in
+   [docs/releases/README.md](../releases/README.md)) and merge them through
+   a pull request with the last changes of the release.
+2. After the last pull request is merged, update `main`
    (`git switch main && git pull`) and on a clean tree create a tag:
    `git tag -a vX.Y.Z -m "…"`. Tags are not covered by the branch ruleset.
-2. `git push origin vX.Y.Z`. Pushing a tag of the form `v*.*.*` triggers
+3. `git push origin vX.Y.Z`. Pushing a tag of the form `v*.*.*` triggers
    `.github/workflows/release.yml`:
+   - the `notes` job fails at once if `docs/releases/vX.Y.Z.md` is missing
+     or empty, before CI and the build (block 0077);
    - the `ci` job calls the whole `ci.yml` (backend, web, e2e); if it does
      not pass, no release is created;
    - the `release` job runs `make release-arm64` on a clean checkout with
@@ -98,32 +105,33 @@ version from `git describe`.
      published with both assets succeeds without changing it; a draft or a
      release missing an asset fails the run (block 0069).
      GitHub marks the newest release as **Latest** automatically; the
-     README installs that release (FR-06). The notes are generated from the
-     commits. Only this job has the `contents: write` permission.
-3. On the target host, the archive and the `.sha256` are downloaded from
+     README installs that release (FR-06). The notes are the file
+     `docs/releases/vX.Y.Z.md`, followed by GitHub's generated list of
+     changes. Only this job has the `contents: write` permission.
+4. On the target host, the archive and the `.sha256` are downloaded from
    GitHub Releases (README, "Installation on Linux with systemd"); the
    reference verification runs on a Raspberry Pi ARM64 with Ubuntu 24.x. In
    the directory with both files, integrity is verified with
    `sha256sum -c marionette-vX.Y.Z-linux-arm64.tar.gz.sha256`.
-4. After unpacking, run `sudo ./install.sh ./marionette-linux-arm64`.
+5. After unpacking, run `sudo ./install.sh ./marionette-linux-arm64`.
    The script installs the unit, keeps the existing configuration and
    performs `systemctl enable` + start/restart of the service.
-5. The deployed version is verified via
+6. The deployed version is verified via
    `curl -s http://localhost:8080/api/health` (the `version` field must
    match the tag) or in the UI footer (FR-41a).
-6. An upgrade uses the same script with the new binary; the data
+7. An upgrade uses the same script with the new binary; the data
    (`marionette.json`, `devices.json`) and `/etc/default/marionette` are
    kept, the binary and the unit are overwritten. A rollback runs the
    installer of the previous release (previous releases stay in GitHub
    Releases). The procedure with backup, checks and a rollback across a
    MAJOR version is in the README, section "Upgrading and rolling back".
-7. No step requires installing Go, Node.js or any other runtime on the
+8. No step requires installing Go, Node.js or any other runtime on the
    target.
 
 Fallback manual procedure (without GitHub or during a CI outage): after
-step 1, run `make release-arm64` locally. The archive and the `.sha256` are
+step 2, run `make release-arm64` locally. The archive and the `.sha256` are
 created in `bin/` and copied to the host manually; then continue with
-step 3.
+step 4.
 
 ## Dependency versioning
 
