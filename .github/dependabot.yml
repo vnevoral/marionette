@@ -16,6 +16,10 @@ updates:
         update-types: ["version-update:semver-major"]
       - dependency-name: "@primeuix/themes"
         update-types: ["version-update:semver-major"]
+      # primeicons 8.x is under the PrimeUI License too; 7.x is MIT
+      # (block 0072).
+      - dependency-name: primeicons
+        update-types: ["version-update:semver-major"]
       - dependency-name: vue
         update-types: ["version-update:semver-major"]
       - dependency-name: vite

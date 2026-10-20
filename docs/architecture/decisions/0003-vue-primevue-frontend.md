@@ -58,3 +58,8 @@ after reviewing the changelog/migration and updating this ADR.
 > on, instead of the deprecated `@primevue/themes` wrapper. `@primeuix/themes`
 > 3.x belongs to PrimeVue 5 and its licence; Dependabot ignores its major
 > versions.
+
+> Added 2026-10-20 (block 0072): `primeicons` 8.x (2026-07-15) is under the
+> PrimeUI License with a license key as well; the project had used `^8` since
+> its first commit. It is pinned to the MIT 7.x line, which has every icon
+> the UI uses, and Dependabot ignores its major versions.
