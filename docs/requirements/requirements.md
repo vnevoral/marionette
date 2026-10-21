@@ -129,8 +129,11 @@ distributed as a single executable file.
   state and is not recorded in the status history; the card keeps waiting
   for the next check. When the window ends without a successful check, the
   last check decides the state (normally Problem) and only then is a change
-  recorded. A primary action that fails or times out ends the wait at once,
-  since there is nothing to confirm. Waiting applies only to cards with
+  recorded. A primary action that times out is treated like a successful
+  one, because it may still have done its work (for example a start command
+  that does not return): the window starts and the checks decide. A primary
+  action that fails ends the wait at once, since there is nothing to
+  confirm. Waiting applies only to cards with
   fast polling (FR-15a); it is visible to every client through the status
   projection and the event stream (FR-42) and is not persisted: after a
   restart the card shows its last confirmed state.

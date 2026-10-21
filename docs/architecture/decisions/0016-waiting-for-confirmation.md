@@ -29,8 +29,9 @@ between neither shown nor recorded.
   action finishes, at most for the action's timeout, a 30 s queue margin
   and the fast polling window. The action queue reports every finished
   primary action to the scheduler.
-- When the action has finished successfully, the fast polling window
-  starts and the wait lasts until its end. A failed or timed-out action
+- When the action has finished successfully or timed out, the fast polling
+  window starts and the wait lasts until its end; a timed-out action may
+  still have done its work, so only the checks can tell. A failed action
   ends the wait at once.
 - While the card waits, a check that is not healthy only updates the
   latest check (`checkedAt`, `lastCheck`), with no event. A healthy check,

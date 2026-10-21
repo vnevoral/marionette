@@ -266,8 +266,10 @@ func (scheduler *Scheduler) NotifyPrimaryAction(cardID string) error {
 
 // PrimaryActionFinished starts fast polling and the confirmation window of
 // a card whose primary action was notified and has now finished (FR-15a,
-// FR-15b). An action that did not succeed has nothing to confirm, so the
-// wait ends at once; fast polling runs either way.
+// FR-15b). A timed-out action may still have done its work (a start command
+// that never returns), so it is confirmed like a successful one; an action
+// that failed has nothing to confirm and the wait ends at once. Fast polling
+// runs either way.
 func (scheduler *Scheduler) PrimaryActionFinished(cardID string, outcome config.RunOutcome) {
 	card, exists := scheduler.store.GetCard(cardID)
 	if !exists || !confirmsPrimaryAction(card) {
@@ -283,7 +285,7 @@ func (scheduler *Scheduler) PrimaryActionFinished(cardID string, outcome config.
 	scheduler.fastUntil[cardID] = until
 	worker := scheduler.workers[cardID]
 	scheduler.mu.Unlock()
-	if outcome == config.RunOutcomeOK {
+	if outcome == config.RunOutcomeOK || outcome == config.RunOutcomeTimeout {
 		_ = scheduler.store.ExtendWaiting(cardID, until)
 	} else {
 		_ = scheduler.store.EndWaiting(cardID)

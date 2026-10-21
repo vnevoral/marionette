@@ -491,12 +491,36 @@ func TestSchedulerEndsTheWaitWhenThePrimaryActionFails(t *testing.T) {
 		t.Fatalf("NotifyPrimaryAction() error = %v", err)
 	}
 	<-clock.durations
-	scheduler.PrimaryActionFinished("failed", config.RunOutcomeTimeout)
+	scheduler.PrimaryActionFinished("failed", config.RunOutcomeFail)
 	if _, waiting := scheduler.store.WaitingUntil("failed"); waiting {
-		t.Fatal("card still waits after its primary action timed out")
+		t.Fatal("card still waits after its primary action failed")
 	}
 	if duration := <-clock.durations; duration != 2*time.Second {
 		t.Fatalf("timer duration = %v, want fast polling to continue", duration)
+	}
+}
+
+func TestSchedulerKeepsWaitingWhenThePrimaryActionTimesOut(t *testing.T) {
+	scheduler, clock, checker, cancel := newTestScheduler(t, "slow", 10, 2, 30)
+	defer cancel()
+	defer stopScheduler(t, scheduler)
+	waitForTimer(t, clock)
+	<-clock.durations
+	waitForInitialCheck(t, checker, "slow")
+	if err := scheduler.NotifyPrimaryAction("slow"); err != nil {
+		t.Fatalf("NotifyPrimaryAction() error = %v", err)
+	}
+	<-clock.durations
+	scheduler.PrimaryActionFinished("slow", config.RunOutcomeTimeout)
+	until, waiting := scheduler.store.WaitingUntil("slow")
+	if !waiting {
+		t.Fatal("card stopped waiting after its primary action timed out")
+	}
+	if want := clock.Now().Add(30 * time.Second); !until.Equal(want) {
+		t.Fatalf("waiting until = %v, want the end of the fast window %v", until, want)
+	}
+	if duration := <-clock.durations; duration != 2*time.Second {
+		t.Fatalf("timer duration = %v, want fast polling", duration)
 	}
 }
 
