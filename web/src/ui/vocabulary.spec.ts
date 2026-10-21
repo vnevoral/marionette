@@ -11,7 +11,7 @@ import {
 	statusPresentation,
 } from "@/ui/vocabulary";
 
-const states: StatusState[] = ["unknown", "ok", "fail"];
+const states: StatusState[] = ["unknown", "ok", "fail", "waiting"];
 const outcomes: Run["outcome"][] = ["ok", "fail", "timeout", "canceled"];
 const rawValues = ["ok", "fail", "accepted", "running", "timeout"];
 

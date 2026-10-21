@@ -2,13 +2,12 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { effectScope, ref } from "vue";
 import { getStatus, type ActionCard, type StatusSnapshot } from "@/api";
 import {
-	defaultMaxWaitMs,
 	expectsFollowUpCheck,
 	isNewerCheck,
 	statusCheckQueueMarginMs,
 	supersedes,
+	statusWaitBudgetMs,
 	useCardStatus,
-	waitBudgetMs,
 	waitForNewerStatus,
 } from "@/composables/useCardStatus";
 import { FakeEventSource } from "@/test/fakeEventSource";
@@ -89,18 +88,9 @@ describe("expectsFollowUpCheck", () => {
 		expect(expectsFollowUpCheck({ ...polled, status: undefined }, "status")).toBe(false);
 	});
 
-	it("waits for the fast polling window after a primary action, or the default budget", () => {
-		expect(waitBudgetMs(polled, "primary")).toBe(120_000);
-		expect(waitBudgetMs({ ...polled, fastPollingWindowSeconds: 30 }, "primary")).toBe(30_000);
-		expect(waitBudgetMs({ ...polled, fastPollingWindowSeconds: undefined }, "primary")).toBe(
-			defaultMaxWaitMs,
-		);
-	});
-
 	it("bounds a manual status check by the status action timeout plus the queue margin", () => {
-		const slow = { ...polled, fastPollingWindowSeconds: 10, status: { ...action, timeoutSec: 30 } };
-		expect(waitBudgetMs(slow, "status")).toBe(30_000 + statusCheckQueueMarginMs);
-		expect(waitBudgetMs({ ...slow, status: undefined }, "status")).toBe(10_000);
+		const slow = { ...polled, status: { ...action, timeoutSec: 30 } };
+		expect(statusWaitBudgetMs(slow)).toBe(30_000 + statusCheckQueueMarginMs);
 	});
 });
 

@@ -162,6 +162,13 @@ async function performDelete(target: ActionCard) {
 }
 
 watch(cardID, () => void loadDetail(), { immediate: true });
+// A confirmation window that ends may record a status change (FR-15b).
+watch(
+	() => status.value?.state,
+	(state, previous) => {
+		if (previous === "waiting" && state !== "waiting") void activity.loadHistory();
+	},
+);
 
 onBeforeUnmount(() => {
 	pendingWait?.abort();

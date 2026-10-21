@@ -348,6 +348,11 @@ const (
 	StatusStateOK StatusState = "ok"
 	// StatusStateFail means that the status action reports an unhealthy state.
 	StatusStateFail StatusState = "fail"
+	// StatusStateWaiting means that a primary action was triggered and the
+	// card waits for a status check to confirm it (FR-15b). It is a runtime
+	// state of the projection only: it is never stored in the status
+	// history or persisted.
+	StatusStateWaiting StatusState = "waiting"
 )
 
 // StatusChange records one interval in a card status state history.
@@ -360,11 +365,13 @@ type StatusChange struct {
 
 // StatusSnapshot contains the latest status check and its interpreted state.
 // A card that has never been checked has a zero CheckedAt; its JSON form
-// carries only "state" (see MarshalJSON).
+// carries only "state" (see MarshalJSON). WaitingUntil is set only in the
+// waiting state: the end of the confirmation window.
 type StatusSnapshot struct {
-	State     StatusState `json:"state"`
-	CheckedAt time.Time   `json:"checkedAt"`
-	LastCheck Run         `json:"lastCheck"`
+	State        StatusState `json:"state"`
+	CheckedAt    time.Time   `json:"checkedAt"`
+	LastCheck    Run         `json:"lastCheck"`
+	WaitingUntil *time.Time  `json:"waitingUntil,omitempty"`
 }
 
 // MarshalJSON omits checkedAt and lastCheck while the card has never been
@@ -374,8 +381,9 @@ func (snapshot StatusSnapshot) MarshalJSON() ([]byte, error) {
 	type plain StatusSnapshot
 	if snapshot.CheckedAt.IsZero() {
 		return json.Marshal(struct {
-			State StatusState `json:"state"`
-		}{State: snapshot.State})
+			State        StatusState `json:"state"`
+			WaitingUntil *time.Time  `json:"waitingUntil,omitempty"`
+		}{State: snapshot.State, WaitingUntil: snapshot.WaitingUntil})
 	}
 	return json.Marshal(plain(snapshot))
 }

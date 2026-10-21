@@ -1,4 +1,4 @@
-# Marionette Requirements (SRS) — v0.14
+# Marionette Requirements (SRS) — v0.15
 
 > Status: **refined** (phase 1 and UX specification, 2026-09-25; extended with
 > an SSE stream for live status changes, 2026-09-25; extended with two polling
@@ -12,7 +12,8 @@
 > FR-57 device renaming, 2026-09-27; FR-10a card color, 2026-09-27;
 > FR-06, FR-41a and FR-42a, 2026-09-27; FR-58 pairing code from the host,
 > 2026-10-12; FR-06 installing the latest release, 2026-10-20; FR-23 UI
-> components without PrimeVue, ADR-0014, 2026-10-20).
+> components without PrimeVue, ADR-0014, 2026-10-20; FR-15b waiting for
+> confirmation of a primary action, ADR-0016, 2026-10-21).
 > The open questions from v0.1 were decided
 > with the project owner, see [Phase 1 decisions](#7-phase-1-decisions-2026-09-25),
 > [Decisions — polling and termination](#9-decisions--polling-and-termination-2026-09-25)
@@ -112,13 +113,31 @@ distributed as a single executable file.
   interval is **60 s**; polling can be turned off completely for a given
   card. Standard polling is a prerequisite for FR-15a (fast polling) —
   without standard polling enabled, fast polling is not activated.
-- **FR-15a**: Immediately after the **primary action** of a card is triggered
-  (manual or future scheduled run), the status action temporarily switches to
-  the **fast polling interval**, default **10 s**, for a default
-  **120 s** (both values configurable globally/per card). After this period
-  the card returns to the standard polling interval (FR-15). If the card
-  does not have standard polling enabled, fast polling is not activated
-  (see FR-15).
+- **FR-15a** _(updated 2026-10-21)_: After the **primary action** of a card
+  has finished successfully (manual or future scheduled run), the status action
+  temporarily switches to the **fast polling interval**, default **10 s**,
+  for a default **120 s** (both values configurable globally/per card).
+  While the primary action is queued or running, the scheduled status
+  checks of the card wait for it. A primary action that fails or times out
+  does not start fast polling; the card stays on its standard interval.
+  After the fast polling window the card
+  returns to the standard polling interval (FR-15). If the card does not
+  have standard polling enabled, fast polling is not activated (see FR-15).
+- **FR-15b** _(added 2026-10-21, ADR-0016)_: From the moment a primary action
+  is accepted until the end of its fast polling window (FR-15a), the card is
+  in the state **Waiting**: the status checks are expected to confirm the
+  action. A successful check ends the wait at once and the card becomes
+  Healthy. A failed check during the window does not change the card's
+  state and is not recorded in the status history; the card keeps waiting
+  for the next check. When the window ends without a successful check, the
+  last check decides the state (normally Problem) and only then is a change
+  recorded. A primary action that fails or times out ends the wait at once
+  and starts no fast polling window, since there is nothing to confirm: a
+  timeout is an error, and the card author sets the action's timeout so
+  that the action always finishes and returns its result code. Waiting applies only to cards with
+  fast polling (FR-15a); it is visible to every client through the status
+  projection and the event stream (FR-42) and is not persisted: after a
+  restart the card shows its last confirmed state.
 - **FR-16**: An example reference use case: primary action = Wake-on-LAN
   packet to a MAC address; status action = `ping` to the IP/hostname of the
   target PC.
@@ -433,32 +452,33 @@ same day, see [section 13](#13-decisions--project-review-2026-09-26).
 The following open questions from v0.1 were decided with the project owner
 and reflected in the FR/NFR above:
 
-| Question                       | Decision                                                                                         |
-| ------------------------------ | ------------------------------------------------------------------------------------------------ |
-| Authentication/authorization   | None in the MVP; trusted network assumption (NFR-01).                                            |
-| Status action evaluation       | Exit code + optional output rule (regex) (FR-14).                                                |
-| Run history                    | Last N runs, default N = 20 (FR-17).                                                             |
-| Automatic polling              | Optional, per card, default interval 60 s (FR-15).                                               |
-| Command validation             | No whitelisting; only structured arguments, no shell string (NFR-01).                            |
-| Action output limit            | 4 KB combined stdout+stderr, the rest is truncated (FR-13).                                      |
-| Config file path / port        | `MARIONETTE_CONFIG` (default `./marionette.json`) / `MARIONETTE_ADDR` (default `:8080`) / `MARIONETTE_SHUTDOWN_TIMEOUT` (default `20s`) (FR-34). |
-| Number of actions per card     | 1 primary + 1 optional status action, more actions per card are not in the MVP (see FR-11, FR-12). |
-| Action execution concurrency   | Configurable limit, default 4 (FR-18, NFR-07).                                                   |
+| Question                     | Decision                                                                                                                                         |
+| ---------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Authentication/authorization | None in the MVP; trusted network assumption (NFR-01).                                                                                            |
+| Status action evaluation     | Exit code + optional output rule (regex) (FR-14).                                                                                                |
+| Run history                  | Last N runs, default N = 20 (FR-17).                                                                                                             |
+| Automatic polling            | Optional, per card, default interval 60 s (FR-15).                                                                                               |
+| Command validation           | No whitelisting; only structured arguments, no shell string (NFR-01).                                                                            |
+| Action output limit          | 4 KB combined stdout+stderr, the rest is truncated (FR-13).                                                                                      |
+| Config file path / port      | `MARIONETTE_CONFIG` (default `./marionette.json`) / `MARIONETTE_ADDR` (default `:8080`) / `MARIONETTE_SHUTDOWN_TIMEOUT` (default `20s`) (FR-34). |
+| Number of actions per card   | 1 primary + 1 optional status action, more actions per card are not in the MVP (see FR-11, FR-12).                                               |
+| Action execution concurrency | Configurable limit, default 4 (FR-18, NFR-07).                                                                                                   |
 
 ## 9. Decisions — polling and termination (2026-09-25)
 
-| Question                             | Decision                                                                                                                                           |
-| ------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Standard polling interval            | Default **60 s** (previously 30 s), per card (FR-15).                                                                                              |
-| Fast polling after the primary action | Default interval **10 s** for **120 s** from triggering the primary action, then back to standard (FR-15a).                                      |
-| Fast polling without standard polling | Not activated — fast polling is only a temporary boost of standard polling and requires it to be enabled (FR-15a).                               |
-| Forced termination after timeout     | The existing `TimeoutSec` (FR-11) is the binding maximum wait time; after expiry the execution engine kills the process (FR-19), no additional new parameter. |
+| Question                              | Decision                                                                                                                                                                        |
+| ------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Standard polling interval             | Default **60 s** (previously 30 s), per card (FR-15).                                                                                                                           |
+| Fast polling after the primary action | Default interval **10 s** for **120 s** from triggering the primary action, then back to standard (FR-15a).                                                                     |
+| Fast polling without standard polling | Not activated — fast polling is only a temporary boost of standard polling and requires it to be enabled (FR-15a).                                                              |
+| Waiting for confirmation (2026-10-21) | Fast polling and the window start when the primary action finishes; until then and during the window the card is Waiting and failed checks are not recorded (FR-15b, ADR-0016). |
+| Forced termination after timeout      | The existing `TimeoutSec` (FR-11) is the binding maximum wait time; after expiry the execution engine kills the process (FR-19), no additional new parameter.                   |
 
 ## 11. Decisions — history persistence on shutdown (2026-09-25)
 
-| Question                          | Decision                                                                                                                                                                                                                                                                                                                                 |
-| --------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Loss of run history on restart    | The history is additionally saved to disk on a **graceful** application shutdown and loaded back at startup together with the configuration (FR-35). At runtime (between individual action runs) it is still not persisted because of SD card wear (ADR-0004). On an uncontrolled crash/outage the history since the last save is lost — an accepted risk. |
+| Question                       | Decision                                                                                                                                                                                                                                                                                                                                                   |
+| ------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Loss of run history on restart | The history is additionally saved to disk on a **graceful** application shutdown and loaded back at startup together with the configuration (FR-35). At runtime (between individual action runs) it is still not persisted because of SD card wear (ADR-0004). On an uncontrolled crash/outage the history since the last save is lost — an accepted risk. |
 
 ## 13. Decisions — project review (2026-09-26)
 
@@ -468,14 +488,14 @@ these are mostly fixes and straightening out the state, not new
 functionality. The implementation is in blocks 0024–0034 (roadmap,
 phase 8).
 
-| Question                       | Decision                                                                                                                                                    |
-| ------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Bounded action queue vs. FR-18 | The queue is bounded, a full queue returns 503 + `Retry-After`; same card + action kind in the queue → idempotent 202 (FR-18 clarified, block 0027).        |
-| Environment of run actions     | Minimal base `PATH`, `HOME`, `LANG`, `TZ` + the action's `Env`; the service's `os.Environ()` is not inherited (NFR-01 c, block 0034).                       |
-| Endpoint for global settings   | `Store.UpdateSettings` is removed from the public store API (YAGNI); the concurrency limit is changed in the file and takes effect after a restart (block 0034). |
-| Future of PrimeFlex            | Removed after phase 8 and replaced with an own utility layer with the same classes; Tailwind rejected, PrimeVue stayed on v4 (MIT) because of the v5 license ([ADR-0010](../architecture/decisions/0010-own-layout-utilities-replace-primeflex.md), block 0035) until it was removed ([ADR-0014](../architecture/decisions/0014-replace-primevue-with-reka-ui.md), block 0076). |
-| Cross-site API protection      | NFR-12 accepted; implementation in block 0026.                                                                                                              |
-| Repository license             | MIT (block 0031 adds `LICENSE`).                                                                                                                            |
+| Question                       | Decision                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
+| ------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Bounded action queue vs. FR-18 | The queue is bounded, a full queue returns 503 + `Retry-After`; same card + action kind in the queue → idempotent 202 (FR-18 clarified, block 0027).                                                                                                                                                                                                                                                                                                        |
+| Environment of run actions     | Minimal base `PATH`, `HOME`, `LANG`, `TZ` + the action's `Env`; the service's `os.Environ()` is not inherited (NFR-01 c, block 0034).                                                                                                                                                                                                                                                                                                                       |
+| Endpoint for global settings   | `Store.UpdateSettings` is removed from the public store API (YAGNI); the concurrency limit is changed in the file and takes effect after a restart (block 0034).                                                                                                                                                                                                                                                                                            |
+| Future of PrimeFlex            | Removed after phase 8 and replaced with an own utility layer with the same classes; Tailwind rejected, PrimeVue stayed on v4 (MIT) because of the v5 license ([ADR-0010](../architecture/decisions/0010-own-layout-utilities-replace-primeflex.md), block 0035) until it was removed ([ADR-0014](../architecture/decisions/0014-replace-primevue-with-reka-ui.md), block 0076).                                                                             |
+| Cross-site API protection      | NFR-12 accepted; implementation in block 0026.                                                                                                                                                                                                                                                                                                                                                                                                              |
+| Repository license             | MIT (block 0031 adds `LICENSE`).                                                                                                                                                                                                                                                                                                                                                                                                                            |
 | Authentication (NFR-01)        | Access only from paired devices: a one-time code (the first one in the service log, any time from `sudo marionette pair` on the host), then a device token in a cookie without further verification; validity 60 days of non-use, configurable; no tokens for scripts (FR-50..58, NFR-13, [ADR-0011](../architecture/decisions/0011-device-pairing-access.md), [ADR-0013](../architecture/decisions/0013-host-pairing-command.md), blocks 0043–0044, 0065). |
 
 ## 12. Traceability

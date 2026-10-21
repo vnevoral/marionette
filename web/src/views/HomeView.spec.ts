@@ -88,6 +88,10 @@ function announcement(card: Wrapper) {
 	return card.find(".action-note [role='status']").text();
 }
 
+function healthyLede(wrapper: ReturnType<typeof mountHome>) {
+	return wrapper.find(".page-header").text();
+}
+
 function cardByName(wrapper: ReturnType<typeof mountHome>, name: string) {
 	const card = wrapper.findAll(".action-card").find((candidate) => candidate.text().includes(name));
 	if (!card) throw new Error(`card ${name} not rendered`);
@@ -119,11 +123,12 @@ describe("HomeView", () => {
 		vi.unstubAllGlobals();
 	});
 
-	it("releases the buttons after the action finishes and shows the result briefly (H1)", async () => {
+	it("shows Waiting from the server after Run action until a check confirms it (FR-15b)", async () => {
 		vi.mocked(enqueuePrimary).mockResolvedValue({
 			cardId: "printer",
 			actionKind: "primary",
 			status: "accepted",
+			checkedAt: before,
 		});
 		const wrapper = mountHome();
 		await flushPromises();
@@ -134,16 +139,49 @@ describe("HomeView", () => {
 		await buttonByLabel(card, "Run action").trigger("click");
 		await flushPromises();
 		expect(enqueuePrimary).toHaveBeenCalledWith("printer");
+		// The request ends once accepted; the server's state carries the wait.
+		expect(buttonByLabel(card, "Run action").attributes("disabled")).toBeUndefined();
+		expect(buttonByLabel(card, "Run action").classes()).not.toContain("m-button-loading");
+		expect(announcement(card)).toBe("Waiting for confirmation");
+
+		FakeEventSource.last().status({
+			cardId: "printer",
+			snapshot: { ...snapshot(before), state: "waiting", waitingUntil: after },
+		});
+		await flushPromises();
+		expect(card.find(".card-banner").text()).toBe("Waiting");
+		expect(healthyLede(wrapper)).toContain("1 healthy");
+
+		FakeEventSource.last().status({ cardId: "printer", snapshot: snapshot(after) });
+		await flushPromises();
+		expect(card.find(".card-banner").text()).toBe("Healthy");
+		wrapper.unmount();
+		expect(FakeEventSource.last().closed).toBe(true);
+	});
+
+	it("releases the buttons after a status check and shows the result briefly (H1)", async () => {
+		vi.mocked(enqueueStatus).mockResolvedValue({
+			cardId: "printer",
+			actionKind: "status",
+			status: "accepted",
+		});
+		const wrapper = mountHome();
+		await flushPromises();
+		const card = cardByName(wrapper, "Printer");
+
+		await buttonByLabel(card, "Check status").trigger("click");
+		await flushPromises();
+		expect(enqueueStatus).toHaveBeenCalledWith("printer");
 		expect(buttonByLabel(card, "Run action").attributes("disabled")).toBeDefined();
 		expect(buttonByLabel(card, "Check status").attributes("disabled")).toBeDefined();
-		expect(buttonByLabel(card, "Run action").classes()).toContain("m-button-loading");
+		expect(buttonByLabel(card, "Check status").classes()).toContain("m-button-loading");
 		expect(card.text()).toContain("Running");
 
 		FakeEventSource.last().status({ cardId: "printer", snapshot: snapshot(after, "fail") });
 		await flushPromises();
 		expect(buttonByLabel(card, "Run action").attributes("disabled")).toBeUndefined();
 		expect(buttonByLabel(card, "Check status").attributes("disabled")).toBeUndefined();
-		expect(buttonByLabel(card, "Run action").classes()).not.toContain("m-button-loading");
+		expect(buttonByLabel(card, "Check status").classes()).not.toContain("m-button-loading");
 		// The badge shows the new state; the card keeps its Last checked line
 		// and only announces the outcome (UX spec §4).
 		expect(card.text()).toContain("Problem");
@@ -154,26 +192,21 @@ describe("HomeView", () => {
 		vi.advanceTimersByTime(4000);
 		await flushPromises();
 		expect(announcement(card)).toBe("");
-
-		await buttonByLabel(card, "Check status").trigger("click");
-		await flushPromises();
-		expect(enqueueStatus).toHaveBeenCalledWith("printer");
 		wrapper.unmount();
-		expect(FakeEventSource.last().closed).toBe(true);
 	});
 
 	it("ignores a check the server already knew when it accepted the action", async () => {
 		const during = "2026-09-26T10:00:02Z";
-		vi.mocked(enqueuePrimary).mockResolvedValue({
+		vi.mocked(enqueueStatus).mockResolvedValue({
 			cardId: "printer",
-			actionKind: "primary",
+			actionKind: "status",
 			status: "accepted",
 			checkedAt: during,
 		});
 		const wrapper = mountHome();
 		await flushPromises();
 		const card = cardByName(wrapper, "Printer");
-		await buttonByLabel(card, "Run action").trigger("click");
+		await buttonByLabel(card, "Check status").trigger("click");
 		await flushPromises();
 
 		FakeEventSource.last().status({ cardId: "printer", snapshot: snapshot(during, "fail") });

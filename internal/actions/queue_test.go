@@ -341,3 +341,36 @@ func TestEnqueueReportsFullQueueWithRetryAfter(t *testing.T) {
 		t.Fatalf("RetryAfter = %s, want at least 1s", full.RetryAfter)
 	}
 }
+
+func TestFinishedPrimaryActionReportsItsOutcome(t *testing.T) {
+	store := config.NewStore(config.Settings{HistorySize: 5, MaxConcurrentActions: 1})
+	card := createServerCard(t, store, "reported")
+	runner := &fakeBackgroundRunner{
+		called: make(chan config.Action, 1),
+		result: execengine.Result{Outcome: config.RunOutcomeTimeout},
+	}
+	actions, err := New(store, runner, &fakeStatusChecker{called: make(chan string, 1)}, nil)
+	if err != nil {
+		t.Fatalf("New() error = %v", err)
+	}
+	defer func() { _, _ = actions.Close(context.Background()) }()
+	type finished struct {
+		cardID  string
+		outcome config.RunOutcome
+	}
+	reported := make(chan finished, 1)
+	actions.OnPrimaryFinished = func(cardID string, outcome config.RunOutcome) {
+		reported <- finished{cardID, outcome}
+	}
+	if err := actions.EnqueuePrimary(card.ID, card.Primary); err != nil {
+		t.Fatalf("EnqueuePrimary() error = %v", err)
+	}
+	select {
+	case got := <-reported:
+		if got.cardID != card.ID || got.outcome != config.RunOutcomeTimeout {
+			t.Fatalf("reported %#v", got)
+		}
+	case <-time.After(5 * time.Second):
+		t.Fatal("the finished primary action was not reported")
+	}
+}

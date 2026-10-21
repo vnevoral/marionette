@@ -39,12 +39,12 @@ export function supersedes(next: StatusSnapshot, current: StatusSnapshot | undef
 }
 
 /**
- * Whether the server will run a status check after `action` is accepted, i.e.
- * whether a view should wait for a newer check. A status action always
- * schedules one; a primary action only activates fast polling, which the
- * scheduler does for cards with a status action and all three polling values
- * set (`Scheduler.NotifyPrimaryAction`). Otherwise the outcome is reported as
- * accepted right away.
+ * Whether the server will run a status check after `action` is accepted. A
+ * status action always schedules one; a primary action is confirmed by fast
+ * polling, which the scheduler runs for cards with a status action and all
+ * three polling values set, and the card waits for it meanwhile
+ * (`Scheduler.NotifyPrimaryAction`, FR-15b). Otherwise the outcome is
+ * reported as accepted right away.
  */
 export function expectsFollowUpCheck(card: ActionCard, action: ActionKind): boolean {
 	if (!card.status) return false;
@@ -73,17 +73,10 @@ export function runWaitBudgetMs(card: ActionCard): number {
 	return card.primary.timeoutSec * 1000 + statusCheckQueueMarginMs;
 }
 
-/**
- * How long a view waits for the follow-up check. A manual status check is
- * bounded by the status action's own timeout plus the queue margin; after a
- * primary action the check comes from fast polling, so the wait is the fast
- * polling window, or `defaultMaxWaitMs` when the card has none.
- */
-export function waitBudgetMs(card: ActionCard, action: ActionKind): number {
-	if (action === "status" && card.status) {
-		return card.status.timeoutSec * 1000 + statusCheckQueueMarginMs;
-	}
-	return card.fastPollingWindowSeconds ? card.fastPollingWindowSeconds * 1000 : defaultMaxWaitMs;
+/** How long a view waits for the result of a manual status check: the
+ * status action's timeout plus the queue margin. */
+export function statusWaitBudgetMs(card: ActionCard): number {
+	return (card.status?.timeoutSec ?? 0) * 1000 + statusCheckQueueMarginMs;
 }
 
 interface WaitCallbacks {

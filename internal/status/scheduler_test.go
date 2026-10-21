@@ -191,6 +191,12 @@ func TestSchedulerUsesFastPollingAndReturnsToStandard(t *testing.T) {
 	if err := scheduler.NotifyPrimaryAction("fast"); err != nil {
 		t.Fatalf("NotifyPrimaryAction() error = %v", err)
 	}
+	// Until the action finishes, the timer only guards the bound of the
+	// wait: the 1 s timeout, the queue margin and the 3 s window.
+	if duration := <-clock.durations; duration != time.Second+primaryQueueMargin+3*time.Second {
+		t.Fatalf("timer duration while the action runs = %v", duration)
+	}
+	scheduler.PrimaryActionFinished("fast", config.RunOutcomeOK)
 	if duration := <-clock.durations; duration != 2*time.Second {
 		t.Fatalf("fast timer duration = %v", duration)
 	}
@@ -200,10 +206,12 @@ func TestSchedulerUsesFastPollingAndReturnsToStandard(t *testing.T) {
 	case <-time.After(time.Second):
 		t.Fatal("fast polling did not run")
 	}
-	if duration := <-clock.durations; duration != 2*time.Second {
-		t.Fatalf("timer remained at duration %v, want 2s", duration)
+	// The fake checker never confirms, so the next check is due when the
+	// confirmation window closes.
+	if duration := <-clock.durations; duration != time.Second {
+		t.Fatalf("timer duration = %v, want 1s to the end of the window", duration)
 	}
-	clock.Advance(2 * time.Second)
+	clock.Advance(time.Second)
 	select {
 	case <-checker.calls:
 	case <-time.After(time.Second):
@@ -211,6 +219,9 @@ func TestSchedulerUsesFastPollingAndReturnsToStandard(t *testing.T) {
 	}
 	if duration := <-clock.durations; duration != 10*time.Second {
 		t.Fatalf("timer duration after fast window = %v, want 10s", duration)
+	}
+	if _, waiting := scheduler.store.WaitingUntil("fast"); waiting {
+		t.Fatal("card still waits after the window closed")
 	}
 }
 
@@ -316,6 +327,8 @@ func TestSchedulerRestartClearsFastPollingWindow(t *testing.T) {
 	if err := scheduler.NotifyPrimaryAction("restart"); err != nil {
 		t.Fatalf("NotifyPrimaryAction() error = %v", err)
 	}
+	<-clock.durations
+	scheduler.PrimaryActionFinished("restart", config.RunOutcomeOK)
 	if duration := <-clock.durations; duration != 2*time.Second {
 		t.Fatalf("fast timer duration = %v", duration)
 	}
@@ -435,4 +448,81 @@ func TestSchedulerStopsWhenParentContextIsCanceled(t *testing.T) {
 		t.Fatalf("Start() after parent cancel error = %v", err)
 	}
 	stopScheduler(t, scheduler)
+}
+
+func TestSchedulerPausesChecksUntilThePrimaryActionFinishes(t *testing.T) {
+	scheduler, clock, checker, cancel := newTestScheduler(t, "paused", 10, 2, 30)
+	defer cancel()
+	defer stopScheduler(t, scheduler)
+	waitForTimer(t, clock)
+	<-clock.durations
+	waitForInitialCheck(t, checker, "paused")
+	if err := scheduler.NotifyPrimaryAction("paused"); err != nil {
+		t.Fatalf("NotifyPrimaryAction() error = %v", err)
+	}
+	<-clock.durations
+	if snapshot, _ := scheduler.store.GetStatus("paused"); snapshot.State != config.StatusStateWaiting {
+		t.Fatalf("state after the action was accepted = %q, want waiting", snapshot.State)
+	}
+	clock.Advance(20 * time.Second)
+	select {
+	case <-checker.calls:
+		t.Fatal("a check ran while the primary action was running")
+	case <-time.After(20 * time.Millisecond):
+	}
+	scheduler.PrimaryActionFinished("paused", config.RunOutcomeOK)
+	if duration := <-clock.durations; duration != 2*time.Second {
+		t.Fatalf("first check after the action due in %v, want the fast interval", duration)
+	}
+	until, waiting := scheduler.store.WaitingUntil("paused")
+	if !waiting || !until.Equal(clock.Now().Add(30*time.Second)) {
+		t.Fatalf("confirmation window ends %v (waiting %v), want 30 s after the action finished", until, waiting)
+	}
+}
+
+func TestSchedulerEndsTheWaitWhenThePrimaryActionFails(t *testing.T) {
+	scheduler, clock, checker, cancel := newTestScheduler(t, "failed", 10, 2, 30)
+	defer cancel()
+	defer stopScheduler(t, scheduler)
+	waitForTimer(t, clock)
+	<-clock.durations
+	waitForInitialCheck(t, checker, "failed")
+	if err := scheduler.NotifyPrimaryAction("failed"); err != nil {
+		t.Fatalf("NotifyPrimaryAction() error = %v", err)
+	}
+	<-clock.durations
+	scheduler.PrimaryActionFinished("failed", config.RunOutcomeTimeout)
+	if _, waiting := scheduler.store.WaitingUntil("failed"); waiting {
+		t.Fatal("card still waits after its primary action timed out")
+	}
+	if duration := <-clock.durations; duration != 10*time.Second {
+		t.Fatalf("timer duration = %v, want the standard interval without fast polling", duration)
+	}
+}
+
+func TestSchedulerReconcileEndsTheWaitOfACardThatNoLongerPolls(t *testing.T) {
+	scheduler, clock, checker, cancel := newTestScheduler(t, "edited", 10, 2, 30)
+	defer cancel()
+	defer stopScheduler(t, scheduler)
+	waitForTimer(t, clock)
+	<-clock.durations
+	waitForInitialCheck(t, checker, "edited")
+	if err := scheduler.NotifyPrimaryAction("edited"); err != nil {
+		t.Fatalf("NotifyPrimaryAction() error = %v", err)
+	}
+	card, _ := scheduler.store.GetCard("edited")
+	card.PollingIntervalSeconds = 0
+	if _, err := scheduler.store.UpdateCard("edited", card); err != nil {
+		t.Fatalf("UpdateCard() error = %v", err)
+	}
+	if err := scheduler.Reconcile(); err != nil {
+		t.Fatalf("Reconcile() error = %v", err)
+	}
+	if _, waiting := scheduler.store.WaitingUntil("edited"); waiting {
+		t.Fatal("card still waits after polling was turned off")
+	}
+	scheduler.PrimaryActionFinished("edited", config.RunOutcomeOK)
+	if _, waiting := scheduler.store.WaitingUntil("edited"); waiting {
+		t.Fatal("a finished action reopened the wait")
+	}
 }
