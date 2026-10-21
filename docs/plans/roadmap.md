@@ -31,7 +31,8 @@ until a status check confirms the action, TypeScript 6; published
 verified `sudo marionette pair` there on 2026-10-12 (the upgrade and
 rollback procedure from the README was verified with `v1.2.1`). The owner
 upgraded it to `v2.0.0` on 2026-10-20: the upgrade keeps the existing
-configuration and only the card icons had to be chosen again. New work starts as a new requirement and block
+configuration and only the card icons had to be chosen again. The owner
+installed `v2.1.0` there on 2026-10-21 and it works as expected. New work starts as a new requirement and block
 per the development workflow and reaches `main` through a pull request
 (block 0068).
 
