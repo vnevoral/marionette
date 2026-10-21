@@ -21,13 +21,16 @@ running version is shown in the UI footer and in `GET /api/health`.
 - **Action cards.** Each card has a name, description, icon and an optional
   color stripe, a **primary action** (for example Wake-on-LAN) and an
   optional **status action** (for example `ping`) that decides whether the
-  card is Healthy, Problem or Unknown.
+  card is Healthy, Problem or Unknown. After the primary action the card is
+  Waiting until a status check confirms it.
 - **Safe execution.** Actions are run directly (no shell) with a timeout,
   in their own process group, with a minimal environment and a global limit
   of concurrent actions. Success is decided by the exit code or by a
   regular expression over the output.
 - **Status checks.** Status actions run on a schedule (a standard interval
   and a faster interval for a while after the primary action) or on demand.
+  Failed checks during that faster window are not recorded until it ends
+  without a successful one.
 - **Live updates.** Status changes and finished primary action runs reach
   the browser over Server-Sent Events, with REST polling as a fallback; the
   dashboard shows the outcome of each run on the card.

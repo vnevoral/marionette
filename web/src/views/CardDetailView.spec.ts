@@ -163,41 +163,42 @@ describe("CardDetailView", () => {
 		wrapper.unmount();
 	});
 
-	it("blocks the buttons until a newer check arrives, then refetches runs and history (H2)", async () => {
+	it("shows Waiting until a check confirms the action, then refetches the history (H2, FR-15b)", async () => {
 		vi.mocked(enqueuePrimary).mockResolvedValue({
 			cardId: "printer",
 			actionKind: "primary",
 			status: "accepted",
+			checkedAt: before,
 		});
 		const { wrapper } = await mountDetail("printer");
 		expect(wrapper.find("h1").text()).toBe("Printer");
 		expect(getRuns).toHaveBeenCalledTimes(1);
 		expect(getStatusHistory).toHaveBeenCalledTimes(1);
-		expect(wrapper.text()).toContain("Healthy");
+		expect(wrapper.find(".status-badge").text()).toBe("Healthy");
 
 		await buttonByLabel(wrapper, "Run action").trigger("click");
 		await flushPromises();
 		expect(enqueuePrimary).toHaveBeenCalledWith("printer");
-		// The badge and the button spinner carry the pending state; the note
-		// keeps its quiet text and only announces the phase (UX spec §4).
+		// The request ends once accepted; the note keeps its quiet text and
+		// only announces the wait (UX spec §4).
 		expect(wrapper.find(".request-feedback").exists()).toBe(false);
 		expect(noteText(wrapper)).toBe(ASYNC_NOTE);
-		expect(announcement(wrapper)).toBe("Running");
-		expect(buttonByLabel(wrapper, "Run action").attributes("disabled")).toBeDefined();
-		expect(buttonByLabel(wrapper, "Check status").attributes("disabled")).toBeDefined();
-		expect(wrapper.text()).toContain("Running");
+		expect(announcement(wrapper)).toBe("Waiting for confirmation");
+		expect(buttonByLabel(wrapper, "Run action").attributes("disabled")).toBeUndefined();
+
+		FakeEventSource.last().status({
+			cardId: "printer",
+			snapshot: { ...snapshot(before), state: "waiting", waitingUntil: after },
+		});
+		await flushPromises();
+		expect(wrapper.find(".status-badge").text()).toBe("Waiting");
+		const historyReads = vi.mocked(getStatusHistory).mock.calls.length;
 
 		FakeEventSource.last().status({ cardId: "printer", snapshot: snapshot(after, "fail") });
 		await flushPromises();
-		expect(noteText(wrapper)).toBe(ASYNC_NOTE);
-		expect(announcement(wrapper)).toBe("Status updated");
-		expect(buttonByLabel(wrapper, "Run action").attributes("disabled")).toBeUndefined();
-		expect(buttonByLabel(wrapper, "Check status").attributes("disabled")).toBeUndefined();
-		expect(wrapper.text()).toContain("Problem");
-		// History follows the check; runs are re-read at the card's fast
-		// polling interval until the new run appears (block 0050).
-		expect(getStatusHistory).toHaveBeenCalledTimes(2);
-		expect(getRuns).toHaveBeenCalledTimes(1);
+		expect(wrapper.find(".status-badge").text()).toBe("Problem");
+		// The end of the wait may have recorded a status change.
+		expect(getStatusHistory).toHaveBeenCalledTimes(historyReads + 1);
 		wrapper.unmount();
 		expect(FakeEventSource.last().closed).toBe(true);
 	});

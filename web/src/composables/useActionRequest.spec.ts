@@ -76,13 +76,25 @@ describe("requestAction", () => {
 		expect(getStatus).not.toHaveBeenCalled();
 	});
 
+	it("ends a confirmed primary action as waiting, without waiting for a check (FR-15b)", async () => {
+		vi.mocked(enqueuePrimary).mockResolvedValue(accepted("primary", before));
+		const phases: string[] = [];
+		const outcome = await requestAction(polled, "primary", {
+			signal: new AbortController().signal,
+			onPhase: (phase) => phases.push(phase),
+		});
+		expect(outcome).toEqual({ kind: "waiting" });
+		expect(phases).toEqual(["queued"]);
+		expect(getStatus).not.toHaveBeenCalled();
+	});
+
 	it("uses the check the server knew at acceptance as the baseline, not the one before the request", async () => {
 		// A scheduled check completed while the request was in flight; the
 		// server reports it in the 202 and a stream event for it arrives later.
-		vi.mocked(enqueuePrimary).mockResolvedValue(accepted("primary", during));
+		vi.mocked(enqueueStatus).mockResolvedValue(accepted("status", during));
 		const phases: string[] = [];
 		const seen: string[] = [];
-		const pending = requestAction(polled, "primary", {
+		const pending = requestAction(polled, "status", {
 			signal: new AbortController().signal,
 			onPhase: (phase) => phases.push(phase),
 			onSnapshot: (next) => seen.push(next.checkedAt ?? ""),
@@ -127,9 +139,9 @@ describe("requestAction", () => {
 		});
 		expect(unknown).toEqual({ kind: "failed", message: "Unable to queue action" });
 
-		vi.mocked(enqueuePrimary).mockResolvedValue(accepted("primary", before));
+		vi.mocked(enqueueStatus).mockResolvedValue(accepted("status", before));
 		const controller = new AbortController();
-		const pending = requestAction(polled, "primary", {
+		const pending = requestAction(polled, "status", {
 			signal: controller.signal,
 			onPhase: () => {},
 		});
@@ -146,6 +158,11 @@ describe("outcomeResult", () => {
 		expect(outcomeResult({ kind: "accepted" }, labels)).toEqual({
 			tone: "success",
 			message: "Accepted",
+		});
+		expect(outcomeResult({ kind: "waiting" }, labels)).toEqual({
+			tone: "success",
+			message: "Waiting for confirmation",
+			quiet: true,
 		});
 		expect(outcomeResult({ kind: "updated" }, labels)).toEqual({
 			tone: "success",

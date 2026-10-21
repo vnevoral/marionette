@@ -292,6 +292,7 @@ func (app application) run(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("create background action queue: %w", err)
 	}
+	queue.OnPrimaryFinished = scheduler.PrimaryActionFinished
 	applicationContext, cancelApplication := context.WithCancel(context.Background())
 	defer cancelApplication()
 	if err := scheduler.Start(applicationContext); err != nil {

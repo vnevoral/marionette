@@ -12,8 +12,8 @@ one or more concrete implementation blocks (see the
 
 ## Current state
 
-As of 2026-10-20 all phases below are **Done**, the last closed block is
-[0081](blocks/0081-dependency-update-typescript-6.md) and the current release is
+As of 2026-10-21 all phases below are **Done**, the last closed block is
+[0082](blocks/0082-waiting-for-confirmation.md) and the current release is
 **v2.0.0** (tags `v1.0.0`, `v1.1.0`, `v1.2.0` to `v1.2.4`, `v1.3.0`,
 `v1.3.1`, `v2.0.0`; `v1.2.0` has no GitHub Release because its CI run
 failed, fixed by block 0059; `v1.3.0` has none because `npm audit` failed on a new
@@ -24,7 +24,7 @@ order), `v1.2.3` block 0062 (card color on the Current status panel),
 0064 and 0065 (`marionette pair`) and `v2.0.0` blocks 0066 to 0077 (the
 new UI on Reka UI and Lucide, card icons as names, hand-written release
 notes; published 2026-10-20, the first release with notes in
-`docs/releases/`). The requirements are at v0.14.
+`docs/releases/`). The requirements are at v0.15.
 `v1.3.1` runs on the reference Raspberry Pi: the owner deployed it and
 verified `sudo marionette pair` there on 2026-10-12 (the upgrade and
 rollback procedure from the README was verified with `v1.2.1`). The owner
@@ -384,6 +384,10 @@ passkeys once there is TLS (ADR-0011), UI localization (ADR-0007).
      — **Done** (2026-10-20); TypeScript 6.0.3 with the deprecated
      `baseUrl` removed (ADR-0015); every other dependency is on its newest
      version that is at least two weeks old.
+  23. [0082 — Waiting for confirmation](blocks/0082-waiting-for-confirmation.md)
+     — **Done** (2026-10-21); after a primary action the card is Waiting
+     until a status check confirms it or the fast polling window ends;
+     failed checks in between are not recorded (FR-15b, ADR-0016).
 
   The open questions from the review are decided in
   [requirements.md, section 13](../requirements/requirements.md#13-decisions--project-review-2026-09-26)

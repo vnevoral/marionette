@@ -49,6 +49,10 @@ type Store struct {
 	history       map[string]map[string][]Run
 	statuses      map[string]StatusSnapshot
 	statusHistory map[string][]StatusChange
+	// waiting holds the cards that wait for a status check to confirm a
+	// primary action (FR-15b). statuses keeps the last confirmed state, so
+	// a waiting card is never persisted or recorded in the status history.
+	waiting map[string]waitingStatus
 	// changes counts every in-memory mutation; savedChanges is the value
 	// captured by the last successful SaveFileWithHistory. They differ while
 	// the file on disk lags behind memory (see Dirty).
@@ -87,7 +91,15 @@ func NewStore(settings Settings) *Store {
 		history:       make(map[string]map[string][]Run),
 		statuses:      make(map[string]StatusSnapshot),
 		statusHistory: make(map[string][]StatusChange),
+		waiting:       make(map[string]waitingStatus),
 	}
+}
+
+// waitingStatus is the confirmation window of one card and the latest
+// check that did not confirm the action yet.
+type waitingStatus struct {
+	until time.Time
+	check *StatusSnapshot
 }
 
 // ListCards returns all cards sorted by ID. Returned cards are independent
@@ -207,9 +219,14 @@ func (store *Store) DeleteCard(id string) error {
 		previousStatusHistory, hadStatusHistory := store.statusHistory[id]
 		delete(store.cards, id)
 		delete(store.history, id)
+		previousWaiting, wasWaiting := store.waiting[id]
 		delete(store.statuses, id)
 		delete(store.statusHistory, id)
+		delete(store.waiting, id)
 		return func() {
+			if wasWaiting {
+				store.waiting[id] = previousWaiting
+			}
 			store.cards[id] = previousCard
 			if hadHistory {
 				store.history[id] = previousHistory
@@ -279,7 +296,8 @@ func (store *Store) GetRuns(cardID string, actionKind string) ([]Run, error) {
 	return append(make([]Run, 0, len(runs)), runs...), nil
 }
 
-// GetStatus returns the latest status snapshot for a card.
+// GetStatus returns the latest status snapshot for a card. A waiting card
+// reports the waiting state with its latest check.
 func (store *Store) GetStatus(cardID string) (StatusSnapshot, bool) {
 	store.mu.RLock()
 	defer store.mu.RUnlock()
@@ -287,8 +305,110 @@ func (store *Store) GetStatus(cardID string) (StatusSnapshot, bool) {
 	if _, exists := store.cards[cardID]; !exists {
 		return StatusSnapshot{}, false
 	}
+	if _, waiting := store.waiting[cardID]; waiting {
+		return store.visibleStatusLocked(cardID), true
+	}
 	snapshot, exists := store.statuses[cardID]
 	return snapshot, exists
+}
+
+// visibleStatusLocked is the snapshot clients see: the confirmed one, or
+// while the card waits, its latest check in the waiting state. The caller
+// holds mu.
+func (store *Store) visibleStatusLocked(cardID string) StatusSnapshot {
+	snapshot := store.statuses[cardID]
+	if snapshot.State == "" {
+		snapshot.State = StatusStateUnknown
+	}
+	wait, waiting := store.waiting[cardID]
+	if !waiting {
+		return snapshot
+	}
+	if wait.check != nil {
+		snapshot = *wait.check
+	}
+	until := wait.until
+	snapshot.State = StatusStateWaiting
+	snapshot.WaitingUntil = &until
+	return snapshot
+}
+
+// WaitingUntil returns the end of the card's confirmation window while it
+// waits for a status check to confirm a primary action.
+func (store *Store) WaitingUntil(cardID string) (time.Time, bool) {
+	store.mu.RLock()
+	defer store.mu.RUnlock()
+	wait, waiting := store.waiting[cardID]
+	return wait.until, waiting
+}
+
+// BeginWaiting puts the card into the waiting state until the given time,
+// or moves the end of a window that is already open (FR-15b). Checks that
+// do not confirm the action keep the card waiting; see UpdateStatus.
+func (store *Store) BeginWaiting(cardID string, until time.Time) error {
+	store.mu.Lock()
+	if _, exists := store.cards[cardID]; !exists {
+		store.mu.Unlock()
+		return ErrNotFound
+	}
+	wait := store.waiting[cardID]
+	wait.until = until
+	store.waiting[cardID] = wait
+	snapshot := store.visibleStatusLocked(cardID)
+	onStatusChange := store.OnStatusChange
+	store.mu.Unlock()
+	if onStatusChange != nil {
+		onStatusChange(cardID, snapshot)
+	}
+	return nil
+}
+
+// ExtendWaiting moves the end of the card's confirmation window if the card
+// still waits; a wait that a healthy check already ended is not reopened.
+func (store *Store) ExtendWaiting(cardID string, until time.Time) error {
+	store.mu.Lock()
+	wait, waiting := store.waiting[cardID]
+	if !waiting {
+		store.mu.Unlock()
+		return nil
+	}
+	wait.until = until
+	store.waiting[cardID] = wait
+	snapshot := store.visibleStatusLocked(cardID)
+	onStatusChange := store.OnStatusChange
+	store.mu.Unlock()
+	if onStatusChange != nil {
+		onStatusChange(cardID, snapshot)
+	}
+	return nil
+}
+
+// EndWaiting closes the card's confirmation window: the latest check made
+// while waiting becomes the card's state, as if it had just been stored, and
+// without one the card returns to its confirmed state. It does nothing for
+// a card that is not waiting.
+func (store *Store) EndWaiting(cardID string) error {
+	store.mu.Lock()
+	wait, waiting := store.waiting[cardID]
+	if !waiting {
+		store.mu.Unlock()
+		return nil
+	}
+	if wait.check != nil {
+		// A closed window makes UpdateStatus store the check and announce
+		// the end of the wait.
+		store.waiting[cardID] = waitingStatus{}
+		store.mu.Unlock()
+		return store.UpdateStatus(cardID, *wait.check)
+	}
+	delete(store.waiting, cardID)
+	snapshot := store.visibleStatusLocked(cardID)
+	onStatusChange := store.OnStatusChange
+	store.mu.Unlock()
+	if onStatusChange != nil {
+		onStatusChange(cardID, snapshot)
+	}
+	return nil
 }
 
 // GetStatusChanges returns the newest status transitions first.
@@ -304,7 +424,11 @@ func (store *Store) GetStatusChanges(cardID string) ([]StatusChange, error) {
 }
 
 // UpdateStatus stores the latest status check and records a transition only
-// when the interpreted state differs from the previous state.
+// when the interpreted state differs from the previous state. While the card
+// waits (FR-15b), a check that does not confirm the action and ends before
+// the window closes is only kept as the latest check; a healthy check, or
+// one that ends when the window has closed, ends the wait and is stored as
+// usual.
 func (store *Store) UpdateStatus(cardID string, snapshot StatusSnapshot) error {
 	if !validStatusState(snapshot.State) {
 		return fmt.Errorf("%w: unsupported status state %q", ErrValidation, snapshot.State)
@@ -312,6 +436,7 @@ func (store *Store) UpdateStatus(cardID string, snapshot StatusSnapshot) error {
 	if snapshot.CheckedAt.IsZero() {
 		snapshot.CheckedAt = time.Now()
 	}
+	snapshot.WaitingUntil = nil
 
 	store.mu.Lock()
 	if _, exists := store.cards[cardID]; !exists {
@@ -319,11 +444,30 @@ func (store *Store) UpdateStatus(cardID string, snapshot StatusSnapshot) error {
 		return ErrNotFound
 	}
 
+	// A wait that ends shows a new state even when the confirmed one is
+	// unchanged, so it is always announced.
+	endedWait := false
+	if wait, waiting := store.waiting[cardID]; waiting {
+		if snapshot.State != StatusStateOK && snapshot.CheckedAt.Before(wait.until) {
+			check := snapshot
+			wait.check = &check
+			store.waiting[cardID] = wait
+			store.mu.Unlock()
+			return nil
+		}
+		delete(store.waiting, cardID)
+		endedWait = true
+	}
+
 	previous, exists := store.statuses[cardID]
 	if exists && previous.State == snapshot.State {
 		store.statuses[cardID] = snapshot
 		store.changes++
+		onStatusChange := store.OnStatusChange
 		store.mu.Unlock()
+		if endedWait && onStatusChange != nil {
+			onStatusChange(cardID, snapshot)
+		}
 		return nil
 	}
 

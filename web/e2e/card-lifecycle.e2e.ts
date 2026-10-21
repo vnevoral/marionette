@@ -1,3 +1,4 @@
+import { rm } from "node:fs/promises";
 import { expect, test } from "@playwright/test";
 import { actionEditor, createCard, currentStatusBadge, deleteAllCards, toast } from "./helpers";
 
@@ -225,4 +226,57 @@ test("asks before discarding unsaved changes", async ({ page, request }) => {
 	await page.getByRole("link", { name: "Back to card detail" }).click();
 	await page.getByRole("alertdialog").getByRole("button", { name: "Discard changes" }).click();
 	await expect(page.getByRole("heading", { name: "Guarded", level: 1 })).toBeVisible();
+});
+
+test("waits for a status check to confirm the action (FR-15b)", async ({ page, request }) => {
+	// The primary action creates a marker that the status action looks for;
+	// fast polling runs every second for a 4 s window.
+	const marker = `/tmp/marionette-e2e-waiting-${Date.now()}`;
+	// "unconfirmed" looks for a marker that its primary action never creates.
+	const polledCard = (id: string, checked: string) => ({
+		id,
+		name: id,
+		primary: { command: "touch", args: [marker], timeoutSec: 5, rule: { type: "exit_code" } },
+		status: { command: "ls", args: [checked], timeoutSec: 5, rule: { type: "exit_code" } },
+		pollingIntervalSeconds: 60,
+		fastPollingIntervalSeconds: 1,
+		fastPollingWindowSeconds: 4,
+	});
+	for (const data of [
+		polledCard("confirmed", marker),
+		polledCard("unconfirmed", `${marker}-missing`),
+	]) {
+		const response = await request.post("/api/cards", {
+			headers: { "Content-Type": "application/json" },
+			data,
+		});
+		expect(response.status()).toBe(201);
+	}
+	await page.goto("/");
+	await expect(page.getByText("Live")).toBeVisible();
+	const cardTitled = (name: string) =>
+		page.locator(".action-card").filter({ has: page.getByRole("heading", { name, exact: true }) });
+	const confirmed = cardTitled("confirmed");
+	const unconfirmed = cardTitled("unconfirmed");
+	await expect(confirmed.locator(".status-badge")).toHaveText("Problem");
+	await expect(unconfirmed.locator(".status-badge")).toHaveText("Problem");
+
+	// A check confirms the action: Waiting, then Healthy without waiting for
+	// the end of the window.
+	await confirmed.getByRole("button", { name: "Run action" }).click();
+	await expect(confirmed.locator(".status-badge")).toHaveText("Waiting");
+	await expect(confirmed.locator(".status-badge")).toHaveText("Healthy", { timeout: 3000 });
+
+	// No check confirms it: Waiting for the whole window, then Problem, and
+	// the failed checks in between record no status change.
+	await unconfirmed.getByRole("button", { name: "Run action" }).click();
+	await expect(unconfirmed.locator(".status-badge")).toHaveText("Waiting");
+	await page.waitForTimeout(2500);
+	await expect(unconfirmed.locator(".status-badge")).toHaveText("Waiting");
+	await expect(unconfirmed.locator(".status-badge")).toHaveText("Problem", { timeout: 5000 });
+	const history = (await (await request.get("/api/cards/unconfirmed/status/history")).json()) as {
+		state: string;
+	}[];
+	expect(history.map((change) => change.state)).toEqual(["fail"]);
+	await rm(marker, { force: true });
 });

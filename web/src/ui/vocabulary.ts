@@ -8,6 +8,7 @@ export const STATUS = {
 	ok: { label: "Healthy", icon: "circle-check", tone: "healthy" },
 	fail: { label: "Problem", icon: "triangle-alert", tone: "problem" },
 	unknown: { label: "Unknown", icon: "circle-question-mark", tone: "unknown" },
+	waiting: { label: "Waiting", icon: "timer", tone: "info" },
 } as const satisfies Record<StatusState, Presentation>;
 
 export const NO_STATUS_CHECK: Presentation = {
@@ -75,6 +76,7 @@ export const FEEDBACK = {
 	updated: "Updated",
 	statusUpdated: "Status updated",
 	resultUnavailable: "Result not available yet",
+	waitingForConfirmation: "Waiting for confirmation",
 	actionFinished: "Action finished",
 	actionTimedOut: "Action timed out",
 	actionCanceled: "Action canceled",

@@ -70,13 +70,14 @@ environment variable names, and regular expressions remain unchanged.
 | Unknown              | Unknown        |
 | OK                   | Healthy        |
 | Fail                 | Problem        |
+| Waiting              | Waiting        |
 | Running              | Running        |
 | Accepted             | Queued         |
 | Refresh              | Refresh        |
 | Run primary action   | Run action     |
 | Manual status action | Check status   |
 
-Internal values such as `unknown`, `ok`, `fail`, `accepted`, and `running` are
+Internal values such as `unknown`, `ok`, `fail`, `waiting`, `accepted`, and `running` are
 never exposed as raw labels.
 
 ## 4. State and feedback model
@@ -85,8 +86,11 @@ The UI separates two axes:
 
 - **Request state**: `idle`, `loading`, `accepted`, `running`, `success`, or
   `error` for the current interaction.
-- **Device state**: `unknown`, `ok`, or `fail` for the last known projection,
-  including the last check time.
+- **Device state**: `unknown`, `ok`, `fail`, or `waiting` for the last known
+  projection, including the last check time. `waiting` (FR-15b) comes from
+  the server: after a primary action the card waits until a status check
+  confirms it or the fast polling window ends; failed checks in between do
+  not change the state.
 
 Rules:
 
@@ -94,19 +98,21 @@ Rules:
   success.
 - While work is pending, controls for that card are disabled and the card
   shows **Running**.
-- After acceptance, the card waits for a check newer than the one the server
-  knew when it accepted the request (the 202 response carries that
-  `checkedAt`, so a scheduled check that completed during the request is not
-  mistaken for the result): a `status.changed` event from the shared stream
-  or a REST read every 2 s. After **Run action** the wait is bounded by the
-  configured fast-polling window; after **Check status** by the status
-  action's timeout plus a 30 s queue margin. The wait happens only when the
-  server will actually run a check: always after **Check status**, and after
-  **Run action** only for a card with a status check and all three
-  automatic-check values set (standard interval, fast interval, fast window),
-  because that is when the server activates fast polling. The stream is
-  shared by all views; while it is down, the card list is re-read over REST
-  every 5 s and the statuses it carries are applied to the dashboard.
+- After **Check status** is accepted, the card waits for a check newer than
+  the one the server knew when it accepted the request (the 202 response
+  carries that `checkedAt`, so a scheduled check that completed during the
+  request is not mistaken for the result): a `status.changed` event from the
+  shared stream or a REST read every 2 s, bounded by the status action's
+  timeout plus a 30 s queue margin.
+- After **Run action** is accepted for a card with a status check and all
+  three automatic-check values set (standard interval, fast interval, fast
+  window), the request ends at once and the server shows the card as
+  **Waiting** (FR-15b) on every device: while the action runs and then
+  until a check confirms it (**Healthy** at once) or the fast window ends
+  (the last check decides, normally **Problem**). The outcome is only
+  announced (**Waiting for confirmation**). The stream is shared by all
+  views; while it is down, the card list is re-read over REST every 5 s and
+  the statuses it carries are applied to the dashboard.
 - When the wait ends, the controls are released immediately. The badge
   shows the new state, so **Updated** is not repeated in text; only an
   outcome the badge cannot show (**Result not available yet**, or the
@@ -161,6 +167,7 @@ Status always includes text, an icon, and a semantic color:
 - **Healthy**: check mark, green;
 - **Problem**: warning mark, red/terracotta;
 - **Running**: spinner or clock, blue;
+- **Waiting**: timer, blue;
 - **Queued**: queue/arrow icon, amber.
 
 Color is never the only carrier of meaning.

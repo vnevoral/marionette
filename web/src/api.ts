@@ -1,4 +1,5 @@
-export type StatusState = "unknown" | "ok" | "fail";
+/** `waiting`: a primary action waits for a status check to confirm it (FR-15b). */
+export type StatusState = "unknown" | "ok" | "fail" | "waiting";
 
 export interface Action {
 	command: string;
@@ -41,6 +42,8 @@ export interface StatusSnapshot {
 	checkedAt?: string;
 	/** Absent until the card has been checked at least once. */
 	lastCheck?: Run;
+	/** End of the confirmation window; only in the `waiting` state. */
+	waitingUntil?: string;
 }
 
 export interface StatusEvent {

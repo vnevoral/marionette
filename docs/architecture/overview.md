@@ -261,7 +261,13 @@ the version is embedded at build time (`-ldflags -X main.version`, `make build`)
 Shape of status data: the `StatusSnapshot` of a card that has not been
 checked yet is just `{"state":"unknown"}` — `checkedAt` and `lastCheck` are
 omitted (`StatusSnapshot.MarshalJSON`, block 0032), so the client does not
-have to recognize Go's zero time. The `duration` field of runs and status
+have to recognize Go's zero time. `state` is `unknown`, `ok`, `fail` or
+`waiting`; a waiting card (FR-15b, ADR-0016) also carries `waitingUntil`,
+the end of its confirmation window, and its latest check. `waiting` is
+kept by the store next to the last confirmed snapshot, so it never reaches
+the status history or the persisted file. The action queue reports each
+finished primary action to the scheduler (`Queue.OnPrimaryFinished`),
+which then starts the fast polling window. The `duration` field of runs and status
 transitions is in **nanoseconds** (Go `time.Duration`); the frontend
 converts it for display.
 
@@ -269,7 +275,7 @@ Events of the SSE stream `GET /api/events` (ADR-0008):
 
 | Event            | When                                                   | `data`                                         |
 | ---------------- | ------------------------------------------------------ | ---------------------------------------------- |
-| `status.changed` | change in the card's interpreted status                | `{"cardId": "…", "snapshot": StatusSnapshot}`  |
+| `status.changed` | change in the card's interpreted status, including the start and end of a wait (FR-15b) | `{"cardId": "…", "snapshot": StatusSnapshot}`  |
 | `run.recorded`   | a primary action run recorded in the history (FR-42a, block 0058) | `{"cardId": "…", "run": Run}`, `Run` as an item of `GET /api/cards/{id}/runs` |
 
 Both events share one `id` sequence. A slow subscriber loses the oldest

@@ -101,6 +101,12 @@ type Queue struct {
 
 	group   sync.WaitGroup
 	pending sync.WaitGroup
+
+	// OnPrimaryFinished is called with the outcome of every primary action
+	// that ran to the end, also when its run could not be saved; it is not
+	// called for an action canceled by Close. The composition root wires it
+	// to the status scheduler (FR-15b) before the first job is enqueued.
+	OnPrimaryFinished func(cardID string, outcome config.RunOutcome)
 }
 
 // New creates a queue and starts its workers. A nil logger discards logs.
@@ -148,6 +154,7 @@ func (queue *Queue) EnqueuePrimary(cardID string, action config.Action) error {
 		if err != nil {
 			if ctx.Err() == nil {
 				logger.Error("primary action failed", "error", err)
+				queue.primaryFinished(cardID, config.RunOutcomeFail)
 			}
 			return
 		}
@@ -155,7 +162,16 @@ func (queue *Queue) EnqueuePrimary(cardID string, action config.Action) error {
 		if err := queue.store.AppendRun(cardID, result.ToRun(KindPrimary)); err != nil {
 			logger.Error("save primary action result", "error", err)
 		}
+		if result.Outcome != config.RunOutcomeCanceled {
+			queue.primaryFinished(cardID, result.Outcome)
+		}
 	})
+}
+
+func (queue *Queue) primaryFinished(cardID string, outcome config.RunOutcome) {
+	if queue.OnPrimaryFinished != nil {
+		queue.OnPrimaryFinished(cardID, outcome)
+	}
 }
 
 // EnqueueStatus schedules a manual status action without waiting for its result.
