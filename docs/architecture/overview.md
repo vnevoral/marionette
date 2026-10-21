@@ -267,7 +267,8 @@ the end of its confirmation window, and its latest check. `waiting` is
 kept by the store next to the last confirmed snapshot, so it never reaches
 the status history or the persisted file. The action queue reports each
 finished primary action to the scheduler (`Queue.OnPrimaryFinished`),
-which then starts the fast polling window. The `duration` field of runs and status
+which then starts the fast polling window after a successful run and ends
+the wait after a failed or timed-out one. The `duration` field of runs and status
 transitions is in **nanoseconds** (Go `time.Duration`); the frontend
 converts it for display.
 

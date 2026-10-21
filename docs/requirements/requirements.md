@@ -114,11 +114,13 @@ distributed as a single executable file.
   card. Standard polling is a prerequisite for FR-15a (fast polling) —
   without standard polling enabled, fast polling is not activated.
 - **FR-15a** _(updated 2026-10-21)_: After the **primary action** of a card
-  has finished (manual or future scheduled run), the status action
+  has finished successfully (manual or future scheduled run), the status action
   temporarily switches to the **fast polling interval**, default **10 s**,
   for a default **120 s** (both values configurable globally/per card).
   While the primary action is queued or running, the scheduled status
-  checks of the card wait for it. After the fast polling window the card
+  checks of the card wait for it. A primary action that fails or times out
+  does not start fast polling; the card stays on its standard interval.
+  After the fast polling window the card
   returns to the standard polling interval (FR-15). If the card does not
   have standard polling enabled, fast polling is not activated (see FR-15).
 - **FR-15b** _(added 2026-10-21, ADR-0016)_: From the moment a primary action
@@ -129,11 +131,10 @@ distributed as a single executable file.
   state and is not recorded in the status history; the card keeps waiting
   for the next check. When the window ends without a successful check, the
   last check decides the state (normally Problem) and only then is a change
-  recorded. A primary action that times out is treated like a successful
-  one, because it may still have done its work (for example a start command
-  that does not return): the window starts and the checks decide. A primary
-  action that fails ends the wait at once, since there is nothing to
-  confirm. Waiting applies only to cards with
+  recorded. A primary action that fails or times out ends the wait at once
+  and starts no fast polling window, since there is nothing to confirm: a
+  timeout is an error, and the card author sets the action's timeout so
+  that the action always finishes and returns its result code. Waiting applies only to cards with
   fast polling (FR-15a); it is visible to every client through the status
   projection and the event stream (FR-42) and is not persisted: after a
   restart the card shows its last confirmed state.

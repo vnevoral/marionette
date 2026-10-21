@@ -37,8 +37,8 @@ checks during the fast polling window are not recorded.
 - **Approval date**: 2026-10-21
 - **Decision notes**: The owner chose the name Waiting and the rule that
   failed checks are not recorded until a check confirms the action or the
-  window ends. A primary action that times out does not end the wait: the
-  checks go on until one succeeds or the window ends.
+  window ends. A primary action that fails or times out is an error: the
+  wait ends and no fast polling window starts.
 
 ## Test plan
 
@@ -46,8 +46,8 @@ checks during the fast polling window are not recorded.
   the wait, a check after the window closes is recorded, ending a wait
   with and without a check, nothing persisted.
 - Scheduler: checks pause until the action finishes, the window starts
-  then, the last check is due at its end, a timed-out action keeps the
-  card waiting through the window, a failed action ends the wait,
+  then, the last check is due at its end, a failed or timed-out action
+  ends the wait without fast polling,
   a card that stops polling stops waiting.
 - Queue: the outcome of a finished primary action is reported.
 - Vitest: the request flow and both views with the Waiting state.
