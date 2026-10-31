@@ -64,19 +64,19 @@ passkeys once there is TLS (ADR-0011), UI localization (ADR-0007).
 
 ## Phase overview
 
-| Phase | Name                                                                                          | Status                                             | Requirements                   |
-| ----- | --------------------------------------------------------------------------------------------- | -------------------------------------------------- | ------------------------------ |
-| 0     | Project bootstrap (repo, Go+Vue+PrimeVue skeleton, Makefile, embed, devops/agent scaffolding) | **Done**                                           | FR-01..04 (foundation)         |
-| 1     | Requirements and architecture refinement                                                      | **Done** (requirements v0.2, ADR-0004 accepted)    | all (SRS review)               |
-| 2     | Domain model + config store (in-memory + JSON persistence)                                    | **Done**                                           | FR-10..14, FR-30..33, ADR-0004 |
-| 3     | Execution engine (safe execution of actions on the host)                                      | **Done**                                           | FR-11, FR-13, NFR-01, NFR-04   |
-| 4     | Status/health-check engine (incl. optional polling)                                           | **Done**                                           | FR-12, FR-15, FR-16, FR-17     |
-| 5     | REST API (card/action CRUD, execution, status reads)                                          | **Done**                                           | FR-40, FR-41                   |
-| 6     | Dashboard UI (cards, status indicators, management forms)                                     | **Done**                                           | FR-20..23                      |
-| 7     | Packaging and deployment (systemd unit, install script, arm64 release)                        | **Done** (2026-09-26; 0023, 0046)                  | FR-01..04, NFR-02              |
-| 8     | Hardening (auth/access control, logging, error states, tests, documentation)                  | **Done** (2026-09-26; blocks 0024–0045)            | NFR-01, NFR-04..06, NFR-12     |
-| 9     | UX redesign and shared design system                                                          | **Done**                                           | FR-24..29, NFR-08..10          |
-| 10    | Real-time status delivery over SSE                                                            | **Done**                                           | FR-42, NFR-11                  |
+| Phase | Name                                                                                          | Status                                          | Requirements                   |
+| ----- | --------------------------------------------------------------------------------------------- | ----------------------------------------------- | ------------------------------ |
+| 0     | Project bootstrap (repo, Go+Vue+PrimeVue skeleton, Makefile, embed, devops/agent scaffolding) | **Done**                                        | FR-01..04 (foundation)         |
+| 1     | Requirements and architecture refinement                                                      | **Done** (requirements v0.2, ADR-0004 accepted) | all (SRS review)               |
+| 2     | Domain model + config store (in-memory + JSON persistence)                                    | **Done**                                        | FR-10..14, FR-30..33, ADR-0004 |
+| 3     | Execution engine (safe execution of actions on the host)                                      | **Done**                                        | FR-11, FR-13, NFR-01, NFR-04   |
+| 4     | Status/health-check engine (incl. optional polling)                                           | **Done**                                        | FR-12, FR-15, FR-16, FR-17     |
+| 5     | REST API (card/action CRUD, execution, status reads)                                          | **Done**                                        | FR-40, FR-41                   |
+| 6     | Dashboard UI (cards, status indicators, management forms)                                     | **Done**                                        | FR-20..23                      |
+| 7     | Packaging and deployment (systemd unit, install script, arm64 release)                        | **Done** (2026-09-26; 0023, 0046)               | FR-01..04, NFR-02              |
+| 8     | Hardening (auth/access control, logging, error states, tests, documentation)                  | **Done** (2026-09-26; blocks 0024–0045)         | NFR-01, NFR-04..06, NFR-12     |
+| 9     | UX redesign and shared design system                                                          | **Done**                                        | FR-24..29, NFR-08..10          |
+| 10    | Real-time status delivery over SSE                                                            | **Done**                                        | FR-42, NFR-11                  |
 
 ## Planning notes
 
@@ -298,8 +298,8 @@ passkeys once there is TLS (ADR-0011), UI localization (ADR-0007).
      — **Done** (2026-09-27); FR-42a, ADR-0008 addendum, `run.recorded`
      instead of repeated queries for runs.
   10. [0059 — Pairing screen at 320 px with a fallback font](blocks/0059-pairing-screen-width-fix.md)
-     — **Done** (2026-09-27); fix for the E2E failure in the first release
-     from CI (`v1.2.0`), FR-29.
+      — **Done** (2026-09-27); fix for the E2E failure in the first release
+      from CI (`v1.2.0`), FR-29.
 
   **After the repository was published (2026-09-27):**
   1. [0060 — Toolchain update: supported Go and golangci-lint v2](blocks/0060-toolchain-go-and-golangci-lint-v2.md)
@@ -311,85 +311,63 @@ passkeys once there is TLS (ADR-0011), UI localization (ADR-0007).
      `: connected` (ADR-0008 addendum), the shutdown test limit follows the
      budget.
 
-  Both blocks were released as `v1.2.2` (GitHub Release from CI, 2026-09-27).
-
-  3. [0062 — Card color on the Current status panel](blocks/0062-card-color-on-status-panel.md)
-     — **Done** (2026-09-27); FR-10a, the detail stripe moves from
-     the icon tile to the Current status panel, same as the dashboard;
-     released as `v1.2.3`.
-  4. [0063 — Page header actions on mobile](blocks/0063-page-header-actions-on-mobile.md)
-     — **Done** (2026-09-29); FR-29, header buttons fill the row
-     equally on narrow screens and their labels do not wrap; released as
-     `v1.2.4`.
-  5. [0064 — Flaky shutdown in the paired-device integration test](blocks/0064-flaky-paired-device-shutdown-test.md)
-     — **Done** (2026-10-02); the test closes a spare idle client
-     connection that `http.Server.Shutdown` would wait 5 s for.
-  6. [0065 — Pairing code from the host (`marionette pair`)](blocks/0065-host-pairing-command.md)
-     — **Done** (2026-10-12); FR-58,
-     [ADR-0013](../architecture/decisions/0013-host-pairing-command.md),
-     `sudo marionette pair` over a local control socket; released as
-     `v1.3.1` and verified on the Pi.
-  7. [0066 — Dependency and toolchain update (October 2026)](blocks/0066-dependency-update-2026-10.md)
-     — **Done** (2026-10-20); Go 1.27.3 in the dev container,
-     golangci-lint v2.15.0, npm updates within the ranges (supersedes
-     Dependabot PRs #13–#17).
-  8. [0067 — Installing the latest release](blocks/0067-latest-release.md)
-     — **Done** (2026-10-20); FR-06, the README installs GitHub's Latest
-     release without typing its version.
-  9. [0068 — Changes reach `main` through pull requests](blocks/0068-pull-request-workflow.md)
-     — **Done** (2026-10-20); the "Protect main" ruleset requires a pull
-     request, the admin bypass applies only within one, squash merge only.
-  10. [0069 — One release run per tag](blocks/0069-one-release-run-per-tag.md)
-     — **Done** (2026-10-20); FR-06, `concurrency` per tag in
-     `release.yml`, `deploy/publish_release.sh` skips a release that is
-     already published with both assets.
-  11. [0070 — `govulncheck` in CI](blocks/0070-govulncheck-in-ci.md)
-     — **Done** (2026-10-20); `govulncheck@v1.8.0` in the `backend` job,
-     `make vulncheck` locally.
-  12. [0071 — `@primevue/themes` → `@primeuix/themes`](blocks/0071-primeuix-themes.md)
-     — **Done** (2026-10-20); the preset imports `@primeuix/themes` 2.x
-     (MIT), Dependabot ignores its 3.x line (PrimeVue 5).
-  13. [0072 — `primeicons` on the MIT 7.x line](blocks/0072-primeicons-mit.md)
-     — **Done** (2026-10-20); `primeicons` 8.x is under the PrimeUI License,
-     7.0.0 is MIT and has every icon the UI uses.
-  14. [0073 — UI foundation (tokens, icons, buttons, surfaces)](blocks/0073-ui-foundation.md)
-     — **Done** (2026-10-20); ADR-0014 part 1: Lucide icons by name with a
-     ghost for unknown values, own `MButton`/`MTag`/`MMessage`/`MCard`/
-     `MSpinner`, refreshed tokens and header; the API accepts icon names
-     only.
-  15. [0074 — UI form controls on Reka UI](blocks/0074-ui-form-controls.md)
-     — **Done** (2026-10-20); ADR-0014 part 2: own `MInput`, `MTextarea`,
-     `MNumberInput`, `MSelect` and `MSwitch` (select and switch on Reka UI).
-  16. [0075 — Toast and confirmation dialog on Reka UI](blocks/0075-ui-feedback.md)
-     — **Done** (2026-10-20); ADR-0014 part 3: own feedback service with
-     `MToastHost` (Reka UI `Toast`) and `MConfirmHost` (Reka UI
-     `AlertDialog`).
-  17. [0076 — Remove PrimeVue](blocks/0076-remove-primevue.md) — **Done**
-     (2026-10-20); ADR-0014 part 4: `primevue`, `@primeuix/themes`,
-     `primeicons` and the preset removed, documentation and the README
-     screenshot updated.
-  18. [0077 — Hand-written release notes](blocks/0077-release-notes.md) —
-     **Done** (2026-10-20); every tag needs `docs/releases/<tag>.md`, the
-     Release workflow fails at once without it; notes for v2.0.0.
-  19. [0078 — Dependabot cooldown](blocks/0078-dependabot-cooldown.md) —
-     **Done** (2026-10-20); Dependabot proposes only versions at least 14
-     days old, the two-week rule is documented.
-  20. [0079 — Repository cleanup](blocks/0079-repo-cleanup.md) — **Done**
-     (2026-10-20); the UI build output is no longer versioned (a
-     placeholder page without `make ui-build`), unused UI variants, tokens
-     and constants removed, stale documentation and dev tooling corrected.
-  21. [0080 — Dev data directory](blocks/0080-dev-data-directory.md) —
-     **Done** (2026-10-20); the dev configuration, paired devices and
-     control socket live in the git-ignored `.dev/` instead of the
-     repository root.
-  22. [0081 — Dependency update and TypeScript 6](blocks/0081-dependency-update-typescript-6.md)
-     — **Done** (2026-10-20); TypeScript 6.0.3 with the deprecated
-     `baseUrl` removed (ADR-0015); every other dependency is on its newest
-     version that is at least two weeks old.
-  23. [0082 — Waiting for confirmation](blocks/0082-waiting-for-confirmation.md)
-     — **Done** (2026-10-21); after a primary action the card is Waiting
-     until a status check confirms it or the fast polling window ends;
-     failed checks in between are not recorded (FR-15b, ADR-0016).
+  Both blocks were released as `v1.2.2` (GitHub Release from CI, 2026-09-27). 3. [0062 — Card color on the Current status panel](blocks/0062-card-color-on-status-panel.md)
+  — **Done** (2026-09-27); FR-10a, the detail stripe moves from
+  the icon tile to the Current status panel, same as the dashboard;
+  released as `v1.2.3`. 4. [0063 — Page header actions on mobile](blocks/0063-page-header-actions-on-mobile.md)
+  — **Done** (2026-09-29); FR-29, header buttons fill the row
+  equally on narrow screens and their labels do not wrap; released as
+  `v1.2.4`. 5. [0064 — Flaky shutdown in the paired-device integration test](blocks/0064-flaky-paired-device-shutdown-test.md)
+  — **Done** (2026-10-02); the test closes a spare idle client
+  connection that `http.Server.Shutdown` would wait 5 s for. 6. [0065 — Pairing code from the host (`marionette pair`)](blocks/0065-host-pairing-command.md)
+  — **Done** (2026-10-12); FR-58,
+  [ADR-0013](../architecture/decisions/0013-host-pairing-command.md),
+  `sudo marionette pair` over a local control socket; released as
+  `v1.3.1` and verified on the Pi. 7. [0066 — Dependency and toolchain update (October 2026)](blocks/0066-dependency-update-2026-10.md)
+  — **Done** (2026-10-20); Go 1.27.3 in the dev container,
+  golangci-lint v2.15.0, npm updates within the ranges (supersedes
+  Dependabot PRs #13–#17). 8. [0067 — Installing the latest release](blocks/0067-latest-release.md)
+  — **Done** (2026-10-20); FR-06, the README installs GitHub's Latest
+  release without typing its version. 9. [0068 — Changes reach `main` through pull requests](blocks/0068-pull-request-workflow.md)
+  — **Done** (2026-10-20); the "Protect main" ruleset requires a pull
+  request, the admin bypass applies only within one, squash merge only. 10. [0069 — One release run per tag](blocks/0069-one-release-run-per-tag.md)
+  — **Done** (2026-10-20); FR-06, `concurrency` per tag in
+  `release.yml`, `deploy/publish_release.sh` skips a release that is
+  already published with both assets. 11. [0070 — `govulncheck` in CI](blocks/0070-govulncheck-in-ci.md)
+  — **Done** (2026-10-20); `govulncheck@v1.8.0` in the `backend` job,
+  `make vulncheck` locally. 12. [0071 — `@primevue/themes` → `@primeuix/themes`](blocks/0071-primeuix-themes.md)
+  — **Done** (2026-10-20); the preset imports `@primeuix/themes` 2.x
+  (MIT), Dependabot ignores its 3.x line (PrimeVue 5). 13. [0072 — `primeicons` on the MIT 7.x line](blocks/0072-primeicons-mit.md)
+  — **Done** (2026-10-20); `primeicons` 8.x is under the PrimeUI License,
+  7.0.0 is MIT and has every icon the UI uses. 14. [0073 — UI foundation (tokens, icons, buttons, surfaces)](blocks/0073-ui-foundation.md)
+  — **Done** (2026-10-20); ADR-0014 part 1: Lucide icons by name with a
+  ghost for unknown values, own `MButton`/`MTag`/`MMessage`/`MCard`/
+  `MSpinner`, refreshed tokens and header; the API accepts icon names
+  only. 15. [0074 — UI form controls on Reka UI](blocks/0074-ui-form-controls.md)
+  — **Done** (2026-10-20); ADR-0014 part 2: own `MInput`, `MTextarea`,
+  `MNumberInput`, `MSelect` and `MSwitch` (select and switch on Reka UI). 16. [0075 — Toast and confirmation dialog on Reka UI](blocks/0075-ui-feedback.md)
+  — **Done** (2026-10-20); ADR-0014 part 3: own feedback service with
+  `MToastHost` (Reka UI `Toast`) and `MConfirmHost` (Reka UI
+  `AlertDialog`). 17. [0076 — Remove PrimeVue](blocks/0076-remove-primevue.md) — **Done**
+  (2026-10-20); ADR-0014 part 4: `primevue`, `@primeuix/themes`,
+  `primeicons` and the preset removed, documentation and the README
+  screenshot updated. 18. [0077 — Hand-written release notes](blocks/0077-release-notes.md) —
+  **Done** (2026-10-20); every tag needs `docs/releases/<tag>.md`, the
+  Release workflow fails at once without it; notes for v2.0.0. 19. [0078 — Dependabot cooldown](blocks/0078-dependabot-cooldown.md) —
+  **Done** (2026-10-20); Dependabot proposes only versions at least 14
+  days old, the two-week rule is documented. 20. [0079 — Repository cleanup](blocks/0079-repo-cleanup.md) — **Done**
+  (2026-10-20); the UI build output is no longer versioned (a
+  placeholder page without `make ui-build`), unused UI variants, tokens
+  and constants removed, stale documentation and dev tooling corrected. 21. [0080 — Dev data directory](blocks/0080-dev-data-directory.md) —
+  **Done** (2026-10-20); the dev configuration, paired devices and
+  control socket live in the git-ignored `.dev/` instead of the
+  repository root. 22. [0081 — Dependency update and TypeScript 6](blocks/0081-dependency-update-typescript-6.md)
+  — **Done** (2026-10-20); TypeScript 6.0.3 with the deprecated
+  `baseUrl` removed (ADR-0015); every other dependency is on its newest
+  version that is at least two weeks old. 23. [0082 — Waiting for confirmation](blocks/0082-waiting-for-confirmation.md)
+  — **Done** (2026-10-21); after a primary action the card is Waiting
+  until a status check confirms it or the fast polling window ends;
+  failed checks in between are not recorded (FR-15b, ADR-0016).
 
   The open questions from the review are decided in
   [requirements.md, section 13](../requirements/requirements.md#13-decisions--project-review-2026-09-26)
