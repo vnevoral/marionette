@@ -12,8 +12,8 @@ one or more concrete implementation blocks (see the
 
 ## Current state
 
-As of 2026-10-21 all phases below are **Done**, the last closed block is
-[0082](blocks/0082-waiting-for-confirmation.md) and the current release is
+As of 2026-10-31 all phases below are **Done**, the latest closed block is
+[0083](blocks/0083-dependency-security-update.md) and the current release is
 **v2.1.0** (tags `v1.0.0`, `v1.1.0`, `v1.2.0` to `v1.2.4`, `v1.3.0`,
 `v1.3.1`, `v2.0.0`, `v2.1.0`; `v1.2.0` has no GitHub Release because its CI run
 failed, fixed by block 0059; `v1.3.0` has none because `npm audit` failed on a new
@@ -49,14 +49,13 @@ PrimeVue by Reka UI, own components and Lucide (ADR-0014, blocks
 0073–0076), hand-written release notes (block 0077), the Dependabot
 cooldown (block 0078), the repository cleanup (block 0079), the dev
 data directory (block 0080) and TypeScript 6 (block 0081, ADR-0015), all
-2026-10-20. The UI bundle is about 340 kB (113 kB gzip) since PrimeVue is
+2026-10-20, plus the dependency and happy-dom security update (block 0083,
+2026-10-31). The UI bundle is about 340 kB (113 kB gzip) since PrimeVue is
 gone, below the Vite warning, so the bundle-size item is dropped.
 
 1. **TypeScript 7.** Waits until `typescript-eslint` and `vue-tsc`
    support it (ADR-0015).
-2. **happy-dom 21.** Major version of a test dependency; qualifies under
-   the two-week rule from 2026-10-26.
-3. **Rollback on the Pi.** The README rollback procedure was last verified
+2. **Rollback on the Pi.** The README rollback procedure was last verified
    with `v1.2.1`; the unit and the control socket changed since (block
    0065). The upgrade to `v2.0.0` is verified; repeat the rollback.
 
