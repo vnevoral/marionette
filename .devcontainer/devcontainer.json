@@ -50,5 +50,10 @@
 		}
 	},
 	"postCreateCommand": "bash .devcontainer/post-create.sh",
-	"remoteUser": "vscode"
+	"remoteUser": "vscode",
+	// Podman/buildah resets /tmp to 0755 while installing the features above
+	// (the generated feature layer bind-mounts into /tmp/build-features-src),
+	// which breaks VS Code's "mkdir -p /tmp/.X11-unix" as the non-root user.
+	// A fresh world-writable tmpfs on /tmp works with both Podman and Docker.
+	"runArgs": ["--tmpfs", "/tmp:exec,mode=1777"]
 }
