@@ -44,5 +44,15 @@
 		"vite": "^8.3.5",
 		"vitest": "^5.0.5",
 		"vue-tsc": "^3.3.13"
+	},
+	"overrides": {
+		"@vue/test-utils": {
+			"js-beautify": {
+				"glob": "^14.0.2",
+				"editorconfig": {
+					"minimatch": "^11.0.9"
+				}
+			}
+		}
 	}
 }
